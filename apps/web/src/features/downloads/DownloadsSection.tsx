@@ -13,7 +13,7 @@ import { useDownloads } from './downloadsContext'
  * warum das Tablet voll ist.
  */
 export function DownloadsSection() {
-  const { records, supported, storage, remove } = useDownloads()
+  const { records, supported, background, storage, remove } = useDownloads()
   const { bookById } = useLibrary()
 
   if (!supported) return null
@@ -24,6 +24,12 @@ export function DownloadsSection() {
   return (
     <section className="flex flex-col gap-4 pt-8">
       <h2 className="text-2xl font-bold">Heruntergeladen</h2>
+
+      <Notice>
+        {background
+          ? 'Das Gerät lädt im Hintergrund weiter – die App darf dabei zu sein.'
+          : 'Dieses Gerät lädt nur, solange die App offen ist. Lass sie beim Herunterladen bitte offen.'}
+      </Notice>
 
       {geladen.length === 0 ? (
         <Notice>

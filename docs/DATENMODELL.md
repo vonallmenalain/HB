@@ -253,7 +253,7 @@ Deployen mit `firebase deploy --only firestore:rules` (Konfiguration in
 | **IndexedDB** `catalog` | Gespiegelter Katalog + `generatedAt` | Bibliothek offline browsebar |
 | **IndexedDB** `progress` | Fortschritt pro (Profil, Buch) | Überlebt alles, auch abgestürzte Tabs |
 | **IndexedDB** `downloads` | Pro Buch: Status, geladene Dateien und Bytes, `filesHash` | Stand überlebt den Neustart |
-| **Cache Storage** `hb-media-v1` | Die Audiodateien, Schlüssel = kanonische URL **ohne** `?t=` | Für grosse Responses gebaut |
+| **Cache Storage** `hb-media-v1` | Audiodateien und Cover, Schlüssel = kanonische URL **ohne** `?t=` | Für grosse Responses gebaut |
 | **Cache Storage** `hb-app-v1` | App-Shell (Workbox-Precache) | Sofortstart, offline |
 | **localStorage** | Zuletzt gewähltes Profil, Gerätekennung (`hb.device`), UI-Kleinkram | Synchron lesbar beim Start, spart einen Frame |
 
@@ -280,9 +280,14 @@ wohl am Profil (`allowDownload`).
 const canonical = (url: string) => {
   const u = new URL(url); u.searchParams.delete('t'); return u.toString()
 }
-await cache.put(new Request(canonical(signedUrl)), response)   // schreiben
+await cache.put(canonical(signedUrl), response)   // schreiben
 const hit  = await cache.match(canonical(signedUrl))           // lesen
 ```
+
+Der Schlüssel steht in `features/downloads/mediaKeys.ts`, und diese Datei kennt
+weder React noch das DOM – sie wird von der App **und** vom Service Worker
+benutzt. Gäbe es zwei Fassungen davon, legte der eine ab, was der andere nicht
+findet.
 
 Sonst wäre jeder Download nach 8 Stunden wertlos, weil sich das Ticket in der URL
 geändert hat.

@@ -393,14 +393,8 @@ Ab 97 % gilt ein Buch als beendet: Haken in der Bibliothek, verschwindet aus
 
 ### 8.2 Im Hintergrund
 
-**Stand: noch offen.** Geladen wird derzeit im Vordergrund – Datei für Datei,
-solange die App offen ist. Das ist der im Konzept vorgesehene Rückfallweg, und
-er deckt alles ab, was danach kommt: Die Dateien liegen am selben Ort, unter
-demselben Schlüssel, und das Abspielen unterscheidet nicht, wer sie dorthin
-gebracht hat.
-
-Der Schritt darauf ist die **Background Fetch API**, und sie ist ein grosser
-Unterschied:
+Wo es sie gibt – auf Android in Chrome – übernimmt die **Background Fetch API**
+den Transfer, und das ist ein grosser Unterschied:
 
 - Der Download wird an das Betriebssystem übergeben und läuft weiter, **auch wenn
   die App geschlossen oder das Gerät gesperrt wird**.
@@ -414,11 +408,24 @@ Unterschied:
 „Hörbuch für die Reise laden" heisst damit schlicht: antippen und weglegen.
 
 Der Download im Vordergrund bleibt daneben bestehen – für Geräte ohne
-Background Fetch und für den Desktop-Browser.
+Background Fetch, für den Desktop-Browser, und für den Fall, dass das System
+die Übergabe ablehnt (kein Platz, schon in der Schlange). Die App probiert erst
+den einen Weg und nimmt dann den anderen; im Elternbereich steht, welcher es
+gerade ist.
 
 Fortsetzbar ist beides ohne eigenes Buchhalten: Was schon im Cache liegt, wird
 übersprungen. Ein abgebrochener Download muss sich deshalb nicht merken, wo er
 war – er sieht es.
+
+**Das Cover geht nicht mit in die Übergabe.** Android bricht ab, sobald mehr
+ankommt als angekündigt, und die Grösse des Covers steht nicht im Katalog. Es
+sind ein paar Dutzend Kilobyte, die die App sofort selbst holt, solange sie
+noch offen ist.
+
+**Der Service Worker legt ab, nicht das Fenster.** Wenn Android fertig ist, ist
+die App vielleicht längst geschlossen – die Dateien in den Cache zu übernehmen
+und den Stand fortzuschreiben, muss deshalb dort passieren. Ist ein Fenster
+offen, bekommt es eine Nachricht und zieht nach.
 
 ### 8.3 Abspielen von heruntergeladenen Büchern
 
@@ -591,7 +598,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M4** | Bibliothek und Buchseite im Kinderdesign | Bücher sind sichtbar und auswählbar ✅ |
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
-| **M7** | Offline-Download, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ (Übergabe an Android steht aus) |
+| **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
 | **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im

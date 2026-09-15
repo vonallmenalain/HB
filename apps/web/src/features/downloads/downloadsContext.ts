@@ -15,6 +15,11 @@ export interface DownloadsContextValue {
   allowed: boolean
   /** Kann dieses Gerät überhaupt speichern? */
   supported: boolean
+  /**
+   * Übernimmt das Betriebssystem den Download? Dann läuft er weiter, auch
+   * wenn die App geschlossen ist.
+   */
+  background: boolean
   storage: StorageInfo | null
   get: (bookId: string) => DownloadRecord | null
   start: (book: Book) => void

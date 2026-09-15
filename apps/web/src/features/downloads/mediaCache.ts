@@ -7,9 +7,12 @@
  *
  * **Der Schlüssel ist die Adresse ohne Ticket.** Das ist der entscheidende
  * Kniff: Das Ticket in der URL wechselt alle paar Stunden – wäre es Teil des
- * Schlüssels, wäre jeder Download am nächsten Tag wertlos.
+ * Schlüssels, wäre jeder Download am nächsten Tag wertlos. Der Schlüssel
+ * selbst steht in `mediaKeys.ts`, weil ihn auch der Service Worker braucht.
  */
-export const MEDIA_CACHE = 'hb-media-v1'
+import { MEDIA_CACHE } from './mediaKeys'
+
+export { MEDIA_CACHE }
 
 /**
  * Cache Storage fehlt in unsicheren Kontexten und im privaten Modus mancher
