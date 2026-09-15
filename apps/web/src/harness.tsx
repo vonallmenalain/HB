@@ -35,7 +35,7 @@ import { AuthContext, type AuthContextValue } from './features/auth/authContext'
 import { FavoritesContext } from './features/favorites/favoritesContext'
 import { TitlesContext } from './features/library/titlesContext'
 import type { Book } from './features/library/catalog'
-import { parseCatalog, sortBooks } from './features/library/catalog'
+import { SUPPORTED_SCHEMA_VERSION, parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
 import { tidyBook, tidyBooks } from './features/library/titles'
 import { createMediaClient } from './features/library/mediaClient'
@@ -287,6 +287,7 @@ function Harness() {
     fromCache: false,
     error: null,
     skipped: 0,
+    schemaVersion: SUPPORTED_SCHEMA_VERSION,
     refresh: () => undefined,
     bookById: (id) => (mediaBase === null ? demoBooks : []).find((book) => book.id === id),
     client: demoClient,
@@ -317,6 +318,7 @@ function Harness() {
         fromCache: false,
         error: null,
         skipped: parsed.ok ? parsed.skipped : 0,
+        schemaVersion: parsed.ok ? parsed.catalog.schemaVersion : null,
         refresh: () => undefined,
         bookById: (id) => books.find((book) => book.id === id),
         client,

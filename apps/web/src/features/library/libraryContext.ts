@@ -13,6 +13,15 @@ export interface LibraryContextValue {
   error: MediaError | null
   /** Vom Dienst gelieferte, aber unbrauchbare Einträge. */
   skipped: number
+  /**
+   * Schema-Version des gelieferten Katalogs, oder null ohne Katalog.
+   *
+   * Steht hier 1, ist der Medien-Dienst auf dem NAS älter als die App: Er
+   * kennt Reihen und Gruppen noch nicht, und die Bibliothek sieht dann anders
+   * aus, als sie soll. Das ist die einzige Stelle, an der sich das erkennen
+   * lässt – deshalb steht es im Elternbereich.
+   */
+  schemaVersion: number | null
   refresh: () => void
   bookById: (id: string) => Book | undefined
   client: MediaClient | null

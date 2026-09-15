@@ -93,6 +93,7 @@ export function makeLibraryValue(
     fromCache: false,
     error: null,
     skipped: 0,
+    schemaVersion: 2,
     refresh: vi.fn(),
     bookById: (id: string) => books.find((book) => book.id === id),
     client: null,

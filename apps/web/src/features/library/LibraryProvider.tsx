@@ -16,6 +16,7 @@ interface State {
   fromCache: boolean
   error: MediaError | null
   skipped: number
+  schemaVersion: number | null
 }
 
 const INITIAL: State = {
@@ -24,6 +25,7 @@ const INITIAL: State = {
   fromCache: false,
   error: null,
   skipped: 0,
+  schemaVersion: null,
 }
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
@@ -70,6 +72,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           fromCache: true,
           error: null,
           skipped: 0,
+          schemaVersion: cached.catalog.schemaVersion,
         })
       }
 
@@ -106,6 +109,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
         fromCache: false,
         error: null,
         skipped: result.skipped,
+        schemaVersion: result.catalog.schemaVersion,
       })
     })()
 
