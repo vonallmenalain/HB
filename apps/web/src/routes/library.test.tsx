@@ -202,6 +202,19 @@ describe('Buchseite', () => {
     )
   })
 
+  it('führt bei einer Reihe mit einem einzigen Buch zurück in die Übersicht', () => {
+    // Die Übersicht führt direkt hierher; zurück müsste man sonst durch eine
+    // Liste mit genau einer Kachel.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/buch/b_9',
+      library: makeLibraryValue({
+        books: [makeBook({ id: 'b_9', title: 'Einzelstück', series: 'Einzelstück' })],
+      }),
+    })
+
+    expect(screen.getByRole('link', { name: /Zurück/ })).toHaveAttribute('href', '/bibliothek')
+  })
+
   it('zeigt Titel, Reihe und Kapitel', () => {
     const book = makeBook({
       id: 'b_1',

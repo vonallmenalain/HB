@@ -56,7 +56,12 @@ export function BookScreen() {
 
   // Zurück dorthin, wo man hergekommen ist: in die Reihe, nicht in die
   // Übersicht aller Reihen.
-  const reihe = seriesOf(books, book)
+  //
+  // Eine Reihe mit einem einzigen Buch ist dabei keine Station: Die Übersicht
+  // führt direkt hierher, und zurück müsste man sonst durch eine Liste mit
+  // genau einer Kachel.
+  const gefunden = seriesOf(books, book)
+  const reihe = gefunden !== null && gefunden.books.length > 1 ? gefunden : null
 
   return (
     <Screen>

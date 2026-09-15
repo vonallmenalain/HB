@@ -89,7 +89,7 @@ jobs:
             echo 'Auf dem QNAP holt es sich der Dienst mit:'
             echo
             echo '```bash'
-            echo 'cd /share/CACHEDEV2_DATA/Container/HB/services/media'
+            echo 'cd /share/CACHEDEV2_DATA/Container/hb-media   # Ordner mit docker-compose.yml'
             echo 'docker compose pull && docker compose up -d'
             echo '```'
             echo
