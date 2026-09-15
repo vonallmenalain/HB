@@ -1,5 +1,8 @@
 # Container Station auf dem QNAP: "Anwendung erstellen" und diese Datei einfügen.
 # Die Werte in .env danebenlegen (siehe .env.example).
+#
+# Ohne Tunnel starten (Schritt 5):   docker compose up -d
+# Mit Tunnel starten (ab Schritt 6): docker compose --profile tunnel up -d
 
 services:
   hb-media:
@@ -11,7 +14,9 @@ services:
     container_name: hb-media
     restart: unless-stopped
     ports:
-      - '8080:8080'
+      # Auf dem QNAP hört die QTS-Weboberfläche selbst auf 8080; dort muss
+      # HB_HOST_PORT auf einen freien Port gesetzt werden (z. B. 18080).
+      - '${HB_HOST_PORT:-8080}:8080'
     volumes:
       # Hörbuch-Ordner nur lesend – der Dienst schreibt dort nie hinein.
       - ${HB_LIBRARY_PATH:?HB_LIBRARY_PATH fehlt}:/media:ro
@@ -28,12 +33,17 @@ services:
 
   # Cloudflare Tunnel: macht den Dienst ohne offenen Port erreichbar.
   # Das Token stammt aus dem Cloudflare-Dashboard (Zero Trust → Networks →
-  # Tunnels). Zeile samt Token weglassen, wenn du einen anderen Weg nimmst.
+  # Tunnels).
+  #
+  # Liegt im Profil "tunnel" und startet deshalb nur bei --profile tunnel. So
+  # läuft der Medien-Dienst schon, bevor der Tunnel existiert – und wer einen
+  # anderen Weg nimmt (myQNAPcloud, Tailscale), lässt das Profil einfach weg.
   cloudflared:
     image: cloudflare/cloudflared:latest
     container_name: hb-tunnel
+    profiles: ['tunnel']
     restart: unless-stopped
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?}
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
     depends_on:
       - hb-media
 

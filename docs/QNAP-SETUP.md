@@ -64,16 +64,40 @@ nirgends sonst auftauchen – insbesondere nicht im Repository.
 
 ## 3. Image bauen
 
+> **Vorher: Root-Shell.** Es genügt nicht, dass dein Konto in QTS zur Gruppe
+> *administrators* gehört – das ist Gruppe 0, nicht Benutzer 0. Docker-Befehle
+> über SSH brauchen echte Root-Rechte, sonst bricht schon der Build ab mit
+> `mkdir /share/…/.qpkg/container-station/homes/<Benutzer>: permission denied`.
+>
+> ```bash
+> sudo -s
+> whoami      # muss "root" ausgeben
+> ```
+>
+> `sudo -i` tut es auch, landet auf dem QNAP aber zuerst im
+> Console-Management-Menü – dort `Q` drücken, dann bist du in der Shell.
+> `sudo -s` startet keine Login-Shell und umgeht das Menü.
+
 Das Projekt ist ein npm-Workspace, der Bau-Kontext ist deshalb der
 **Projektstamm**, nicht der Service-Ordner.
 
-**Weg A – auf dem NAS bauen** (wenn dort git und Container Station verfügbar sind):
+**Weg A – auf dem NAS bauen** (Container Station vorausgesetzt):
 
 ```bash
-git clone https://github.com/vonallmenalain/HB.git
+cd /share/CACHEDEV2_DATA/Container        # ein Freigabeordner, nicht das Home
+curl -L https://github.com/vonallmenalain/HB/archive/refs/heads/main.tar.gz | tar xz
+mv HB-main HB
 cd HB
 docker build -f services/media/Dockerfile -t hb-media:latest .
 ```
+
+> QTS bringt **kein git** mit, deshalb der Umweg über das Archiv. Wer es per
+> Entware nachinstalliert hat, nimmt stattdessen
+> `git clone https://github.com/vonallmenalain/HB.git`.
+>
+> Nicht im Home-Ordner (`~`, `/share/homes/…`) bauen: Container Station spiegelt
+> Pfade von dort in einen eigenen Verwaltungsordner und scheitert daran. Ein
+> normaler Freigabeordner funktioniert.
 
 **Weg B – auf dem Rechner bauen und übertragen** (wenn das NAS schwach ist):
 
@@ -99,13 +123,14 @@ docker load < hb-media.tar.gz
 | Variable | Beispiel | Bedeutung |
 |---|---|---|
 | `HB_LIBRARY_PATH` | `/share/Hoerbuecher` | Ordner auf dem NAS, wird read-only eingehängt |
+| `HB_HOST_PORT` | `18080` | Port auf dem NAS selbst – **8080 gehört dort der QTS-Weboberfläche** |
 | `HB_FIREBASE_PROJECT_ID` | `hoerbuchkinder` | Projekt-ID aus der Firebase-Konsole |
 | `HB_TICKET_SECRET` | *(aus Schritt 2)* | Signatur der Media-Tickets, ≥ 32 Zeichen |
 | `HB_ALLOWED_ORIGINS` | `https://hb.alae.app` | Adresse der App; mehrere mit Komma |
 | `HB_ALLOWED_UIDS` | `abc123…` | **Bei aktivierter Google-Anmeldung unbedingt ausfüllen** – leer heisst „jeder verifizierte Nutzer des Projekts" |
 | `HB_ADMIN_UIDS` | `abc123…` | Darf `/admin/rescan` auslösen |
 | `HB_RESCAN_INTERVAL_MINUTES` | `360` | Abstand automatischer Neu-Scans; `0` schaltet sie ab |
-| `CLOUDFLARE_TUNNEL_TOKEN` | *(aus Schritt 6)* | Token des Tunnels |
+| `CLOUDFLARE_TUNNEL_TOKEN` | *(aus Schritt 6)* | Token des Tunnels; bis dahin leer lassen |
 
 Fehlt etwas, startet der Dienst nicht und nennt **alle** fehlenden Variablen auf
 einmal im Log – nicht nur die erste.
@@ -114,20 +139,25 @@ einmal im Log – nicht nur die erste.
 
 ## 5. Container starten
 
-In der Container Station → **Anwendungen → Erstellen**, den Inhalt von
-`services/media/docker-compose.yml` einfügen und die `.env` daneben ablegen.
-
-Alternativ über SSH:
+Über SSH, im Ordner des Dienstes:
 
 ```bash
-cd HB/services/media
+cd /share/CACHEDEV2_DATA/Container/HB/services/media
 docker compose up -d
 ```
 
-Prüfen, ob er läuft:
+Der Cloudflare-Tunnel bleibt dabei aussen vor – er liegt im Profil `tunnel` und
+kommt erst in Schritt 6 dazu. Der Medien-Dienst läuft auch ohne ihn.
+
+> In der Container Station geht es auch über **Anwendungen → Erstellen** mit dem
+> Inhalt von `docker-compose.yml`. Dort liest sie allerdings keine `.env` von der
+> Platte – die Werte müssen in der Maske selbst eingetragen werden, sonst bricht
+> sie mit `required variable … is missing a value` ab. Über SSH ist es kürzer.
+
+Prüfen, ob er läuft (Port aus `HB_HOST_PORT`):
 
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:18080/health
 # {"ok":true,"books":187,"scannedAt":"…","scanning":false}
 ```
 
@@ -138,6 +168,9 @@ erwarteten Struktur.
 > Der erste Scan dauert länger als alle folgenden: Bei MP3s ohne VBR-Header muss
 > jede Datei einmal ganz gelesen werden, um die Dauer zu bestimmen. Das Ergebnis
 > landet im Cache-Volume und wird danach wiederverwendet.
+>
+> `docker compose down` ist deshalb unbedenklich, `docker compose down -v` nicht:
+> Das `-v` löscht das Cache-Volume, und der nächste Start liest alles neu ein.
 
 ---
 
@@ -151,7 +184,15 @@ erwarteten Struktur.
    - Subdomain: `hb-media`
    - Domain: `alae.app`
    - Service: `HTTP` → `hb-media:8080`
-5. Container neu starten
+5. Tunnel dazustarten:
+
+   ```bash
+   docker compose --profile tunnel up -d
+   ```
+
+> Die `8080` im Public Hostname ist der **containerinterne** Port – der bleibt
+> immer 8080, unabhängig davon, was in `HB_HOST_PORT` steht. Cloudflared spricht
+> den Dienst über das Docker-Netz an, nicht über den Port auf dem NAS.
 
 Danach ist der Dienst unter `https://hb-media.alae.app` erreichbar:
 
@@ -198,6 +239,10 @@ die Dateien. Fällt eine Stelle aus, bleibt die andere wirksam.
 
 | Beobachtung | Wahrscheinliche Ursache |
 |---|---|
+| `git: command not found` | QTS bringt kein git mit – Archiv-Weg aus Schritt 3 nehmen |
+| `permission denied` auf `.qpkg/container-station/homes/…` | Docker ohne Root-Shell aufgerufen – `sudo -s` (Schritt 3) |
+| `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port – `HB_HOST_PORT` setzen |
+| `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
 | `401` bei `/library` | Ticket fehlt oder abgelaufen; die App holt normalerweise selbst ein neues |
