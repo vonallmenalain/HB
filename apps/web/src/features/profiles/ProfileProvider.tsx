@@ -4,9 +4,11 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDocs,
   onSnapshot,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
 
 import { useUser } from '@/features/auth/authContext'
@@ -101,6 +103,21 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const remove = useCallback(
     async (id: string) => {
       if (!db) return
+
+      // Firestore löscht Unterkollektionen nicht mit dem Dokument. Ohne diesen
+      // Schritt bliebe der Hörfortschritt liegen – obwohl die Rückfrage im
+      // Elternbereich ausdrücklich verspricht, dass er verschwindet.
+      const progressRef = collection(db, 'users', user.uid, 'profiles', id, 'progress')
+      const progress = await getDocs(progressRef)
+      // Ein Batch fasst höchstens 500 Schreibvorgänge.
+      for (let start = 0; start < progress.docs.length; start += 400) {
+        const batch = writeBatch(db)
+        for (const entry of progress.docs.slice(start, start + 400)) {
+          batch.delete(entry.ref)
+        }
+        await batch.commit()
+      }
+
       await deleteDoc(doc(db, 'users', user.uid, 'profiles', id))
       if (selectedId === id) clearSelection()
     },

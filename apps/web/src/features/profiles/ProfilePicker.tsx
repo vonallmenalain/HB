@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import { Avatar } from '@/ui/Avatar'
 import { BigLinkButton } from '@/ui/BigButton'
@@ -15,6 +15,7 @@ import { useProfiles } from './profilesContext'
  */
 export function ProfilePicker() {
   const { loading, profiles, select } = useProfiles()
+  const navigate = useNavigate()
 
   if (loading) {
     return (
@@ -48,6 +49,9 @@ export function ProfilePicker() {
               type="button"
               onClick={() => {
                 select(profile.id)
+                // `/profil` zeigt immer die Auswahl – ohne diesen Schritt
+                // bliebe das Kind nach dem Antippen auf dieser Seite stehen.
+                void navigate('/')
               }}
               className="flex w-full flex-col items-center gap-3 rounded-tile bg-surface p-4 transition-transform active:scale-[0.97] focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
