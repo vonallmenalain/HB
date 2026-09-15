@@ -222,13 +222,21 @@ mitziehen – sonst blockiert der Browser die Anfragen stillschweigend.
 
 ---
 
-## 8. UIDs freischalten
+## 8. Konten freischalten
 
 Zwei Stellen, die dasselbe Konto kennen müssen:
 
-1. **Firestore** – Kollektion `allowlist`, ein Dokument mit der UID als ID.
-   Ohne das zeigt die App „Noch kein Zugriff" samt der UID zum Kopieren.
-2. **`HB_ALLOWED_UIDS`** – dieselbe UID, damit der Medien-Dienst Ton ausliefert.
+1. **Firestore** – die Freigabeliste `allowlist`. Darum kümmert sich seit M9 die
+   App selbst: Wer sich anmeldet, legt eine Anfrage ab, und der Administrator
+   gibt sie im Adminbereich frei (*Elternbereich → Adminbereich →
+   Zugriffsanfragen*). Von Hand in der Konsole muss dort niemand mehr etwas
+   eintragen.
+2. **`HB_ALLOWED_UIDS`** – die UID desselben Kontos, damit der Medien-Dienst Ton
+   ausliefert. Das bleibt Handarbeit: Der Dienst auf dem NAS kennt Firestore
+   nicht.
+
+Die UID steht im Adminbereich bei jedem freigegebenen Konto und in der
+Firebase-Konsole unter *Authentication → Users*.
 
 Die Trennung ist Absicht: Firestore schützt den Fortschritt, der Medien-Dienst
 die Dateien. Fällt eine Stelle aus, bleibt die andere wirksam.

@@ -4,17 +4,19 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** Alle Meilensteine M0–M8 stehen. Die App ist damit fertig für den
+> **Status:** Alle Meilensteine M0–M9 stehen. Die App ist damit fertig für den
 > Alltag: auswählen, hören, punktgenau weiterhören, über Geräte abgleichen,
-> herunterladen und offline hören, Einschlaf-Timer, Elternbereich mit PIN.
+> herunterladen und offline hören, Einschlaf-Timer, Elternbereich mit PIN,
+> Bibliothek nach Reihen, Favoriten und Vorschläge, Adminbereich mit Freigaben.
 >
 > **Was noch aussteht, kann nur Alain tun:** den Medien-Dienst aufs QNAP
 > deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)), die Netlify-
-> Variablen setzen, die Firestore-Regeln deployen und die eigene UID
-> freischalten.
+> Variablen setzen und die beiden GitHub-Geheimnisse für das Regel-Deployment
+> hinterlegen (siehe [`docs/FIREBASE-DEPLOY.md`](docs/FIREBASE-DEPLOY.md)).
 >
 > **Der Elternbereich öffnet sich mit zwei Sekunden Druck auf den Titel
-> „Hörbücher"** – kein sichtbarer Knopf, damit ihn kein Kind findet.
+> „Hörbücher"** – kein sichtbarer Knopf, damit ihn kein Kind findet. Der
+> **Adminbereich** liegt darin, sichtbar nur für das Administratorkonto.
 
 ## Was die App können soll
 
@@ -28,6 +30,9 @@ Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört h
   gültiges Token.
 - **Kinderprofile.** Ein Familien-Login, darin ein Avatar pro Kind – Kinder
   müssen nie ein Passwort eintippen.
+- **Aufgeräumt.** Die Bibliothek gliedert nach Reihen, Titel werden aus den
+  Ordnernamen lesbar gemacht, und auf der Startseite stehen Weiterhören,
+  Gemerktes und Vorschläge.
 
 ## Technik in einem Satz
 
@@ -51,6 +56,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | [`docs/KONZEPT.md`](docs/KONZEPT.md) | Ziele, Bedienkonzept für Kinder, Architektur, Sicherheit, Offline-Strategie, Risiken, Roadmap, **offene Fragen** |
 | [`docs/DATENMODELL.md`](docs/DATENMODELL.md) | Ordnerkonvention auf dem NAS, Katalog-Schema, Firestore-Struktur, API-Verträge |
 | [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md) | Schritt für Schritt: Medien-Dienst aufs NAS bringen, Tunnel einrichten, mit der App verbinden |
+| [`docs/FIREBASE-DEPLOY.md`](docs/FIREBASE-DEPLOY.md) | Schritt für Schritt durch die Google-Konsole: Dienstkonto, Rollen, Geheimnisse – damit GitHub die Firestore-Regeln deployt |
 
 ## Roadmap
 
@@ -65,6 +71,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M6 | Geräte-Sync über Firestore | ✅ |
 | M7 | Offline-Downloads, Background Fetch, Verwaltung im Elternmodus | ✅ |
 | M8 | Sleep-Timer, Elternmodus mit PIN, Feinschliff | ✅ |
+| M9 | Reihen, aufgeräumte Titel, Dashboard, Adminbereich, Spulen | ✅ |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
 
@@ -85,26 +92,37 @@ npm run dev          # Entwicklungsserver auf http://localhost:5173
 | `npm run typecheck` | TypeScript über App, Werkzeuge und Service Worker |
 | `npm test` | Vitest |
 | `npm run icons` | App-Icons aus `tools/generate-icons.mjs` neu erzeugen |
+| `HB_ADMIN_EMAIL=… npm run rules` | `firestore.rules` aus `firestore.rules.tmpl` erzeugen (siehe unten) |
 
 ### Einrichtung
 
 1. `.env.example` nach `apps/web/.env.local` kopieren und die
-   Firebase-Web-Konfiguration eintragen. In Netlify liegen dieselben Werte unter
+   Firebase-Web-Konfiguration eintragen, dazu `VITE_ADMIN_EMAIL` mit der Adresse
+   des Administratorkontos. In Netlify liegen dieselben Werte unter
    *Site settings → Environment variables*. Fehlen sie, zeigt die App den
    Bildschirm „Konfiguration fehlt" und nennt die fehlenden Variablen.
-2. Firestore-Regeln deployen: `firebase deploy --only firestore:rules`
-3. Das eigene Konto freischalten – siehe unten.
+2. In GitHub die Geheimnisse `FIREBASE_SERVICE_ACCOUNT` und `HB_ADMIN_EMAIL`
+   hinterlegen – Schritt für Schritt in
+   [`docs/FIREBASE-DEPLOY.md`](docs/FIREBASE-DEPLOY.md). Danach deployt GitHub
+   die Firestore-Regeln bei jeder Änderung von selbst. Von Hand geht es weiterhin:
+   `HB_ADMIN_EMAIL=… npm run rules && firebase deploy --only firestore:rules`
+3. Einmal anmelden. Das Administratorkonto schaltet sich dabei selbst frei.
 
 ### Ein Konto freischalten
 
 Mit aktivierter Google-Anmeldung kann sich grundsätzlich jeder *anmelden*.
-Zugriff bekommt nur, wer in der Freigabeliste steht:
+Zugriff bekommt nur, wer in der Freigabeliste steht – und darüber entscheidet
+der Adminbereich, nicht mehr die Firebase-Konsole:
 
-1. In der App anmelden. Es erscheint „Noch kein Zugriff" mit der Kennung (UID).
-2. In der Firebase-Konsole unter *Firestore → Daten* eine Kollektion
-   `allowlist` anlegen und darin ein Dokument mit genau dieser UID als
-   Dokument-ID erstellen. Der Inhalt spielt keine Rolle.
-3. In der App auf „Nochmal prüfen" tippen.
+1. Das neue Konto meldet sich in der App an. Es erscheint „Gleich geht's los";
+   die Anfrage liegt damit beim Administrator.
+2. Der Administrator öffnet *Elternbereich → Adminbereich* und tippt bei der
+   Anfrage auf **Freigeben**.
+3. Das wartende Gerät tippt auf „Nochmal prüfen".
+
+Damit der Medien-Dienst auf dem NAS demselben Konto auch Ton ausliefert, gehört
+seine UID zusätzlich in `HB_ALLOWED_UIDS` (siehe
+[`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md#8-konten-freischalten)).
 
 Zusätzlich empfiehlt sich, unter *Authentication → Settings → User actions* die
 Selbst-Registrierung abzuschalten. Das ersetzt die Freigabeliste nicht, hält
@@ -115,8 +133,11 @@ aber fremde Konten aus dem Projekt heraus.
 ```
 apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/app/           Router, Anmelde-Weiche, App-Hülle
-  src/features/auth/ Anmeldung, Freigabeliste
-  src/features/library/   Katalog, Medien-Client, Bibliothek
+  src/features/auth/ Anmeldung, Freigabeliste, Zugriffsanfragen
+  src/features/admin/     Adminbereich: Freigaben, Titel, Hörhistorie
+  src/features/library/   Katalog, Medien-Client, Reihen, Titel-Aufbereitung
+  src/features/favorites/ Gemerkte Hörbücher je Profil
+  src/features/history/   Hörhistorie aufzeichnen und auswerten
   src/features/player/    Audio-Engine, Media Session, Player-Zustand
   src/features/progress/  Hörfortschritt
   src/features/profiles/  Kinderprofile
@@ -129,8 +150,8 @@ services/media/      Medien-Dienst für das QNAP (Node, Fastify, Docker)
   src/catalog/       Scanner, Namensauswertung, Katalogbau
   src/media/         Range-Header
 tools/               Build-Werkzeuge ausserhalb der App
-docs/                Konzept, Datenmodell, NAS-Anleitung
-firestore.rules      Sicherheitsregeln der Datenbank
+docs/                Konzept, Datenmodell, NAS- und Firebase-Anleitung
+firestore.rules.tmpl Sicherheitsregeln der Datenbank (Vorlage, siehe oben)
 ```
 
 ### Bildschirme ansehen, ohne sich anzumelden
