@@ -5,6 +5,7 @@ import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ConfigMissingScreen } from '@/features/auth/ConfigMissingScreen'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { useAuth } from '@/features/auth/authContext'
+import { DownloadProvider } from '@/features/downloads/DownloadProvider'
 import { LibraryProvider } from '@/features/library/LibraryProvider'
 import { NowPlayingBar } from '@/features/player/NowPlayingBar'
 import { PlayerProvider } from '@/features/player/PlayerProvider'
@@ -45,10 +46,12 @@ function AuthGate() {
         <ProfileProvider>
           <LibraryProvider>
             <ProgressProvider>
-              <PlayerProvider>
-                <AppRoutes />
-                <NowPlayingBar />
-              </PlayerProvider>
+              <DownloadProvider>
+                <PlayerProvider>
+                  <AppRoutes />
+                  <NowPlayingBar />
+                </PlayerProvider>
+              </DownloadProvider>
             </ProgressProvider>
           </LibraryProvider>
         </ProfileProvider>

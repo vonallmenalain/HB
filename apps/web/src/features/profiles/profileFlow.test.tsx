@@ -6,9 +6,11 @@ import { describe, expect, it } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
 import { LibraryContext } from '@/features/library/libraryContext'
+import { DownloadsContext } from '@/features/downloads/downloadsContext'
 import { PlayerContext } from '@/features/player/playerContext'
 import { ProgressContext } from '@/features/progress/progressContext'
 import {
+  makeDownloadsValue,
   makeLibraryValue,
   makePlayerValue,
   makeProfile,
@@ -45,7 +47,9 @@ function StatefulProfiles({ children }: { children: React.ReactNode }) {
     <ProfilesContext value={value}>
       <LibraryContext value={makeLibraryValue()}>
         <ProgressContext value={makeProgressValue()}>
-          <PlayerContext value={makePlayerValue()}>{children}</PlayerContext>
+          <DownloadsContext value={makeDownloadsValue()}>
+            <PlayerContext value={makePlayerValue()}>{children}</PlayerContext>
+          </DownloadsContext>
         </ProgressContext>
       </LibraryContext>
     </ProfilesContext>

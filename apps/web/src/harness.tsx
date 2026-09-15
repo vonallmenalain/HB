@@ -39,6 +39,7 @@ import { NowPlayingBar } from './features/player/NowPlayingBar'
 import { PlayerProvider } from './features/player/PlayerProvider'
 import type { ProgressCloud } from './features/progress/cloud'
 import type { Progress } from './features/progress/progress'
+import { DownloadProvider } from './features/downloads/DownloadProvider'
 import { ProgressStore } from './features/progress/ProgressProvider'
 import { parseRemoteProgress, toRemoteDoc } from './features/progress/sync'
 import { ProfilesContext, type ProfilesContextValue } from './features/profiles/profilesContext'
@@ -185,6 +186,7 @@ const demoClient: LibraryContextValue['client'] = {
   coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),
   audioUrl: () => null,
   canonicalAudioUrl: () => '',
+  canonicalCoverUrl: (path) => path,
   forgetTicket: () => undefined,
 }
 
@@ -193,7 +195,8 @@ const profile = {
   name: 'Emma',
   avatar: '🦊',
   color: '#6d28d9',
-  allowDownload: false,
+  // In der Vorschau freigegeben, sonst wäre der Download-Knopf nie zu sehen.
+  allowDownload: true,
   createdAt: '2026-01-01T00:00:00.000Z',
 }
 
@@ -260,10 +263,12 @@ function Harness() {
             {/* Ohne `?sync=1` gibt es keine Cloud-Seite – der Fortschritt läuft
                 dann rein lokal, genau wie in der App bei fehlendem Netz. */}
             <ProgressStore cloudFor={syncDemo ? localStorageCloud : undefined}>
-              <PlayerProvider>
-                <AppRoutes />
-                <NowPlayingBar />
-              </PlayerProvider>
+              <DownloadProvider>
+                <PlayerProvider>
+                  <AppRoutes />
+                  <NowPlayingBar />
+                </PlayerProvider>
+              </DownloadProvider>
             </ProgressStore>
           </LibraryContext>
         </ProfilesContext>

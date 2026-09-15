@@ -1,5 +1,7 @@
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
+import { DownloadButton } from '@/features/downloads/DownloadButton'
+import { useDownloads } from '@/features/downloads/downloadsContext'
 import { useLibrary } from '@/features/library/libraryContext'
 import { usePlayer } from '@/features/player/playerContext'
 import { progressRatio, resolveResume } from '@/features/progress/progress'
@@ -17,6 +19,7 @@ export function BookScreen() {
   const { bookId = '' } = useParams()
   const { status, bookById, client } = useLibrary()
   const { get: getProgress } = useProgress()
+  const { offlineCoverUrl } = useDownloads()
   const player = usePlayer()
   const navigate = useNavigate()
 
@@ -43,7 +46,11 @@ export function BookScreen() {
     )
   }
 
-  const cover = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
+  // Was auf dem Gerät liegt, geht vor – sonst bliebe die Seite im Flugzeug
+  // ohne Bild, obwohl das Buch vollständig heruntergeladen ist.
+  const cover =
+    offlineCoverUrl(book.id) ??
+    (book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null)
 
   return (
     <Screen>
@@ -104,6 +111,8 @@ export function BookScreen() {
                 </p>
               </div>
             ) : null}
+
+            <DownloadButton book={book} />
           </div>
         )
       })()}

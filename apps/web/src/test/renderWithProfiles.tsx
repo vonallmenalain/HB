@@ -3,6 +3,11 @@ import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
+import type { DownloadRecord } from '@/features/downloads/downloads'
+import {
+  DownloadsContext,
+  type DownloadsContextValue,
+} from '@/features/downloads/downloadsContext'
 import type { Book } from '@/features/library/catalog'
 import {
   LibraryContext,
@@ -114,6 +119,41 @@ export function makeProgressValue(
   }
 }
 
+export function makeDownloadRecord(
+  overrides: Partial<DownloadRecord> = {},
+): DownloadRecord {
+  return {
+    bookId: 'b_1',
+    status: 'done',
+    filesTotal: 1,
+    filesDone: 1,
+    bytesTotal: 1_000_000,
+    bytesDone: 1_000_000,
+    filesHash: 'abc',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+export function makeDownloadsValue(
+  overrides: Partial<DownloadsContextValue> = {},
+): DownloadsContextValue {
+  const records = overrides.records ?? new Map<string, DownloadRecord>()
+  return {
+    records,
+    allowed: false,
+    supported: true,
+    storage: null,
+    get: (bookId: string) => records.get(bookId) ?? null,
+    start: vi.fn(),
+    cancel: vi.fn(),
+    remove: vi.fn(),
+    offlineUrl: () => null,
+    offlineCoverUrl: () => null,
+    ...overrides,
+  }
+}
+
 export function makePlayerValue(
   overrides: Partial<PlayerContextValue> = {},
 ): PlayerContextValue {
@@ -145,11 +185,13 @@ export function renderWithProfiles(
     route = '/',
     library = makeLibraryValue(),
     progress = makeProgressValue(),
+    downloads = makeDownloadsValue(),
     player = makePlayerValue(),
   }: {
     route?: string
     library?: LibraryContextValue
     progress?: ProgressContextValue
+    downloads?: DownloadsContextValue
     player?: PlayerContextValue
   } = {},
 ) {
@@ -159,7 +201,9 @@ export function renderWithProfiles(
         <ProfilesContext value={value}>
           <LibraryContext value={library}>
             <ProgressContext value={progress}>
-              <PlayerContext value={player}>{children}</PlayerContext>
+              <DownloadsContext value={downloads}>
+                <PlayerContext value={player}>{children}</PlayerContext>
+              </DownloadsContext>
             </ProgressContext>
           </LibraryContext>
         </ProfilesContext>

@@ -1,13 +1,15 @@
 import { type DBSchema, type IDBPDatabase, openDB } from 'idb'
 
+import { type DownloadRecord } from '@/features/downloads/downloads'
 import { type Progress } from '@/features/progress/progress'
 
 /**
  * Lokale Datenbank der App.
  *
  * Hier liegt, was den Neustart überleben muss und zu gross oder zu
- * strukturiert für localStorage ist: der gespiegelte Katalog und der
- * Hörfortschritt. Der Download-Status kommt mit M7 dazu.
+ * strukturiert für localStorage ist: der gespiegelte Katalog, der
+ * Hörfortschritt und der Stand der Downloads. Die Audiodateien selbst liegen
+ * nicht hier, sondern in Cache Storage – der ist für grosse Antworten gebaut.
  */
 interface HbSchema extends DBSchema {
   meta: {
@@ -20,10 +22,19 @@ interface HbSchema extends DBSchema {
     value: Progress & { profileId: string }
     indexes: { byProfile: string }
   }
+  downloads: {
+    /**
+     * Die Buch-ID. Bewusst **nicht** pro Profil: Der Platz auf dem Gerät ist
+     * einer, und zweimal dieselbe Datei zu speichern, nur weil zwei Kinder sie
+     * hören, wäre Verschwendung.
+     */
+    key: string
+    value: DownloadRecord
+  }
 }
 
 const DB_NAME = 'hb'
-const DB_VERSION = 2
+const DB_VERSION = 3
 
 let handle: Promise<IDBPDatabase<HbSchema>> | null = null
 
@@ -36,6 +47,9 @@ function db(): Promise<IDBPDatabase<HbSchema>> {
       if (!database.objectStoreNames.contains('progress')) {
         const store = database.createObjectStore('progress')
         store.createIndex('byProfile', 'profileId')
+      }
+      if (!database.objectStoreNames.contains('downloads')) {
+        database.createObjectStore('downloads')
       }
     },
   })
@@ -99,6 +113,30 @@ export async function deleteProgressFor(profileId: string): Promise<void> {
     const database = await db()
     const keys = await database.getAllKeysFromIndex('progress', 'byProfile', profileId)
     await Promise.all(keys.map((key) => database.delete('progress', key)))
+  } catch {
+    // bewusst ignoriert
+  }
+}
+
+export async function readAllDownloads(): Promise<DownloadRecord[]> {
+  try {
+    return await (await db()).getAll('downloads')
+  } catch {
+    return []
+  }
+}
+
+export async function writeDownload(record: DownloadRecord): Promise<void> {
+  try {
+    await (await db()).put('downloads', record, record.bookId)
+  } catch {
+    // bewusst ignoriert
+  }
+}
+
+export async function deleteDownload(bookId: string): Promise<void> {
+  try {
+    await (await db()).delete('downloads', bookId)
   } catch {
     // bewusst ignoriert
   }

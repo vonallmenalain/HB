@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   makeBook,
+  makeDownloadRecord,
+  makeDownloadsValue,
   makeLibraryValue,
   makeProfile,
   makeProfilesValue,
@@ -38,6 +40,36 @@ describe('Bibliothek', () => {
       'href',
       '/buch/b_2',
     )
+  })
+
+  it('zeigt an, welche Bücher auf dem Gerät liegen', () => {
+    // Im Flugzeug ist das die einzige Auskunft, die zählt – und sie muss ohne
+    // Lesen zu erkennen sein.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({ books: BOOKS }),
+      downloads: makeDownloadsValue({
+        records: new Map([['b_1', makeDownloadRecord({ bookId: 'b_1' })]]),
+      }),
+    })
+
+    expect(screen.getByRole('link', { name: /Der Super-Papagei/ })).toHaveTextContent(
+      'Auf dem Gerät',
+    )
+    expect(screen.getByRole('link', { name: /Der Phantomsee/ })).not.toHaveTextContent(
+      'Auf dem Gerät',
+    )
+  })
+
+  it('nimmt das Cover vom Gerät, sobald es dort liegt', () => {
+    const { container } = renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({ books: [makeBook({ id: 'b_1', cover: '/cover/b_1.jpg' })] }),
+      downloads: makeDownloadsValue({ offlineCoverUrl: () => 'blob:abc' }),
+    })
+
+    // Das Cover trägt bewusst kein `alt` – der Titel steht direkt darunter.
+    expect(container.querySelector('img')).toHaveAttribute('src', 'blob:abc')
   })
 
   it('zeigt einen leeren Zustand statt eines Fehlers, wenn nichts da ist', () => {

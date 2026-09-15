@@ -46,8 +46,14 @@ export interface MediaClient {
   fetchCatalog: (etag: string | null) => Promise<CatalogFetch>
   coverUrl: (coverPath: string) => string | null
   audioUrl: (bookId: string, fileIdx: number) => string | null
-  /** Kanonische Adresse ohne Ticket – Schlüssel für den Offline-Cache (M7). */
+  /**
+   * Kanonische Adressen ohne Ticket – die Schlüssel für den Offline-Cache.
+   *
+   * Das Ticket in der URL wechselt alle paar Stunden. Wäre es Teil des
+   * Schlüssels, wäre jeder Download am nächsten Tag wertlos.
+   */
   canonicalAudioUrl: (bookId: string, fileIdx: number) => string
+  canonicalCoverUrl: (coverPath: string) => string
   forgetTicket: () => void
 }
 
@@ -211,6 +217,9 @@ export function createMediaClient(options: {
         : withTicket(`/audio/${bookId}/${String(fileIdx)}`, ticket)
     },
     canonicalAudioUrl: (bookId, fileIdx) => `${baseUrl}/audio/${bookId}/${String(fileIdx)}`,
+    // Das `?v=` im Pfad gehört dazu: Es wechselt, wenn sich das Cover ändert –
+    // und genau dann soll auch der Cache-Eintrag ein anderer sein.
+    canonicalCoverUrl: (coverPath) => `${baseUrl}${coverPath}`,
     forgetTicket,
   }
 }
