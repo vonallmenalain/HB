@@ -93,6 +93,7 @@ npm run dev          # Entwicklungsserver auf http://localhost:5173
 | `npm test` | Vitest |
 | `npm run icons` | App-Icons aus `tools/generate-icons.mjs` neu erzeugen |
 | `HB_ADMIN_EMAIL=… npm run rules` | `firestore.rules` aus `firestore.rules.tmpl` erzeugen (siehe unten) |
+| `npm run rules:check` | Die Regeln gegen den Firestore-Emulator prüfen – braucht Java, läuft nicht in der CI |
 
 ### Einrichtung
 

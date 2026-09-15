@@ -14,6 +14,9 @@ import { formatTime } from '@/lib/format'
  * Gezogen wird gegen einen eigenen Wert, nicht gegen die laufende Wiedergabe –
  * sonst zöge der Daumen gegen die Sekunden an, die währenddessen weiterlaufen.
  */
+/** Schrittweite: fein genug zum Suchen, grob genug für Pfeiltasten. */
+const SCHRITT = 5
+
 export function SeekBar({
   positionSec,
   durationSec,
@@ -28,7 +31,10 @@ export function SeekBar({
   const [gezogen, setGezogen] = useState<number | null>(null)
 
   const max = Math.max(1, Math.round(durationSec))
-  const wert = Math.min(max, Math.max(0, Math.round(gezogen ?? positionSec)))
+  // Auf die Schrittweite gerundet: Sonst zeigte der Browser einen anderen Wert
+  // an, als React gesetzt hat, und der Daumen sässe neben der Füllung.
+  const roh = Math.min(max, Math.max(0, Math.round(gezogen ?? positionSec)))
+  const wert = Math.min(max, Math.round(roh / SCHRITT) * SCHRITT)
   const anteil = (wert / max) * 100
 
   const springen = (): void => {
@@ -43,7 +49,7 @@ export function SeekBar({
       className="seek"
       min={0}
       max={max}
-      step={5}
+      step={SCHRITT}
       value={wert}
       aria-label={label}
       aria-valuetext={`${formatTime(wert)} von ${formatTime(max)}`}

@@ -12,7 +12,14 @@ const KEY = 'hb.view'
  * „Weiterhören" ganz oben; wer nur nachsehen wollte, bekommt keinen Ton ins
  * Wohnzimmer.
  */
-const ERLAUBT = [/^\/$/, /^\/bibliothek$/, /^\/buch\/[^/]+$/]
+const ERLAUBT = [
+  /^\/$/,
+  /^\/bibliothek$/,
+  // Auch die Reihe, in der geblättert wurde – sonst landet man nach dem
+  // Neustart wieder in der Übersicht und sucht sie erneut.
+  /^\/bibliothek\/[^/]+$/,
+  /^\/buch\/[^/]+$/,
+]
 
 /** Aus dem Player wird die Buchseite – dieselbe Stelle, ohne Wiedergabe. */
 const PLAYER = /^\/player\/([^/]+)$/

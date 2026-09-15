@@ -339,7 +339,9 @@ Anmelden selbst angelegt – ist die Rückversicherung, falls beim Deployen einm
 die falsche Adresse eingesetzt wird. Sonst stünde niemand mehr zur Verfügung,
 der das geraderücken könnte.
 
-Deployt wird bei jeder Änderung an der Vorlage automatisch über
+Geprüft werden die Regeln mit `npm run rules:check` gegen den
+Firestore-Emulator – knapp dreissig Fälle vom Administrator bis zum abgelehnten
+Konto. Deployt wird bei jeder Änderung an der Vorlage automatisch über
 [`.github/workflows/firestore-rules.yml`](../.github/workflows/firestore-rules.yml);
 die Einrichtung steht in [`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md). Von Hand
 geht es weiterhin:

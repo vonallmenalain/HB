@@ -146,6 +146,24 @@ fehlgeschlagenen Lauf.
 
 ---
 
+## Regeln vorher prüfen
+
+Die Regeln sind der einzige Teil dieser App, dessen Wirkung sich beim Ansehen
+nicht überprüfen lässt: Eine Zeile, die richtig aussieht, kann die Tür
+aufmachen oder die ganze Familie aussperren. Deshalb:
+
+```bash
+npm run rules:check
+```
+
+Das startet den Firestore-Emulator und spielt knapp dreissig Fälle durch –
+Administrator, freigegebenes Kind, fremdes Konto, abgelehnte Anfrage. Gebraucht
+wird dafür Java; der Emulator lädt sich beim ersten Mal selbst herunter.
+
+Der Durchlauf gehört bewusst nicht zur CI: Java und ein Download von rund
+hundert Megabyte bei jedem Pull Request wären zu viel des Guten. Vor einer
+Änderung an `firestore.rules.tmpl` gehört er trotzdem einmal gestartet.
+
 ## Ohne GitHub deployen
 
 Geht weiterhin, etwa zum Ausprobieren:

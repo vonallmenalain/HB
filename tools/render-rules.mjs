@@ -23,7 +23,16 @@ const template = join(root, 'firestore.rules.tmpl')
 const target = join(root, 'firestore.rules')
 const PLACEHOLDER = '__ADMIN_EMAIL__'
 
-const email = (process.env.HB_ADMIN_EMAIL ?? '').trim().toLowerCase()
+/**
+ * `--probe` erzeugt Regeln mit einer erfundenen Adresse.
+ *
+ * Für den Emulator-Durchlauf und für den CI-Schritt, der nur wissen will, ob
+ * sich die Vorlage überhaupt erzeugen lässt. Deployt wird damit nie.
+ */
+const probe = process.argv.includes('--probe')
+const email = probe
+  ? 'chef@example.test'
+  : (process.env.HB_ADMIN_EMAIL ?? '').trim().toLowerCase()
 
 if (email === '') {
   console.error(
