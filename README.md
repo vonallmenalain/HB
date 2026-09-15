@@ -4,8 +4,8 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** Konzeptphase. Es gibt noch keinen Code – zuerst wird das Konzept
-> abgestimmt, dann startet die Umsetzung mit Meilenstein M1.
+> **Status:** Meilenstein M1 steht – die PWA-Hülle ist gebaut, installierbar und
+> deployt. Inhalte folgen ab M2.
 
 ## Was die App können soll
 
@@ -47,7 +47,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M | Inhalt | Status |
 |---|---|---|
 | M0 | Konzept | ✅ |
-| M1 | Projektgerüst, PWA-Hülle, CI, Netlify | offen |
+| M1 | Projektgerüst, PWA-Hülle, CI, Netlify | ✅ |
 | M2 | Firebase Auth + Kinderprofile | offen |
 | M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | offen |
 | M4 | Bibliothek im Kinderdesign | offen |
@@ -57,6 +57,59 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M8 | Sleep-Timer, Elternmodus, Feinschliff | offen |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
+
+## Entwicklung
+
+```bash
+npm install          # einmalig, installiert alle Workspaces
+npm run dev          # Entwicklungsserver auf http://localhost:5173
+```
+
+| Befehl | Zweck |
+|---|---|
+| `npm run dev` | Entwicklungsserver (ohne Service Worker) |
+| `npm run build` | Typprüfung und Produktionsbuild nach `apps/web/dist` |
+| `npm run preview` | Gebautes Ergebnis lokal servieren – nur so lässt sich der Service Worker testen |
+| `npm run lint` | ESLint |
+| `npm run typecheck` | TypeScript über App, Werkzeuge und Service Worker |
+| `npm test` | Vitest |
+| `npm run icons` | App-Icons aus `tools/generate-icons.mjs` neu erzeugen |
+
+Umgebungsvariablen: `.env.example` nach `.env.local` kopieren. In Netlify liegen
+dieselben Werte unter *Site settings → Environment variables*.
+
+### Aufbau
+
+```
+apps/web/          PWA (Vite, React, TypeScript, Tailwind)
+  src/app/         Router und App-Hülle
+  src/routes/      Bildschirme
+  src/ui/          Design-System-Bausteine
+  src/lib/         Hilfsfunktionen
+  src/sw.ts        Service Worker (eigener Code, kein generierter)
+tools/             Build-Werkzeuge ausserhalb der App
+docs/              Konzept und Datenmodell
+```
+
+Der Service Worker läuft im Entwicklungsmodus bewusst **nicht** mit – sonst
+bekommt man beim Entwickeln veraltete Dateien ausgeliefert. Zum Testen der
+Installierbarkeit und des Offline-Starts `npm run build && npm run preview`.
+
+## Deployment
+
+| | |
+|---|---|
+| Host | Netlify, Build aus `main` |
+| Netlify-Domain | `hoerbuchkinder.netlify.app` |
+| App-Domain | `hb.alae.app` |
+| Medien-Dienst | `hb-media.alae.app` (QNAP über Cloudflare Tunnel, ab M3) |
+
+Auto-Publishing ist in Netlify gesperrt: Ein Merge auf `main` baut einen Deploy,
+veröffentlicht ihn aber nicht. Das Publishen bleibt ein bewusster Schritt.
+
+Die Content-Security-Policy in `netlify.toml` nennt den Medien-Host namentlich.
+Wird der Tunnel unter einer anderen Adresse erreichbar, muss er dort und in
+`VITE_MEDIA_BASE_URL` geändert werden.
 
 ## Hinweis zu Inhalten
 

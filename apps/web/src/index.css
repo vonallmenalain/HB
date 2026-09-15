@@ -1,0 +1,80 @@
+@import 'tailwindcss';
+
+/*
+ * Design-Tokens. Die Werte setzen die verbindlichen Regeln aus
+ * docs/KONZEPT.md §5.5 um: grosse Touch-Ziele, grosse Schrift, hoher Kontrast.
+ */
+@theme {
+  --color-bg: #fbf7f0;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f3ece1;
+  --color-ink: #1f1b16;
+  --color-ink-soft: #5f5546;
+  --color-line: #e3d9c9;
+  --color-primary: #6d28d9;
+  --color-on-primary: #ffffff;
+  --color-accent: #ea580c;
+
+  /* Kleinstes Touch-Ziel 64px, Play/Pause 112px */
+  --spacing-touch: 4rem;
+  --spacing-touch-lg: 7rem;
+
+  --radius-tile: 1.5rem;
+
+  --font-sans:
+    system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+/* Dunkles Thema fürs Zubettgehen – dieselben Token, andere Werte. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg: #17140f;
+    --color-surface: #241f18;
+    --color-surface-sunken: #1d1912;
+    --color-ink: #f6f0e6;
+    --color-ink-soft: #b5a894;
+    --color-line: #3a3228;
+    --color-primary: #a78bfa;
+    --color-on-primary: #1f1b16;
+    --color-accent: #fb923c;
+  }
+}
+
+:root {
+  color-scheme: light dark;
+}
+
+html {
+  /* Verhindert, dass iOS/Android beim Drehen die Schrift skaliert. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  /* Mindestgrösse Fliesstext laut Konzept: 18px */
+  font-size: 1.125rem;
+  line-height: 1.5;
+  /* Kein Gummiband-Scrollen über den Rand hinaus. */
+  overscroll-behavior-y: none;
+}
+
+/* Kinder tippen doppelt und halten gedrückt – beides soll nichts auslösen. */
+button {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  font: inherit;
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

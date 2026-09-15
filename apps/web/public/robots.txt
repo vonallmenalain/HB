@@ -1,0 +1,4 @@
+# Private Familien-App mit urheberrechtlich geschützten Inhalten.
+# Nichts davon gehört in einen Suchindex.
+User-agent: *
+Disallow: /

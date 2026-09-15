@@ -1,0 +1,63 @@
+# Netlify-Konfiguration für hb.alae.app (Netlify-Domain: hoerbuchkinder.netlify.app)
+
+[build]
+  command = "npm run build"
+  publish = "apps/web/dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# Single-Page-App: jede Route liefert die App-Hülle aus.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Robots-Tag = "noindex, nofollow"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Die App braucht keinen Standort, keine Kamera, kein Mikrofon.
+    Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
+    Content-Security-Policy = """\
+      default-src 'self'; \
+      base-uri 'self'; \
+      object-src 'none'; \
+      frame-ancestors 'none'; \
+      form-action 'self'; \
+      script-src 'self'; \
+      style-src 'self' 'unsafe-inline'; \
+      img-src 'self' data: blob: https://hb-media.alae.app; \
+      media-src 'self' blob: https://hb-media.alae.app; \
+      font-src 'self'; \
+      worker-src 'self'; \
+      manifest-src 'self'; \
+      connect-src 'self' https://hb-media.alae.app \
+        https://identitytoolkit.googleapis.com https://securetoken.googleapis.com \
+        https://firestore.googleapis.com"""
+
+# Der Service Worker darf nie aus dem Browser-Cache kommen, sonst bleibt die
+# App auf einer alten Version stehen.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/manifest.webmanifest"
+  [headers.values]
+    Cache-Control = "no-cache"
+    Content-Type = "application/manifest+json; charset=utf-8"
+
+# Gehashte Build-Artefakte sind unveränderlich.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/icons/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
