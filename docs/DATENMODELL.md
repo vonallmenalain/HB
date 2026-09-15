@@ -252,7 +252,7 @@ Deployen mit `firebase deploy --only firestore:rules` (Konfiguration in
 |---|---|---|
 | **IndexedDB** `catalog` | Gespiegelter Katalog + `generatedAt` | Bibliothek offline browsebar |
 | **IndexedDB** `progress` | Fortschritt pro (Profil, Buch) | Überlebt alles, auch abgestürzte Tabs |
-| **IndexedDB** `downloads` | Pro Buch: Status, pro Datei: `pending`/`done`/`failed`, Bytes | Fortsetzbare Downloads |
+| **IndexedDB** `downloads` | Pro Buch: Status, geladene Dateien und Bytes, `filesHash` | Stand überlebt den Neustart |
 | **Cache Storage** `hb-media-v1` | Die Audiodateien, Schlüssel = kanonische URL **ohne** `?t=` | Für grosse Responses gebaut |
 | **Cache Storage** `hb-app-v1` | App-Shell (Workbox-Precache) | Sofortstart, offline |
 | **localStorage** | Zuletzt gewähltes Profil, Gerätekennung (`hb.device`), UI-Kleinkram | Synchron lesbar beim Start, spart einen Frame |
@@ -263,6 +263,16 @@ Netz da ist. Ein zweites Verzeichnis derselben Information hätte nur eine weite
 Stelle geschaffen, an der etwas auseinanderlaufen kann. Was die Cloud verpasst
 hat, fällt beim nächsten Abgleich ohnehin auf – dort wird verglichen, nicht
 geglaubt.
+
+Der Zustand je Datei steht bewusst **nicht** dort: Ob eine Datei schon da ist,
+weiss der Cache selbst am besten. Ein zweites Verzeichnis daneben könnte
+auseinanderlaufen – etwa wenn das System bei Speicherdruck aufräumt. Ein
+abgebrochener Download fragt deshalb den Cache und überspringt, was er findet.
+
+Der `downloads`-Eintrag gilt für das **Gerät**, nicht für ein Profil: Der Platz
+ist einer, und zweimal dieselbe Datei zu speichern, nur weil zwei Kinder sie
+hören, wäre Verschwendung. Die Erlaubnis zum Herunterladen hängt dagegen sehr
+wohl am Profil (`allowDownload`).
 
 **Cache-Schlüssel ohne Ticket** – das ist der entscheidende Kniff:
 

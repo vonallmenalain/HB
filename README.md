@@ -4,12 +4,12 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M6 steht – die App ist benutzbar, und der Hörfortschritt folgt
-> dem Kind aufs nächste Gerät. Wiedergabe mit Hintergrundbetrieb,
-> Kapitelwechsel, Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der
-> Abgleich über Firestore funktionieren. Was noch fehlt: den Medien-Dienst
-> aufs NAS deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)),
-> Offline-Downloads (M7) und der Feinschliff (M8).
+> **Status:** M7 steht – Hörbücher lassen sich auf das Gerät laden und dann
+> ohne Internet hören. Dazu Wiedergabe mit Hintergrundbetrieb, Kapitelwechsel,
+> Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der Abgleich des
+> Fortschritts über Firestore. Was noch fehlt: den Medien-Dienst aufs NAS
+> deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)), die Übergabe
+> des Downloads an Android (Background Fetch) und der Feinschliff (M8).
 
 ## Was die App können soll
 
@@ -58,7 +58,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M4 | Bibliothek im Kinderdesign | ✅ |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
 | M6 | Geräte-Sync über Firestore | ✅ |
-| M7 | Offline-Downloads | offen |
+| M7 | Offline-Downloads, Verwaltung im Elternmodus | ✅ (Background Fetch offen) |
 | M8 | Sleep-Timer, Elternmodus, Feinschliff | offen |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).

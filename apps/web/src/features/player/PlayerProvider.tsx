@@ -8,6 +8,7 @@ import {
 } from 'react'
 
 import { type Book, chapterAt, resolvePosition } from '@/features/library/catalog'
+import { useDownloads } from '@/features/downloads/downloadsContext'
 import { useLibrary } from '@/features/library/libraryContext'
 import { makeProgress, resolveResume } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
@@ -28,13 +29,20 @@ const PERSIST_INTERVAL_MS = 5000
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { client } = useLibrary()
   const { get: getProgress, save: saveProgress } = useProgress()
+  const { offlineUrl, offlineCoverUrl } = useDownloads()
 
   const engine = useMemo(() => (typeof document === 'undefined' ? null : getEngine()), [])
 
   // Der Client wechselt mit der Anmeldung, die Engine lebt länger als er.
+  //
+  // Was auf dem Gerät liegt, hat Vorrang: kein Netz, kein Ticket, kein
+  // abgelaufenes Ticket. Erst wenn dort nichts liegt, wird gestreamt.
   useEffect(() => {
-    setAudioUrlResolver((bookId, fileIdx) => client?.audioUrl(bookId, fileIdx) ?? null)
-  }, [client])
+    setAudioUrlResolver(
+      (bookId, fileIdx) =>
+        offlineUrl(bookId, fileIdx) ?? client?.audioUrl(bookId, fileIdx) ?? null,
+    )
+  }, [client, offlineUrl])
   const snapshot = useSyncExternalStore(
     engine?.subscribe ?? (() => () => undefined),
     engine?.snapshot ?? (() => null),
@@ -92,9 +100,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
 
   // Sperrbildschirm mitführen.
   useEffect(() => {
-    const cover = book?.cover != null ? (client?.coverUrl(book.cover) ?? null) : null
+    const offlineCover = book === null ? null : offlineCoverUrl(book.id)
+    const cover =
+      offlineCover ?? (book?.cover != null ? (client?.coverUrl(book.cover) ?? null) : null)
     setMediaMetadata(book, chapter?.title ?? book?.title ?? '', cover)
-  }, [book, chapter, client])
+  }, [book, chapter, client, offlineCoverUrl])
 
   useEffect(() => {
     setMediaPlaybackState(snapshot?.playing ?? false)

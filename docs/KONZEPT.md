@@ -393,8 +393,14 @@ Ab 97 % gilt ein Buch als beendet: Haken in der Bibliothek, verschwindet aus
 
 ### 8.2 Im Hintergrund
 
-Da nur Android-Geräte im Einsatz sind, steht die **Background Fetch API** zur
-Verfügung – und das ist ein grosser Unterschied:
+**Stand: noch offen.** Geladen wird derzeit im Vordergrund – Datei für Datei,
+solange die App offen ist. Das ist der im Konzept vorgesehene Rückfallweg, und
+er deckt alles ab, was danach kommt: Die Dateien liegen am selben Ort, unter
+demselben Schlüssel, und das Abspielen unterscheidet nicht, wer sie dorthin
+gebracht hat.
+
+Der Schritt darauf ist die **Background Fetch API**, und sie ist ein grosser
+Unterschied:
 
 - Der Download wird an das Betriebssystem übergeben und läuft weiter, **auch wenn
   die App geschlossen oder das Gerät gesperrt wird**.
@@ -407,19 +413,28 @@ Verfügung – und das ist ein grosser Unterschied:
 
 „Hörbuch für die Reise laden" heisst damit schlicht: antippen und weglegen.
 
-Als Rückfallebene bleibt der Download im Vordergrund (Datei für Datei per
-`fetch`, Fortschritt in IndexedDB), falls Background Fetch auf einem Gerät
-fehlt oder scheitert. Der gleiche Code deckt auch den Desktop-Browser ab.
+Der Download im Vordergrund bleibt daneben bestehen – für Geräte ohne
+Background Fetch und für den Desktop-Browser.
+
+Fortsetzbar ist beides ohne eigenes Buchhalten: Was schon im Cache liegt, wird
+übersprungen. Ein abgebrochener Download muss sich deshalb nicht merken, wo er
+war – er sieht es.
 
 ### 8.3 Abspielen von heruntergeladenen Büchern
 
 Die App fragt vor jedem Track: liegt er im Cache?
 
-- **Ja** → Blob aus dem Cache holen, `URL.createObjectURL()`, abspielen. Kein
-  Netzwerk, kein Service Worker, kein Ticket, kein abgelaufenes Ticket.
+- **Ja** → Object-URL auf den Blob aus dem Cache. Kein Netzwerk, kein Service
+  Worker, kein Ticket, kein abgelaufenes Ticket.
 - **Nein** → signierte Stream-URL vom NAS.
 
-Object-URLs werden beim Trackwechsel wieder freigegeben.
+**Gefragt wird synchron, vorbereitet wird beim Start.** Das ist keine
+Feinheit: Der Player fragt in dem Moment nach der Adresse, in dem das Kind
+tippt. Läge dort ein `await`, ginge die Nutzergeste verloren – und Android
+verweigert die Wiedergabe dann. Die Object-URLs für alles, was auf dem Gerät
+liegt, werden deshalb einmal beim App-Start angelegt und bis zum Löschen
+gehalten. Ein Blob aus Cache Storage liegt auf der Platte, nicht im
+Arbeitsspeicher; die Adresse dafür kostet nichts.
 
 Der Umweg über den Blob statt über eine vom Service Worker abgefangene Anfrage
 ist bewusst gewählt: Ein `<audio>`-Element stellt Range-Requests, und die müsste
@@ -576,7 +591,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M4** | Bibliothek und Buchseite im Kinderdesign | Bücher sind sichtbar und auswählbar ✅ |
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
-| **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich |
+| **M7** | Offline-Download, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ (Übergabe an Android steht aus) |
 | **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
