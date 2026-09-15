@@ -266,8 +266,14 @@ Anfangsbuchstaben – nie ein leeres graues Rechteck.
  │                               │
  │  |<    -30s    >    +30s   >| │
  │  64px   64px  112px  64px     │
+ │              ■                │   ← anhalten und zumachen
  └───────────────────────────────┘
 ```
+
+**Das Viereck macht den Player zu.** Pause allein lässt die Leiste am unteren
+Rand stehen – sie gehört dorthin, solange noch etwas läuft, und ist im Weg,
+wenn niemand mehr hört. Die Stelle geht dabei nicht verloren: Sie steht danach
+wieder oben auf der Startseite unter „Weiterhören".
 
 **Der Fortschrittsbalken war bis M8 bewusst nur Anzeige** – aus Sorge, ein Kind
 verliere beim versehentlichen Wischen seine Stelle. In der Praxis fehlte er:
@@ -354,7 +360,16 @@ selbsttätig weiterzuwechseln.
 
 ### 5.7 Elternmodus und Adminbereich
 
-Erreichbar über langen Druck (2 s) auf den Titel, gesichert mit 4-stelliger PIN.
+Erreichbar über das Profilbild oben rechts (**Profil → Für Erwachsene**) und
+weiterhin über langen Druck (2 s) auf den Titel; beides gesichert mit
+4-stelliger PIN.
+
+**Warum jetzt sichtbar:** Der versteckte Eingang war als Schutz gedacht und war
+keiner – er hielt nicht die Kinder fern, sondern die Erwachsenen. Wer ihn nicht
+kennt, findet ihn nicht, und die App merkt sich beim Start die zuletzt gesehene
+Ansicht, sodass man den Titel unter Umständen gar nicht mehr zu Gesicht bekommt.
+Geschützt wird der Bereich durch die PIN, nicht durch das Verstecken der Tür –
+deshalb sagt die App deutlich, solange keine gesetzt ist.
 Enthält: Profile verwalten, Downloads verwalten/löschen, Katalog neu einlesen,
 Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden.
 
@@ -700,6 +715,19 @@ Links. Diese App bildet genau das ab.
 **Deployment:** Push auf `main` → Netlify baut automatisch. Da bei dir
 Auto-Publishing gesperrt ist, wird der Build erstellt, aber nicht live geschaltet –
 das Veröffentlichen bleibt ein bewusster Klick.
+
+Drei Dinge werden unabhängig voneinander ausgeliefert, und jedes hat seinen
+eigenen Weg:
+
+| Teil | Wie es dorthin kommt |
+|---|---|
+| App | Netlify baut aus `main`; veröffentlicht wird von Hand |
+| Firestore-Regeln | GitHub deployt sie bei jeder Änderung an der Vorlage ([`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md)) |
+| Medien-Dienst | GitHub baut das Image für `amd64` und `arm64` und legt es in der GitHub Container Registry ab; das NAS holt es mit `docker compose pull` – oder von selbst, wenn das Profil `auto-update` mitläuft ([`QNAP-SETUP.md`](./QNAP-SETUP.md#9-aktualisieren)) |
+
+Das ist Absicht: Die App darf sich ändern, ohne das NAS anzufassen, und
+umgekehrt. Welcher Stand auf dem NAS läuft, sagt `/health` – ohne die Angabe
+bliebe nach einem Update nur Raten.
 
 ---
 

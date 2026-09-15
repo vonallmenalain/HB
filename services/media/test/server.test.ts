@@ -5,6 +5,7 @@ import { issueTicket } from '../src/auth/ticket.js'
 import { createCatalogStore } from '../src/catalogStore.js'
 import type { Config } from '../src/config.js'
 import { buildServer } from '../src/server.js'
+import { SCHEMA_VERSION } from '../src/catalog/types.js'
 
 import { PNG_1X1, makeLibrary } from './fixtures.js'
 
@@ -30,6 +31,7 @@ function makeConfig(overrides: Partial<Config> = {}): Config {
     allowedUids: [],
     adminUids: [],
     scanOnStart: false,
+    version: 'test',
     rescanIntervalMinutes: 0,
     ...overrides,
   }
@@ -72,6 +74,15 @@ describe('GET /health', () => {
     const response = await app.inject({ method: 'GET', url: '/health' })
     expect(response.statusCode).toBe(200)
     expect(response.json()).toMatchObject({ ok: true, books: 2 })
+  })
+
+  it('nennt die Kennung des Images und die Katalog-Form', async () => {
+    // Nach einem Update ist das die einzige Frage: Läuft schon der neue Stand?
+    const response = await app.inject({ method: 'GET', url: '/health' })
+    expect(response.json()).toMatchObject({
+      version: 'test',
+      schemaVersion: SCHEMA_VERSION,
+    })
   })
 })
 

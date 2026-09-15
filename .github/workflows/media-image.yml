@@ -1,0 +1,97 @@
+# Medien-Dienst bauen und veröffentlichen.
+#
+# Bis M9 wurde das Image auf dem QNAP selbst gebaut: Quelltext als Archiv
+# herunterladen, entpacken, `docker build`. Das dauert auf einem NAS lange, und
+# vor allem passiert es nur, wenn jemand daran denkt.
+#
+# Jetzt baut GitHub das Image bei jeder Änderung am Dienst und legt es in der
+# GitHub Container Registry ab. Auf dem NAS bleibt ein einziger Befehl:
+#
+#   docker compose pull && docker compose up -d
+#
+# Wer das Profil `auto-update` mitstartet, braucht auch den nicht mehr.
+#
+# Nötig ist dafür kein Geheimnis: `GITHUB_TOKEN` darf in das eigene Repository
+# veröffentlichen. Einmalig muss das Paket in GitHub auf „public" gestellt
+# werden, sonst verlangt das NAS eine Anmeldung – siehe docs/QNAP-SETUP.md.
+name: Medien-Dienst
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/media/**
+      - package.json
+      - package-lock.json
+      - .github/workflows/media-image.yml
+  # Von Hand auslösbar, etwa nach einer Änderung an der Basis oder um ein
+  # bestehendes Image neu zu bauen.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: media-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/hb-media
+
+jobs:
+  build:
+    name: Image bauen und veröffentlichen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Die meisten QNAP-Modelle sind amd64, einige (TS-x33) arm64. Beide zu
+      # bauen kostet ein paar Minuten und erspart die Frage, welches hier steht.
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Kennzeichnung erzeugen
+        id: meta
+        run: |
+          echo "version=$(git -C . rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "image=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Bauen und veröffentlichen
+        uses: docker/build-push-action@v6
+        with:
+          # Der Bau-Kontext ist der Projektstamm: Das Projekt ist ein
+          # npm-Workspace und braucht das Wurzel-package-lock.json.
+          context: .
+          file: services/media/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            HB_VERSION=${{ steps.meta.outputs.version }}
+          tags: |
+            ${{ steps.meta.outputs.image }}:latest
+            ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}
+          # Ohne Cache lädt jeder Lauf dieselben Abhängigkeiten neu.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Was jetzt auf dem NAS zu tun ist
+        run: |
+          {
+            echo "### Neues Image: \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}\`"
+            echo
+            echo 'Auf dem QNAP holt es sich der Dienst mit:'
+            echo
+            echo '```bash'
+            echo 'cd /share/CACHEDEV2_DATA/Container/HB/services/media'
+            echo 'docker compose pull && docker compose up -d'
+            echo '```'
+            echo
+            echo 'Mit dem Profil `auto-update` passiert das von selbst.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,21 @@
+# Ergänzung zum Selberbauen – nur nötig, wenn das Image nicht aus der GitHub
+# Container Registry kommen soll (Ausprobieren einer Änderung, kein Netz,
+# eigener Fork):
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
+#
+# Auf dem NAS wird das nicht gebraucht; dort genügt `docker compose pull`.
+# Deshalb steht es in einer eigenen Datei: Die Hauptdatei kommt ohne Quelltext
+# neben sich aus und lässt sich allein aufs NAS legen.
+
+services:
+  hb-media:
+    build:
+      # Der Bau-Kontext ist der Projektstamm, nicht dieser Ordner: Das Projekt
+      # ist ein npm-Workspace und braucht das Wurzel-package-lock.json.
+      context: ../..
+      dockerfile: services/media/Dockerfile
+      args:
+        HB_VERSION: selbst-gebaut
+    image: ${HB_IMAGE:-hb-media:latest}

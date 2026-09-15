@@ -103,6 +103,21 @@ describe('Bibliothek', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'blob:abc')
   })
 
+  it('zeigt bei einem zu alten Dienst schlicht alle Hörbücher', () => {
+    // Schema 1 kennt keine Reihen. Ohne diesen Rückfall bestünde die Übersicht
+    // aus hunderten „Reihen" mit je einem Eintrag.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({ books: BOOKS, schemaVersion: 1 }),
+    })
+
+    expect(screen.getByRole('link', { name: /Der Super-Papagei/ })).toHaveAttribute(
+      'href',
+      '/buch/b_1',
+    )
+    expect(screen.getByText(/kennt die Reihen noch nicht/)).toBeInTheDocument()
+  })
+
   it('führt von der Reihenübersicht zurück auf die Startseite', () => {
     // Die App startet dort, wo man aufgehört hat. Ohne diesen Weg käme man nie
     // wieder zu Weiterhören, Favoriten und Elternbereich.

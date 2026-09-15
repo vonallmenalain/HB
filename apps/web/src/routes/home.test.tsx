@@ -4,11 +4,13 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
 import {
+  makeAuthValue,
   makeBook,
   makeLibraryValue,
   makeProfile,
   makeProfilesValue,
   makeProgressEntry,
+  makeParentsValue,
   makeProgressValue,
   renderWithProfiles,
 } from '@/test/renderWithProfiles'
@@ -60,8 +62,8 @@ describe('Startseite', () => {
       library: makeLibraryValue({ books: KIDS }),
     })
 
-    await userEvent.click(screen.getByRole('link', { name: /Emma – Bild und Farbe ändern/ }))
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Dein Bild')
+    await userEvent.click(screen.getByRole('link', { name: /Emma – Profil und Einstellungen/ }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Dein Profil')
   })
 
   it('lässt ein Kind sein Tier selbst wechseln', async () => {
@@ -71,6 +73,40 @@ describe('Startseite', () => {
 
     await userEvent.click(screen.getByRole('button', { name: 'Bild 🐻' }))
     expect(update).toHaveBeenCalledWith(EMMA.id, { avatar: '🐻' })
+  })
+
+  it('führt vom Profil in den Elternbereich', () => {
+    // Der versteckte Eingang (zwei Sekunden auf den Titel) findet niemand, der
+    // ihn nicht kennt. Hinter der PIN darf er sichtbar sein.
+    renderWithProfiles(<AppRoutes />, profiles(), { route: '/profil/bearbeiten' })
+
+    expect(screen.getByRole('link', { name: /Elternbereich/ })).toHaveAttribute(
+      'href',
+      '/eltern',
+    )
+  })
+
+  it('zeigt den Adminbereich nur dem Administratorkonto', () => {
+    const { unmount } = renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/profil/bearbeiten',
+    })
+    expect(screen.queryByRole('link', { name: /Adminbereich/ })).not.toBeInTheDocument()
+    unmount()
+
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/profil/bearbeiten',
+      auth: makeAuthValue({ isAdmin: true }),
+    })
+    expect(screen.getByRole('link', { name: /Adminbereich/ })).toHaveAttribute('href', '/admin')
+  })
+
+  it('warnt, solange keine PIN gesetzt ist', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/profil/bearbeiten',
+      parents: makeParentsValue({ hasPin: false }),
+    })
+
+    expect(screen.getByText(/Noch keine PIN/)).toBeInTheDocument()
   })
 
   it('zeigt einen Weg in die ganze Bibliothek', () => {

@@ -62,57 +62,64 @@ nirgends sonst auftauchen – insbesondere nicht im Repository.
 
 ---
 
-## 3. Image bauen
+## 3. Image holen
 
-> **Vorher: Root-Shell.** Es genügt nicht, dass dein Konto in QTS zur Gruppe
-> *administrators* gehört – das ist Gruppe 0, nicht Benutzer 0. Docker-Befehle
-> über SSH brauchen echte Root-Rechte, sonst bricht schon der Build ab mit
-> `mkdir /share/…/.qpkg/container-station/homes/<Benutzer>: permission denied`.
->
+Das Image wird nicht mehr auf dem NAS gebaut. GitHub baut es bei jeder Änderung
+am Medien-Dienst (Workflow **Medien-Dienst**) für `amd64` und `arm64` und legt
+es in der GitHub Container Registry ab:
+
+```
+ghcr.io/vonallmenalain/hb-media:latest
+```
+
+Auf dem NAS bleibt damit nur noch: herunterladen und starten. Kein Quelltext,
+kein `docker build`, keine halbe Stunde Wartezeit auf einer NAS-CPU.
+
+**Einmalig:** Das Paket muss öffentlich sein, sonst verlangt das NAS eine
+Anmeldung. In GitHub: **Profil → Packages → hb-media → Package settings →
+Change visibility → Public**. Der Inhalt ist ohnehin nur der Quelltext dieses
+öffentlichen Repositories – Hörbücher, Adressen und Geheimnisse sind nicht im
+Image.
+
+> **Lieber privat?** Dann auf dem NAS einmal anmelden:
 > ```bash
-> sudo -s
-> whoami      # muss "root" ausgeben
+> echo <GitHub-Token mit read:packages> | docker login ghcr.io -u vonallmenalain --password-stdin
 > ```
+
+**Nur zwei Dateien aufs NAS**, in einen Freigabeordner (nicht ins Home –
+Container Station spiegelt Pfade von dort in einen eigenen Verwaltungsordner und
+scheitert daran):
+
+```bash
+sudo -s                                    # echte Root-Rechte, siehe unten
+mkdir -p /share/CACHEDEV2_DATA/Container/hb-media
+cd /share/CACHEDEV2_DATA/Container/hb-media
+curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media/docker-compose.yml
+curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media/.env.example
+mv .env.example .env
+```
+
+> **Root-Shell.** Es genügt nicht, dass dein Konto in QTS zur Gruppe
+> *administrators* gehört – das ist Gruppe 0, nicht Benutzer 0. Docker-Befehle
+> über SSH brauchen echte Root-Rechte, sonst bricht schon der Start ab mit
+> `permission denied`.
 >
 > `sudo -i` tut es auch, landet auf dem QNAP aber zuerst im
-> Console-Management-Menü – dort `Q` drücken, dann bist du in der Shell.
-> `sudo -s` startet keine Login-Shell und umgeht das Menü.
+> Console-Management-Menü – dort `Q` drücken. `sudo -s` startet keine
+> Login-Shell und umgeht das Menü.
 
-Das Projekt ist ein npm-Workspace, der Bau-Kontext ist deshalb der
-**Projektstamm**, nicht der Service-Ordner.
-
-**Weg A – auf dem NAS bauen** (Container Station vorausgesetzt):
+**Selber bauen** geht weiterhin, etwa um eine Änderung auszuprobieren, bevor sie
+in `main` liegt. Dafür braucht es den Quelltext und die Ergänzungsdatei:
 
 ```bash
-cd /share/CACHEDEV2_DATA/Container        # ein Freigabeordner, nicht das Home
-curl -L https://github.com/vonallmenalain/HB/archive/refs/heads/main.tar.gz | tar xz
-mv HB-main HB
-cd HB
-docker build -f services/media/Dockerfile -t hb-media:latest .
+docker compose -f docker-compose.yml -f docker-compose.build.yml build
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 ```
 
-> QTS bringt **kein git** mit, deshalb der Umweg über das Archiv. Wer es per
-> Entware nachinstalliert hat, nimmt stattdessen
-> `git clone https://github.com/vonallmenalain/HB.git`.
->
-> Nicht im Home-Ordner (`~`, `/share/homes/…`) bauen: Container Station spiegelt
-> Pfade von dort in einen eigenen Verwaltungsordner und scheitert daran. Ein
-> normaler Freigabeordner funktioniert.
-
-**Weg B – auf dem Rechner bauen und übertragen** (wenn das NAS schwach ist):
-
-```bash
-# Auf dem Rechner – Architektur des NAS beachten:
-docker build --platform linux/amd64 -f services/media/Dockerfile -t hb-media:latest .
-docker save hb-media:latest | gzip > hb-media.tar.gz
-# Datei aufs NAS kopieren, dann dort:
-docker load < hb-media.tar.gz
-```
-
-> Die meisten QNAP-Modelle sind `linux/amd64`. Bei einem ARM-Modell
-> (z. B. TS-x33) stattdessen `--platform linux/arm64` verwenden. Das Image
-> nutzt `bookworm-slim` statt Alpine, weil `sharp` (für die Cover) dort
-> fertige Binärdateien mitbringt.
+> Der Bau-Kontext ist der **Projektstamm**, nicht der Service-Ordner: Das
+> Projekt ist ein npm-Workspace und braucht das Wurzel-`package-lock.json`.
+> Das Image nutzt `bookworm-slim` statt Alpine, weil `sharp` (für die Cover)
+> dort fertige Binärdateien mitbringt.
 
 ---
 
@@ -139,10 +146,11 @@ einmal im Log – nicht nur die erste.
 
 ## 5. Container starten
 
-Über SSH, im Ordner des Dienstes:
+Über SSH, im Ordner mit `docker-compose.yml` und `.env`:
 
 ```bash
-cd /share/CACHEDEV2_DATA/Container/HB/services/media
+cd /share/CACHEDEV2_DATA/Container/hb-media
+docker compose pull          # holt das fertige Image aus der Registry
 docker compose up -d
 ```
 
@@ -243,12 +251,65 @@ die Dateien. Fällt eine Stelle aus, bleibt die andere wirksam.
 
 ---
 
+## 9. Aktualisieren
+
+Sobald am Medien-Dienst etwas geändert wird, baut GitHub das Image neu. Auf dem
+NAS gibt es zwei Wege, es dort auch laufen zu lassen.
+
+**Von Hand – zwei Zeilen:**
+
+```bash
+cd /share/CACHEDEV2_DATA/Container/hb-media
+docker compose pull && docker compose up -d
+```
+
+`up -d` startet den Container nur neu, wenn sich das Image tatsächlich geändert
+hat. Ist schon der neue Stand da, passiert nichts.
+
+**Von selbst – einmal einschalten:**
+
+```bash
+docker compose --profile auto-update up -d
+```
+
+Damit läuft zusätzlich ein kleiner Wächter (Watchtower), der stündlich nach
+einem neuen Image sieht und `hb-media` bei Bedarf neu startet. Den Abstand
+bestimmt `HB_UPDATE_INTERVAL_SECONDS`.
+
+> **Was das kostet:** Der Wächter braucht den Docker-Socket und darf damit
+> alles, was Docker auf dem NAS darf. Für ein Heim-NAS ist das vertretbar, aber
+> es ist eine Entscheidung – deshalb liegt er in einem eigenen Profil und
+> startet nicht von allein mit.
+
+**Prüfen, was läuft:**
+
+```bash
+curl http://localhost:18080/health
+# {"ok":true,"version":"1a2b3c4","schemaVersion":2,"books":187,…}
+```
+
+`version` ist die Kennung des Standes, aus dem das Image gebaut wurde – sie
+steht auch im Protokoll des GitHub-Workflows. `schemaVersion` sagt, welche
+Katalogform der Dienst liefert; die App zeigt im Elternbereich eine Warnung,
+solange dort noch `1` steht.
+
+**Einen Stand zurücknehmen:** In der `.env` `HB_IMAGE` auf eine bestimmte
+Kennung setzen und neu starten:
+
+```bash
+HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
+```
+
+---
+
 ## Fehlersuche
 
 | Beobachtung | Wahrscheinliche Ursache |
 |---|---|
-| `git: command not found` | QTS bringt kein git mit – Archiv-Weg aus Schritt 3 nehmen |
+| `denied` oder `unauthorized` bei `docker compose pull` | Das Paket in GitHub steht auf *privat* – öffentlich schalten oder auf dem NAS bei ghcr.io anmelden (Schritt 3) |
+| `no matching manifest for linux/...` | Das NAS hat eine Architektur, für die nicht gebaut wird – im Workflow `platforms` ergänzen |
 | `permission denied` auf `.qpkg/container-station/homes/…` | Docker ohne Root-Shell aufgerufen – `sudo -s` (Schritt 3) |
+| Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
 | `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port – `HB_HOST_PORT` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |

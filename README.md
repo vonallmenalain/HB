@@ -192,6 +192,7 @@ Installierbarkeit und des Offline-Starts `npm run build && npm run preview`.
 | Netlify-Domain | `hoerbuchkinder.netlify.app` |
 | App-Domain | `hb.alae.app` |
 | Medien-Dienst | `hb-media.alae.app` (QNAP über Cloudflare Tunnel, ab M3) |
+| Image des Dienstes | `ghcr.io/vonallmenalain/hb-media:latest` – GitHub baut es bei jeder Änderung an `services/media/**`, das NAS holt es mit `docker compose pull` (oder von selbst, siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md#9-aktualisieren)) |
 
 Auto-Publishing ist in Netlify gesperrt: Ein Merge auf `main` baut einen Deploy,
 veröffentlicht ihn aber nicht. Das Publishen bleibt ein bewusster Schritt.

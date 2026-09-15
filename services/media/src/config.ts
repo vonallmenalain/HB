@@ -18,6 +18,13 @@ export interface Config {
   scanOnStart: boolean
   /** Abstand wiederholter Scans in Minuten; 0 schaltet sie ab. */
   rescanIntervalMinutes: number
+  /**
+   * Kennung des gebauten Images, beim Bauen hineingelegt.
+   *
+   * Beantwortet die Frage, die man sich nach jedem Update stellt: Läuft schon
+   * der neue Stand? Ohne sie bleibt nur Raten.
+   */
+  version: string
 }
 
 function list(value: string | undefined): string[] {
@@ -105,5 +112,7 @@ export function readConfig(env: Record<string, string | undefined>): Config {
     adminUids: list(env.HB_ADMIN_UIDS),
     scanOnStart: env.HB_SCAN_ON_START !== 'false',
     rescanIntervalMinutes,
+    // Fehlt sie, läuft ein von Hand gebautes Image – auch das ist eine Antwort.
+    version: env.HB_VERSION?.trim() ?? 'unbekannt',
   }
 }

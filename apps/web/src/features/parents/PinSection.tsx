@@ -57,6 +57,13 @@ export function PinSection() {
     <section className="flex flex-col gap-4 pt-8">
       <h2 className="text-2xl font-bold">Eltern-PIN</h2>
 
+      {hasPin ? null : (
+        <Notice tone="error">
+          Ohne PIN steht dieser Bereich jedem offen, der auf das Profilbild tippt – auch
+          den Kindern. Vier Ziffern genügen.
+        </Notice>
+      )}
+
       <Notice>
         Die PIN hält ein Kind vom Elternbereich fern – mehr nicht. Wer das Gerät in der Hand
         hat, ist ohnehin angemeldet. Vergessen ist sie kein Problem: Nach dem nächsten

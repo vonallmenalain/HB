@@ -29,6 +29,7 @@ export interface PlayerContextValue {
   seekTo: (positionSec: number) => void
   /** Einschlaf-Timer setzen oder mit `null` abschalten. */
   setSleep: (mode: SleepMode | null) => void
+  /** Hält an und macht den Player zu: kein Buch mehr offen, keine Leiste unten. */
   stop: () => void
 }
 

@@ -199,6 +199,34 @@ describe('scanLibrary', () => {
     ])
   })
 
+  it('nennt ein Buch nach dem Ordner darüber, wenn es in „CD1" steckt', async () => {
+    // Genau so sehen gerippte Hörspiele aus. Ohne diese Regel hiesse die Folge
+    // in der Bibliothek „CD1" und läge in einer Gruppe mit ihrem eigenen Namen.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: '5 Freunde/5Freunde - 001 - beim Wanderzirkus/CD1', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.series).toBe('5 Freunde')
+    expect(catalog.books[0]?.group).toBeNull()
+    expect(catalog.books[0]?.title).toBe('beim Wanderzirkus')
+    expect(catalog.books[0]?.seriesIndex).toBe(1)
+  })
+
+  it('lässt aussagekräftige Unterordner in Ruhe', async () => {
+    // „2019" ist eine Jahresangabe und keine CD-Nummer.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Kids/Adventskalender/2019', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books[0]?.title).toBe('2019')
+    expect(catalog.books[0]?.group).toBe('Adventskalender')
+  })
+
   it('überspringt Ordner ohne Audiodateien', async () => {
     const { mediaRoot, cacheDir } = await makeLibrary([
       { path: 'Leer/Unterordner', files: [{ name: 'liesmich.txt', content: 'nichts' }] },

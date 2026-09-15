@@ -22,7 +22,14 @@ COPY services/media ./services/media
 RUN npm run compile -w @hb/media
 
 FROM node:22-bookworm-slim AS runtime
-ENV NODE_ENV=production
+
+# Welcher Stand hier läuft, beantwortet sonst niemand: Der Container weiss
+# nichts von Git. `/health` gibt die Kennung zurück – damit lässt sich nach
+# einem Update in einem Zug prüfen, ob es angekommen ist.
+ARG HB_VERSION=unbekannt
+
+ENV NODE_ENV=production \
+    HB_VERSION=$HB_VERSION
 WORKDIR /app
 
 COPY package.json package-lock.json ./

@@ -5,6 +5,7 @@ import { vi } from 'vitest'
 import type { User } from 'firebase/auth'
 
 import { AdminContext, type AdminContextValue } from '@/features/admin/adminContext'
+import { ParentsContext, type ParentsContextValue } from '@/features/parents/parentsContext'
 import { AuthContext, type AuthContextValue } from '@/features/auth/authContext'
 import {
   FavoritesContext,
@@ -227,6 +228,21 @@ export function makeAdminValue(overrides: Partial<AdminContextValue> = {}): Admi
   }
 }
 
+export function makeParentsValue(
+  overrides: Partial<ParentsContextValue> = {},
+): ParentsContextValue {
+  return {
+    loading: false,
+    hasPin: true,
+    locked: false,
+    unlock: vi.fn().mockResolvedValue(true),
+    lock: vi.fn(),
+    setPin: vi.fn().mockResolvedValue(undefined),
+    removePin: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 export function makeFavoritesValue(
   overrides: Partial<FavoritesContextValue> = {},
 ): FavoritesContextValue {
@@ -260,6 +276,7 @@ export function renderWithProfiles(
     player = makePlayerValue(),
     auth = makeAuthValue(),
     admin = makeAdminValue(),
+    parents = makeParentsValue(),
     favorites = makeFavoritesValue(),
     titles = makeTitlesValue(),
   }: {
@@ -270,6 +287,7 @@ export function renderWithProfiles(
     player?: PlayerContextValue
     auth?: AuthContextValue
     admin?: AdminContextValue
+    parents?: ParentsContextValue
     favorites?: FavoritesContextValue
     titles?: TitlesContextValue
   } = {},
@@ -278,6 +296,7 @@ export function renderWithProfiles(
     return (
       <MemoryRouter initialEntries={[route]}>
         <AuthContext value={auth}>
+          <ParentsContext value={parents}>
           <AdminContext value={admin}>
             <TitlesContext value={titles}>
               <ProfilesContext value={value}>
@@ -293,6 +312,7 @@ export function renderWithProfiles(
               </ProfilesContext>
             </TitlesContext>
           </AdminContext>
+          </ParentsContext>
         </AuthContext>
       </MemoryRouter>
     )

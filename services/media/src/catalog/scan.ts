@@ -116,6 +116,16 @@ async function writeCover(
   }
 }
 
+/**
+ * Ordnernamen, die nichts über den Inhalt sagen: `CD1`, `Teil 2`, `01`.
+ *
+ * Vierstellige Zahlen bleiben aussen vor – `2019` unter „Adventskalender" ist
+ * eine Jahresangabe und damit sehr wohl eine Aussage.
+ */
+function isDiscFolder(name: string): boolean {
+  return /^(cd|disc|disk|teil|part|folge|track)?[\s._-]*\d{1,3}$/i.test(name.trim())
+}
+
 interface FolderContents {
   audio: string[]
   cover: string | null
@@ -148,10 +158,19 @@ async function scanBook(
   contents: FolderContents,
   options: ScanOptions,
   knownAddedAt: ReadonlyMap<string, string>,
+  /**
+   * Der Ordner, unter dessen Namen das Buch erscheint.
+   *
+   * Normalerweise der Ordner mit den Dateien selbst. Steckt das Buch aber in
+   * einem nichtssagenden Unterordner („CD1"), ist es der Ordner darüber –
+   * sonst hiesse die Folge in der Bibliothek „CD1".
+   */
+  presentedAs: string = folder,
 ): Promise<{ book: Book; location: BookLocation } | null> {
   const { mediaRoot, cacheDir } = options
   const relativePath = relative(mediaRoot, folder)
-  const parent = dirname(relativePath)
+  const anzeigePfad = relative(mediaRoot, presentedAs)
+  const parent = dirname(anzeigePfad)
   // Alle Ordner über dem Buch: der oberste ist die Reihe, alles darunter eine
   // Gruppe darin („Adventskalender", „Mini-Fälle").
   const folderChain = parent === '.' || parent === '' ? [] : parent.split(sep)
@@ -202,8 +221,11 @@ async function scanBook(
   // Erst ohne Cover bauen, um die ID zu bekommen – der Cover-Dateiname hängt
   // daran.
   const withoutCover = buildBook({
+    // Die Kennung hängt am echten Ordner, nicht am angezeigten: Sie muss über
+    // Scans hinweg gleich bleiben, sonst verliert jedes Kind seinen
+    // Fortschritt.
     relativePath,
-    folderName: basename(folder),
+    folderName: basename(presentedAs),
     folderChain,
     files,
     coverAvailable: false,
@@ -268,6 +290,25 @@ async function walk(
       collected.locations.set(result.book.id, result.location)
     }
     return
+  }
+
+  // Ein einzelner Unterordner ohne eigene Aussage („CD1", „Teil 2", „01")
+  // gehört nicht in die Bibliothek: Die Folge heisst nach dem Ordner darüber.
+  if (contents.subdirectories.length === 1 && isDiscFolder(contents.subdirectories[0]!)) {
+    const innerPath = join(folder, contents.subdirectories[0]!)
+    try {
+      const inner = await readFolder(innerPath)
+      if (inner.audio.length > 0) {
+        const result = await scanBook(innerPath, inner, options, knownAddedAt, folder)
+        if (result) {
+          collected.books.push(result.book)
+          collected.locations.set(result.book.id, result.location)
+        }
+        return
+      }
+    } catch {
+      // Nicht lesbar: dann eben den gewöhnlichen Weg weiter unten.
+    }
   }
 
   for (const name of contents.subdirectories) {

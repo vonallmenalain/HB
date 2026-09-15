@@ -60,6 +60,11 @@ export function buildServer(options: ServerOptions): FastifyInstance {
 
   app.get('/health', () => ({
     ok: true,
+    // `version` ist die Kennung des Images, `schemaVersion` die Form des
+    // Katalogs. Zusammen beantworten sie nach einem Update die einzige Frage,
+    // die zählt: Läuft schon der neue Stand?
+    version: config.version,
+    schemaVersion: store.catalog().schemaVersion,
     books: store.catalog().books.length,
     scannedAt: store.catalog().generatedAt,
     scanning: store.scanning(),
