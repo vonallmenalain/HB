@@ -116,11 +116,12 @@ dort liegt die ausgefüllte `.env` bereits:
 cd /share/CACHEDEV2_DATA/Container/HB/services/media   # der bisherige Ordner
 docker compose down                                    # alten Container anhalten
 curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media/docker-compose.yml
-docker compose pull && docker compose up -d
+docker compose pull && docker compose --profile tunnel up -d
 ```
 
 Das `curl` überschreibt die alte `docker-compose.yml`, die `.env` bleibt
-unangetastet. Wer stattdessen in den neuen Ordner umzieht, nimmt die `.env` mit
+unangetastet. Das `--profile tunnel` beim Start ist kein Versehen: `down` hält
+auch `hb-tunnel` an, und ohne das Profil käme er nicht wieder mit hoch. Wer stattdessen in den neuen Ordner umzieht, nimmt die `.env` mit
 (`cp …/services/media/.env .`) und hält vorher den alten Container an – sonst
 kollidieren Name und Port.
 
@@ -155,7 +156,7 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d
 | Variable | Beispiel | Bedeutung |
 |---|---|---|
 | `HB_LIBRARY_PATH` | `/share/Hoerbuecher` | Ordner auf dem NAS, wird read-only eingehängt |
-| `HB_HOST_PORT` | `18080` | Port auf dem NAS selbst – **8080 gehört dort der QTS-Weboberfläche** |
+| `HB_HOST_PORT` | `18080` | Port auf dem NAS selbst – **8080 gehört dort der QTS-Weboberfläche**. Leer lassen gilt als „nicht gesetzt"; dann greift die Vorgabe 18080 |
 | `HB_FIREBASE_PROJECT_ID` | `hoerbuchkinder` | Projekt-ID aus der Firebase-Konsole |
 | `HB_TICKET_SECRET` | *(aus Schritt 2)* | Signatur der Media-Tickets, ≥ 32 Zeichen |
 | `HB_ALLOWED_ORIGINS` | `https://hb.alae.app` | Adresse der App; mehrere mit Komma |
@@ -337,8 +338,9 @@ HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 | `no matching manifest for linux/...` | Das NAS hat eine Architektur, für die nicht gebaut wird – im Workflow `platforms` ergänzen |
 | `permission denied` auf `.qpkg/container-station/homes/…` | Docker ohne Root-Shell aufgerufen – `sudo -s` (Schritt 3) |
 | Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
-| `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port – `HB_HOST_PORT` setzen |
+| `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port. Steht in der `.env` `HB_HOST_PORT` gar nicht oder nur leer (`HB_HOST_PORT=`), greift die Vorgabe – Zeile auf `HB_HOST_PORT=18080` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
+| Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
 | `401` bei `/library` | Ticket fehlt oder abgelaufen; die App holt normalerweise selbst ein neues |
