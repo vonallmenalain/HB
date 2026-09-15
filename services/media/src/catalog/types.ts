@@ -23,6 +23,15 @@ export interface Chapter {
 export interface Book {
   id: string
   title: string
+  /**
+   * Der Ordnername auf dem NAS, unverändert.
+   *
+   * Der Titel oben ist aufgeräumt – ohne Reihennamen, ohne Nummer, mit
+   * vereinheitlichten Trennzeichen. Im Adminbereich muss aber nachvollziehbar
+   * bleiben, woraus er entstanden ist: Sonst lässt sich weder suchen noch
+   * beurteilen, ob das Aufräumen danebenlag.
+   */
+  folderName: string
   /** Oberster Ordner unter dem Medien-Stamm – die Reihe, nach der die App gliedert. */
   series: string | null
   /**

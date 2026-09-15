@@ -29,6 +29,14 @@ describe('stripSeriesPrefix', () => {
 
   it('lässt einen Titel stehen, der nur zufällig so anfängt', () => {
     expect(stripSeriesPrefix('Der Fall der Kids', ['Kids'])).toBe('Der Fall der Kids')
+    expect(stripSeriesPrefix('Abenteuer mit Bibi Blocksberg - Hexerei', ['Bibi Blocksberg'])).toBe(
+      'Abenteuer mit Bibi Blocksberg - Hexerei',
+    )
+    // Der Reihenname gehört hier zum Satz – „auf der Felseninsel" wäre ein
+    // Fragment.
+    expect(stripSeriesPrefix('5 Freunde auf der Felseninsel', ['5 Freunde'])).toBe(
+      '5 Freunde auf der Felseninsel',
+    )
   })
 })
 
@@ -52,7 +60,6 @@ describe('tidyBook', () => {
     // Ordnernamen jeder Folge noch einmal drin.
     const book = tidyBook(
       makeBook({
-        sourceTitle: 'Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln',
         title: 'Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln',
         series: 'Fragezeichen Kids',
         group: null,
@@ -68,7 +75,7 @@ describe('tidyBook', () => {
   it('nimmt auch den Namen des Unterordners heraus', () => {
     const book = tidyBook(
       makeBook({
-        sourceTitle: 'Mini-Fälle - 05 - Alarm, die Ritter kommen!',
+        title: 'Mini-Fälle - 05 - Alarm, die Ritter kommen!',
         series: 'Fragezeichen Kids',
         group: 'Mini-Fälle',
         seriesIndex: null,
@@ -80,7 +87,7 @@ describe('tidyBook', () => {
 
   it('lässt einen von Hand gesetzten Titel gewinnen', () => {
     const book = tidyBook(
-      makeBook({ sourceTitle: 'Kids-68-Chaos', seriesIndex: 68 }),
+      makeBook({ title: 'Kids-68-Chaos', seriesIndex: 68 }),
       '68 - Chaos im Dunkeln',
     )
 
@@ -89,9 +96,34 @@ describe('tidyBook', () => {
     expect(bookLabel(book)).toBe('68 - Chaos im Dunkeln')
   })
 
+  it('behält die Nummer, wenn sie vor dem Reihennamen steht', () => {
+    // Sonst wäre die Folge namenlos: „068 - …" fiele beim Kürzen weg.
+    const book = tidyBook(
+      makeBook({
+        title: '068 - Bibi Blocksberg - Der Schulausflug',
+        series: 'Bibi Blocksberg',
+        seriesIndex: null,
+      }),
+    )
+
+    expect(bookLabel(book)).toBe('68 - Der Schulausflug')
+  })
+
+  it('überspringt keine echten Wörter vor dem Reihennamen', () => {
+    const book = tidyBook(
+      makeBook({
+        title: 'Abenteuer mit Bibi Blocksberg - Hexerei',
+        series: 'Bibi Blocksberg',
+        seriesIndex: null,
+      }),
+    )
+
+    expect(book.title).toBe('Abenteuer mit Bibi Blocksberg - Hexerei')
+  })
+
   it('behält den Titel, wenn nichts aufzuräumen ist', () => {
     const book = tidyBook(
-      makeBook({ sourceTitle: 'Der Super-Papagei', series: 'Die drei ???', seriesIndex: 1 }),
+      makeBook({ title: 'Der Super-Papagei', series: 'Die drei ???', seriesIndex: 1 }),
     )
     expect(bookLabel(book)).toBe('01 - Der Super-Papagei')
   })

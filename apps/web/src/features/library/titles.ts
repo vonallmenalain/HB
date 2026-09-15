@@ -76,7 +76,10 @@ export function tidyName(raw: string): string {
     .trim()
 }
 
-const MAX_LEAD_WORDS = 3
+/** Zahl als Ziffernfolge – Zahlwörter sind beim Vergleichen schon umgeschrieben. */
+function isNumber(value: string): boolean {
+  return /^\d+$/.test(value)
+}
 
 function stripOnePrefix(name: string, prefix: string): string | null {
   const wanted = tokenize(prefix)
@@ -85,36 +88,50 @@ function stripOnePrefix(name: string, prefix: string): string | null {
   if (wanted.length === 0) return null
 
   const tokens = tokenize(name)
+  let index = 0
+  let matched = 0
 
-  for (let start = 0; start < Math.min(tokens.length, MAX_LEAD_WORDS); start += 1) {
-    let index = start
-    let matched = 0
+  while (matched < wanted.length && index < tokens.length) {
+    const token = tokens[index]!
 
-    while (matched < wanted.length && index < tokens.length) {
-      const token = tokens[index]!
-      if (token.value === wanted[matched]) {
-        matched += 1
-        index += 1
-      } else if (FILLER_WORDS.has(token.value)) {
-        index += 1
-      } else {
-        break
-      }
+    if (token.value === wanted[matched]) {
+      matched += 1
+      index += 1
+      continue
     }
 
-    if (matched === wanted.length) {
-      const cleaned = name
-        .slice(tokens[index - 1]!.end)
-        .replace(/^[\s\p{P}]+/u, '')
-        .trim()
-      if (cleaned !== '') return cleaned
-    }
+    // Vor dem Reihennamen dürfen Füllwörter und Zahlen stehen, zwischen seinen
+    // Wörtern nur Füllwörter. Ein echtes Wort davor heisst: kein Präfix.
+    const ueberspringbar =
+      matched === 0
+        ? FILLER_WORDS.has(token.value) || isNumber(token.value)
+        : FILLER_WORDS.has(token.value)
+    if (!ueberspringbar) return null
+    index += 1
   }
 
-  return null
+  if (matched < wanted.length) return null
+
+  const rest = name
+    .slice(tokens[index - 1]!.end)
+    .replace(/^[\s\p{P}]+/u, '')
+    .trim()
+  if (rest === '') return null
+
+  // Geht es klein weiter, war der Reihenname Teil des Satzes und kein Präfix:
+  // „5 Freunde auf der Felseninsel" darf nicht „auf der Felseninsel" heissen.
+  if (/^\p{Ll}/u.test(rest)) return null
+
+  return rest
 }
 
-/** Nimmt den Reihennamen vorn aus einem Titel heraus – oder lässt ihn stehen. */
+/**
+ * Nimmt den Reihennamen vorn aus einem Titel heraus – oder lässt ihn stehen.
+ *
+ * Nur Füllwörter und eine führende Zahl dürfen übersprungen werden, keine
+ * echten Wörter: „Abenteuer mit Bibi Blocksberg - Hexerei" ist kein
+ * „Bibi Blocksberg"-Präfix und bleibt deshalb stehen.
+ */
 export function stripSeriesPrefix(name: string, candidates: readonly (string | null)[]): string {
   let shortest = name
   for (const candidate of candidates) {
@@ -154,24 +171,41 @@ export function formatSeriesIndex(index: number): string {
 }
 
 /**
+ * Räumt den Titel aus dem Katalog auf.
+ *
+ * Erst die Nummer, dann die Reihe: Sonst verschwände eine Nummer, die vor dem
+ * Reihennamen steht – „068 - Bibi Blocksberg - Der Schulausflug" soll Folge 68
+ * bleiben. Stand sie dahinter, kommt sie danach zum Vorschein.
+ */
+function cleanCatalogTitle(book: Book): NumberedTitle {
+  const zuerst = splitNumber(book.title)
+  const ohneReihe = stripSeriesPrefix(zuerst.title, [book.series, book.group])
+
+  return zuerst.number === null
+    ? splitNumber(ohneReihe)
+    : { number: zuerst.number, title: tidyName(ohneReihe) }
+}
+
+/**
  * Räumt einen Katalogeintrag für die Anzeige auf.
  *
- * Ein von Hand gesetzter Titel gewinnt über alles Erkannte. Er wird genauso
- * zerlegt wie ein erkannter: Wer im Adminbereich „05 - Chaos im Dunkeln“
- * hinschreibt, bekommt genau das zu lesen – und nicht „05 - 05 - Chaos“.
+ * Ein von Hand gesetzter Titel gewinnt über alles Erkannte und wird nicht
+ * angerührt – nur die Nummer wird abgetrennt, damit sie nicht doppelt
+ * erscheint: Wer „05 - Chaos im Dunkeln“ hinschreibt, liest genau das und
+ * nicht „05 - 05 - Chaos im Dunkeln“.
  */
 export function tidyBook(book: Book, override?: string | null): Book {
   const eigener = override?.trim() ?? ''
-  const roh = eigener === '' ? stripSeriesPrefix(book.sourceTitle, [book.series, book.group]) : eigener
-  const { number, title } = splitNumber(roh)
+  const { number, title } = eigener === '' ? cleanCatalogTitle(book) : splitNumber(eigener)
 
   return {
     ...book,
-    title: title === '' ? book.sourceTitle : title,
+    title: title === '' ? book.title : title,
     // Die erkannte Nummer gewinnt: Sie steht im Titel und muss zu ihm passen.
     seriesIndex: number ?? book.seriesIndex,
   }
 }
+
 
 /** „05 - Chaos im Dunkeln“ – der Titel, wie er in einer Reihe untereinander steht. */
 export function bookLabel(book: Book): string {

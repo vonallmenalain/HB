@@ -85,16 +85,52 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     if (book) historyRef.current.started(book)
   }, [book])
 
+  /**
+   * Gehörte Sekunden aus dem Fortschritt, nicht aus dem Takt.
+   *
+   * Ein Takt alle fünf Sekunden heisst nicht fünf Sekunden Ton: Beim Puffern
+   * steht die Zeit still, und im Hintergrund darf der Browser den Takt
+   * strecken. Gezählt wird deshalb, wie weit die Stelle im Buch gewandert ist
+   * – höchstens aber so viel, wie tatsächlich Zeit vergangen ist, damit ein
+   * Sprung nach vorn nicht als Hören zählt.
+   */
+  const zuletztGezaehlt = useRef<{ positionSec: number; zeitMs: number } | null>(null)
+
+  const zaehleGehoertes = useCallback(() => {
+    if (!book) return
+    const jetzt = Date.now()
+    const vorher = zuletztGezaehlt.current
+    zuletztGezaehlt.current = { positionSec, zeitMs: jetzt }
+    if (vorher === null) return
+
+    const gehoert = positionSec - vorher.positionSec
+    const vergangen = (jetzt - vorher.zeitMs) / 1000
+    if (gehoert > 0) historyRef.current.listened(book, Math.min(gehoert, vergangen))
+  }, [book, positionSec])
+
+  const zaehlenRef = useRef(zaehleGehoertes)
+  useEffect(() => {
+    zaehlenRef.current = zaehleGehoertes
+  }, [zaehleGehoertes])
+
+  // Ein neues Buch fängt bei null an, sonst zählte der Sprung vom letzten
+  // Buch als gehörte Zeit.
+  useEffect(() => {
+    zuletztGezaehlt.current = null
+  }, [book])
+
   useEffect(() => {
     if (snapshot?.playing !== true) return
     const timer = setInterval(() => {
       persistRef.current()
-      // Der Takt läuft nur, solange wirklich abgespielt wird – damit sind das
-      // gehörte Sekunden und nicht Sekunden mit offener App.
-      if (book) historyRef.current.listened(book, PERSIST_INTERVAL_MS / 1000)
+      zaehlenRef.current()
     }, PERSIST_INTERVAL_MS)
     return () => {
       clearInterval(timer)
+      // Beim Anhalten zählt der letzte angefangene Abschnitt noch mit; danach
+      // beginnt die Messung von vorn, damit die Pause nicht mitzählt.
+      zaehlenRef.current()
+      zuletztGezaehlt.current = null
     }
   }, [snapshot?.playing, book])
 

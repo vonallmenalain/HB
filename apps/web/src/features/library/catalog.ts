@@ -31,8 +31,13 @@ export interface Book {
   id: string
   /** Aufbereitet für die Anzeige – siehe `titles.ts`. */
   title: string
-  /** Der Titel, wie ihn der Dienst geliefert hat. Im Adminbereich sichtbar. */
-  sourceTitle: string
+  /**
+   * Der Ordnername auf dem NAS, unverändert – im Adminbereich sichtbar.
+   *
+   * Ältere Dienste liefern ihn nicht; dann steht hier der Titel, und das ist
+   * das Nächstbeste, was es gibt.
+   */
+  folderName: string
   /** Oberster Ordner: die Reihe, nach der die Bibliothek gliedert. */
   series: string | null
   /** Ordner zwischen Reihe und Buch, etwa „Mini-Fälle“ – sonst null. */
@@ -123,7 +128,7 @@ export function parseBook(raw: unknown): Book | null {
   return {
     id,
     title,
-    sourceTitle: title,
+    folderName: str(record.folderName) ?? title,
     series: str(record.series),
     group: str(record.group),
     seriesIndex: num(record.seriesIndex),

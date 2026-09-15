@@ -13,7 +13,7 @@ const MAX_TREFFER = 25
 
 function passt(book: Book, suche: string): boolean {
   if (suche === '') return true
-  const text = `${book.title} ${book.sourceTitle} ${book.series ?? ''} ${book.group ?? ''}`
+  const text = `${book.title} ${book.folderName} ${book.series ?? ''} ${book.group ?? ''}`
   return text.toLowerCase().includes(suche.toLowerCase())
 }
 
@@ -84,7 +84,7 @@ export function TitlesSection() {
                 </p>
                 {/* Was auf dem NAS steht – die Antwort auf „warum heisst das so?“ */}
                 <p className="pt-1 text-sm text-ink-soft">
-                  Ordner: <span className="font-mono">{book.sourceTitle}</span>
+                  Ordner: <span className="font-mono">{book.folderName}</span>
                 </p>
               </div>
 

@@ -93,6 +93,13 @@ describe('parseBookFolder', () => {
       seriesIndex: 12,
     })
   })
+
+  it('behält die Nummer, wenn sie vor dem Reihennamen steht', () => {
+    // Zuerst die Nummer, dann die Reihe – sonst wäre die Folge namenlos.
+    expect(
+      parseBookFolder('068 - Bibi Blocksberg - Der Schulausflug', ['Bibi Blocksberg']),
+    ).toEqual({ title: 'Der Schulausflug', seriesIndex: 68 })
+  })
 })
 
 describe('tidyName', () => {
@@ -136,6 +143,21 @@ describe('stripSeriesPrefix', () => {
   it('lässt den Namen in Ruhe, wenn die Reihe nicht vorn steht', () => {
     expect(stripSeriesPrefix('Der Fall der Kids', ['Kids'])).toBe('Der Fall der Kids')
     expect(stripSeriesPrefix('Chaos im Dunkeln', ['Bibi Blocksberg'])).toBe('Chaos im Dunkeln')
+  })
+
+  it('überspringt keine echten Wörter vor dem Reihennamen', () => {
+    // „Abenteuer mit" gehört zum Titel. Würde es übersprungen, bliebe von der
+    // Folge nur „Hexerei" übrig.
+    expect(stripSeriesPrefix('Abenteuer mit Bibi Blocksberg - Hexerei', ['Bibi Blocksberg'])).toBe(
+      'Abenteuer mit Bibi Blocksberg - Hexerei',
+    )
+  })
+
+  it('lässt den Reihennamen stehen, wo er Teil des Satzes ist', () => {
+    // Bliebe nur „auf der Felseninsel" übrig, wäre der Titel ein Satzfragment.
+    expect(stripSeriesPrefix('5 Freunde auf der Felseninsel', ['5 Freunde'])).toBe(
+      '5 Freunde auf der Felseninsel',
+    )
   })
 
   it('schrumpft einen Titel nie auf nichts zusammen', () => {

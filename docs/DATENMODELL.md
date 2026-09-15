@@ -55,7 +55,9 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 | Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
-| Ordnername beginnt mit dem Reihennamen | Der fliegt heraus: `Die Drei Fragezeichen Kids-68-Chaos` → `seriesIndex: 68`, `title: "Chaos"`. Verglichen wird unempfindlich gegen Artikel, Gross-/Kleinschreibung und Zahlwörter, `Die drei ???` gilt als `Die 3 Fragezeichen` |
+| Ordnername beginnt mit dem Reihennamen | Der fliegt heraus: `Die Drei Fragezeichen Kids-68-Chaos` → `seriesIndex: 68`, `title: "Chaos"`. Verglichen wird unempfindlich gegen Artikel, Gross-/Kleinschreibung und Zahlwörter, `Die drei ???` gilt als `Die 3 Fragezeichen`. Übersprungen werden dabei nur Füllwörter und eine führende Zahl – `Abenteuer mit Bibi Blocksberg` ist kein Präfix |
+| Reihenname steckt im Satz | Bleibt stehen: `5 Freunde auf der Felseninsel` wird nicht zu `auf der Felseninsel` |
+| Nummer steht vor dem Reihennamen | Sie wird zuerst abgetrennt: `068 - Bibi Blocksberg - Der Schulausflug` → `seriesIndex: 68`, `title: "Der Schulausflug"` |
 | Trennzeichen | `_` wird Leerzeichen; ein Strich gilt als Trenner, wenn Leerraum daneben steht oder auf einer Seite eine Ziffer – `Mini-Fall` behält seinen Bindestrich |
 | Ordnername ist danach leer | Dann bleibt der ursprüngliche Name stehen. Lieber einmal zu viel stehen lassen als einen Titel anschneiden |
 | `buch.json` vorhanden | Felder daraus haben **Vorrang** vor allem Erkannten |
@@ -94,7 +96,8 @@ Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
   "books": [
     {
       "id": "b_4f3a9c2e",              // sha1(relativer Pfad), gekürzt – stabil
-      "title": "Der Super-Papagei",
+      "title": "Der Super-Papagei",    // aufgeräumt: ohne Reihe, ohne Nummer
+      "folderName": "01 - Der Super-Papagei",  // wie der Ordner heisst
       "series": "Die drei ???",        // oberster Ordner = Reihe
       "group": null,                   // Ordner darunter, sonst null
       "seriesIndex": 1,
@@ -121,8 +124,11 @@ Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
 }
 ```
 
-**Schema-Version 2** (seit M9): `group` ist dazugekommen, und `series` ist nicht
-mehr der unmittelbar übergeordnete Ordner, sondern der oberste. Eine ältere App
+**Schema-Version 2** (seit M9): `group` und `folderName` sind dazugekommen, und
+`series` ist nicht mehr der unmittelbar übergeordnete Ordner, sondern der
+oberste. `folderName` ist der Ordnername, wie er auf dem NAS steht – ohne ihn
+liesse sich im Adminbereich nicht nachvollziehen, woraus ein aufgeräumter Titel
+entstanden ist. Eine ältere App
 lehnt einen neueren Katalog ab und sagt das auch – lieber ehrlich melden als
 raten. Umgekehrt versteht die aktuelle App einen Katalog der Version 1
 weiterhin: `group` fehlt dann schlicht.

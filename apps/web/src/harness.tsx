@@ -167,10 +167,10 @@ const TITLES: [string, string | null, string | null][] = [
   ['Die Olchis - 01 - Ein Fall für die Olchis', 'Die Olchis', null],
 ]
 
-const rohBooks: Book[] = TITLES.map(([sourceTitle, series, group], i) => ({
+const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
   id: `b_${String(i)}`,
-  title: sourceTitle,
-  sourceTitle,
+  title: folderName,
+  folderName,
   series,
   group,
   seriesIndex: null,

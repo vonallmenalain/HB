@@ -108,6 +108,7 @@ export function buildBook(input: BookInput): Book {
   return {
     id,
     title,
+    folderName: input.folderName,
     series: firstNonEmpty(override?.series, seriesFromPath),
     group: firstNonEmpty(override?.group, groupFromPath),
     seriesIndex: override?.seriesIndex ?? parsed.seriesIndex,

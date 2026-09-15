@@ -49,7 +49,7 @@ export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
     id: 'b_1',
     title: 'Der Super-Papagei',
-    sourceTitle: 'Der Super-Papagei',
+    folderName: '01 - Der Super-Papagei',
     series: 'Die drei ???',
     group: null,
     seriesIndex: 1,

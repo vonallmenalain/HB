@@ -113,14 +113,10 @@ export function tidyName(raw: string): string {
     .trim()
 }
 
-/**
- * Wie weit vorn ein Reihenname stehen muss, um noch als Präfix zu zählen.
- *
- * „Die drei ??? Kids - 05 - …" beginnt mit zwei Füllwörtern, ehe die Reihe
- * kommt. Weiter hinten wäre es kein Präfix mehr, sondern ein Wort im Titel –
- * und „Der Fall der Kids" dürfte nicht zu „" zusammenschrumpfen.
- */
-const MAX_LEAD_WORDS = 3
+/** Zahl als Ziffernfolge – Zahlwörter sind beim Vergleichen schon umgeschrieben. */
+function isNumber(value: string): boolean {
+  return /^\d+$/.test(value)
+}
 
 function stripOnePrefix(name: string, prefix: string): string | null {
   const wanted = tokenize(prefix)
@@ -129,33 +125,42 @@ function stripOnePrefix(name: string, prefix: string): string | null {
   if (wanted.length === 0) return null
 
   const tokens = tokenize(name)
+  let index = 0
+  let matched = 0
 
-  for (let start = 0; start < Math.min(tokens.length, MAX_LEAD_WORDS); start += 1) {
-    let index = start
-    let matched = 0
+  while (matched < wanted.length && index < tokens.length) {
+    const token = tokens[index]!
 
-    while (matched < wanted.length && index < tokens.length) {
-      const token = tokens[index]!
-      if (token.value === wanted[matched]) {
-        matched += 1
-        index += 1
-      } else if (FILLER_WORDS.has(token.value)) {
-        index += 1
-      } else {
-        break
-      }
+    if (token.value === wanted[matched]) {
+      matched += 1
+      index += 1
+      continue
     }
 
-    if (matched === wanted.length) {
-      const rest = name.slice(tokens[index - 1]!.end)
-      // Was nach dem Reihennamen steht, beginnt mit Trennzeichen – und bei
-      // „Die drei ???" mit den Fragezeichen, die zur Reihe gehören.
-      const cleaned = rest.replace(/^[\s\p{P}]+/u, '').trim()
-      if (cleaned !== '') return cleaned
-    }
+    // Vor dem Reihennamen dürfen Füllwörter und Zahlen stehen: „Die drei ???
+    // Kids" gegen „Fragezeichen Kids", „68 Bibi Blocksberg" gegen „Bibi
+    // Blocksberg". Zwischen seinen Wörtern nur Füllwörter.
+    const ueberspringbar =
+      matched === 0 ? FILLER_WORDS.has(token.value) || isNumber(token.value) : FILLER_WORDS.has(token.value)
+    if (!ueberspringbar) return null
+    index += 1
   }
 
-  return null
+  if (matched < wanted.length) return null
+
+  // Was nach dem Reihennamen steht, beginnt mit Trennzeichen – und bei
+  // „Die drei ???" mit den Fragezeichen, die zur Reihe gehören.
+  const rest = name
+    .slice(tokens[index - 1]!.end)
+    .replace(/^[\s\p{P}]+/u, '')
+    .trim()
+  if (rest === '') return null
+
+  // Geht es klein weiter, war der Reihenname Teil des Satzes und kein Präfix:
+  // „5 Freunde auf der Felseninsel" darf nicht „auf der Felseninsel" heissen.
+  if (/^\p{Ll}/u.test(rest)) return null
+
+  return rest
 }
 
 /**
@@ -165,8 +170,13 @@ function stripOnePrefix(name: string, prefix: string): string | null {
  * jeder Folge darin. In der Reihe gelesen ist das nur Rauschen – aus
  * „Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln" wird „68-Chaos Im Dunkeln".
  *
- * Passt kein Kandidat, bleibt der Name, wie er ist. Lieber einmal zu viel
- * stehen lassen als einen Titel anschneiden.
+ * Nur Füllwörter dürfen übersprungen werden, keine echten Wörter: „Abenteuer
+ * mit Bibi Blocksberg - Hexerei" ist kein „Bibi Blocksberg"-Präfix und bleibt
+ * deshalb stehen. Passt kein Kandidat, bleibt der Name, wie er ist – lieber
+ * einmal zu viel stehen lassen als einen Titel anschneiden.
+ *
+ * Eine führende Folgennummer gehört vorher abgetrennt (siehe
+ * {@link parseBookFolder}); sonst zählt sie hier als überspringbare Zahl.
  */
 export function stripSeriesPrefix(
   name: string,
@@ -181,29 +191,45 @@ export function stripSeriesPrefix(
   return shortest
 }
 
+/** Eine führende Folgennummer, wenn ein Trennzeichen dahinter steht. */
+function splitLeadingNumber(text: string): { number: number | null; rest: string } {
+  // Nur mit Trennzeichen: „1984" ist ein Titel, „5 Freunde" eine Reihe –
+  // beide dürfen ihre Zahl behalten.
+  const match = /^(?:(?:folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})\s*[-–—.)_:]\s*(.+)$/i.exec(
+    text,
+  )
+  if (!match) return { number: null, rest: text }
+
+  const [, index = '', rest = ''] = match
+  return { number: Number(index), rest: rest.trim() }
+}
+
 /**
  * `01 - Der Super-Papagei` → `{ title: 'Der Super-Papagei', seriesIndex: 1 }`
  *
- * Die Reihennamen der übergeordneten Ordner fliegen vorher heraus, damit in der
+ * Die Reihennamen der übergeordneten Ordner fliegen dabei heraus, damit in der
  * Reihe nicht neunmal dasselbe untereinander steht.
+ *
+ * Erst die Nummer, dann die Reihe: Sonst verschwände eine Nummer, die vor dem
+ * Reihennamen steht – „068 - Bibi Blocksberg - Der Schulausflug" soll Folge 68
+ * bleiben und nicht namenlos werden.
  */
 export function parseBookFolder(
   name: string,
   seriesNames: readonly (string | null)[] = [],
 ): FolderName {
-  const tidy = tidyName(stripSeriesPrefix(name.trim(), seriesNames))
+  const tidy = tidyName(name.trim())
+  const zuerst = splitLeadingNumber(tidy)
+  const ohneReihe = tidyName(stripSeriesPrefix(zuerst.rest, seriesNames))
 
-  // Eine Nummer zählt nur mit Trennzeichen dahinter: „1984" ist ein Titel,
-  // „5 Freunde" eine Reihe – beide dürfen ihre Zahl behalten.
-  const match = /^(?:(?:folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})\s*[-–—.)_:]\s*(.+)$/i.exec(
-    tidy,
-  )
-  if (match) {
-    const [, index = '', title = ''] = match
-    return { title: tidyName(title), seriesIndex: Number(index) }
-  }
+  // Stand die Nummer hinter dem Reihennamen, kommt sie jetzt zum Vorschein.
+  const danach =
+    zuerst.number === null
+      ? splitLeadingNumber(ohneReihe)
+      : { number: zuerst.number, rest: ohneReihe }
 
-  return { title: tidy === '' ? name.trim() : tidy, seriesIndex: null }
+  const title = tidyName(danach.rest)
+  return { title: title === '' ? name.trim() : title, seriesIndex: danach.number }
 }
 
 /** `5` → `05` – zweistellig liest sich in einer Liste ruhiger. */
