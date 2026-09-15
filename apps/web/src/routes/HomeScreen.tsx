@@ -46,17 +46,27 @@ export function HomeScreen() {
     ...gemerkt.map((book) => book.id),
   ])
 
-  const vorschlaege = suggestBooks({
-    books,
-    entries: [...entries.values()],
-    exclude: schonZuSehen,
-    limit: 6,
-  })
+  // Ohne einen einzigen gehörten Satz gibt es nichts vorzuschlagen. Dann
+  // stünde dort einfach das Neueste – und darunter, im Ausschnitt der
+  // Bibliothek, noch einmal dasselbe.
+  const vorschlaege =
+    entries.size === 0
+      ? []
+      : suggestBooks({
+          books,
+          entries: [...entries.values()],
+          exclude: schonZuSehen,
+          limit: 6,
+        })
+
+  for (const book of vorschlaege) schonZuSehen.add(book.id)
 
   const neueste = [...books]
     .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
     .filter((book) => !schonZuSehen.has(book.id))
-    .slice(0, 4)
+    // Sechs füllen das Raster auf Handy und Tablet – und am ersten Tag, wenn
+    // sonst noch nichts auf der Seite steht, wirkt sie damit nicht leer.
+    .slice(0, 6)
 
   return (
     <Screen>

@@ -30,7 +30,10 @@ import type { User } from 'firebase/auth'
 import { MemoryRouter } from 'react-router-dom'
 
 import { AppRoutes } from './app/AppRoutes'
+import { AdminContext, type AdminContextValue } from './features/admin/adminContext'
 import { AuthContext, type AuthContextValue } from './features/auth/authContext'
+import { FavoritesContext } from './features/favorites/favoritesContext'
+import { TitlesContext } from './features/library/titlesContext'
 import type { Book } from './features/library/catalog'
 import { parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
@@ -229,7 +232,55 @@ const profiles: ProfilesContextValue = {
   remove: () => Promise.resolve(),
 }
 
+/**
+ * Eine Anfrage, die es nicht gibt – damit der Adminbereich in der Vorschau
+ * nicht leer ist und sich das Freigeben ansehen lässt.
+ */
+const demoAdmin = (
+  offen: boolean,
+  freigeben: () => void,
+): AdminContextValue => ({
+  loading: false,
+  requests: offen
+    ? [
+        {
+          uid: 'uid-oma',
+          email: 'oma@example.com',
+          name: 'Oma',
+          requestedAt: '2026-09-01T10:00:00.000Z',
+          status: 'pending' as const,
+        },
+      ]
+    : [],
+  accounts: [
+    { uid: 'uid-vorschau', email: 'vorschau@example.com', name: null, admin: true, approvedAt: '' },
+    ...(offen
+      ? []
+      : [
+          {
+            uid: 'uid-oma',
+            email: 'oma@example.com',
+            name: 'Oma',
+            admin: false,
+            approvedAt: '2026-09-01T10:05:00.000Z',
+          },
+        ]),
+  ],
+  error: false,
+  approve: () => {
+    freigeben()
+    return Promise.resolve()
+  },
+  deny: () => Promise.resolve(),
+  revoke: () => Promise.resolve(),
+})
+
 function Harness() {
+  // Sterne, Titel und Freigaben laufen in der Vorschau gegen den Speicher
+  // dieses Tabs – so lässt sich alles ausprobieren, ohne Firebase.
+  const [favoriten, setFavoriten] = useState<ReadonlySet<string>>(new Set())
+  const [titel, setTitel] = useState<ReadonlyMap<string, string>>(new Map())
+  const [offeneAnfrage, setOffeneAnfrage] = useState(true)
   const [library, setLibrary] = useState<LibraryContextValue>(() => ({
     status: mediaBase === null ? 'ready' : 'loading',
     books: mediaBase === null ? demoBooks : [],
@@ -273,12 +324,51 @@ function Harness() {
     })()
   }, [])
 
+  const favoritenWert = {
+    ids: favoriten,
+    isFavorite: (bookId: string) => favoriten.has(bookId),
+    toggle: (bookId: string) => {
+      setFavoriten((vorher) => {
+        const next = new Set(vorher)
+        if (!next.delete(bookId)) next.add(bookId)
+        return next
+      })
+    },
+  }
+
+  const titelWert = {
+    titles: titel,
+    setTitle: (bookId: string, neuerTitel: string) => {
+      setTitel((vorher) => {
+        const next = new Map(vorher)
+        if (neuerTitel.trim() === '') next.delete(bookId)
+        else next.set(bookId, neuerTitel.trim())
+        return next
+      })
+      return Promise.resolve()
+    },
+  }
+
+  // Die Titel wirken in der Vorschau sofort – wie in der App, nur ohne Cloud.
+  const bibliothek: LibraryContextValue = {
+    ...library,
+    books: tidyBooks(library.books, titel),
+    bookById: (id) => tidyBooks(library.books, titel).find((book) => book.id === id),
+  }
+
   return (
     <MemoryRouter initialEntries={[route]}>
       <AuthContext value={auth}>
+        <AdminContext
+          value={demoAdmin(offeneAnfrage, () => {
+            setOffeneAnfrage(false)
+          })}
+        >
+        <TitlesContext value={titelWert}>
+        <FavoritesContext value={favoritenWert}>
         <ParentProvider>
           <ProfilesContext value={profiles}>
-            <LibraryContext value={library}>
+            <LibraryContext value={bibliothek}>
               {/* Ohne `?sync=1` gibt es keine Cloud-Seite – der Fortschritt
                   läuft dann rein lokal, wie in der App bei fehlendem Netz. */}
               <ProgressStore cloudFor={syncDemo ? localStorageCloud : undefined}>
@@ -292,6 +382,9 @@ function Harness() {
             </LibraryContext>
           </ProfilesContext>
         </ParentProvider>
+        </FavoritesContext>
+        </TitlesContext>
+        </AdminContext>
       </AuthContext>
     </MemoryRouter>
   )

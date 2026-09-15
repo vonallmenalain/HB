@@ -109,6 +109,13 @@ export function AccessSection() {
 
       <h2 className="pt-4 text-2xl font-bold">Freigeschaltete Konten</h2>
 
+      {!loading && accounts.length === 0 ? (
+        <Notice>
+          Noch keine Konten in der Liste. Nach der ersten Anmeldung steht hier das
+          Administratorkonto.
+        </Notice>
+      ) : null}
+
       <ul className="flex flex-col gap-3">
         {accounts.map((account) => (
           <li key={account.uid} className="flex flex-col gap-2 rounded-tile bg-surface p-4">
