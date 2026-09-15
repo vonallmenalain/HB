@@ -1,0 +1,282 @@
+import { beforeAll, describe, expect, it } from 'vitest'
+import type { FastifyInstance } from 'fastify'
+
+import { issueTicket } from '../src/auth/ticket.js'
+import { createCatalogStore } from '../src/catalogStore.js'
+import type { Config } from '../src/config.js'
+import { buildServer } from '../src/server.js'
+
+import { PNG_1X1, makeLibrary } from './fixtures.js'
+
+const SECRET = 's'.repeat(40)
+const UID = 'uid-papa'
+
+let app: FastifyInstance
+let ticket: string
+let bookId: string
+let bookWithoutCoverId: string
+let audioBytes: number
+
+function makeConfig(overrides: Partial<Config> = {}): Config {
+  return {
+    host: '127.0.0.1',
+    port: 0,
+    mediaRoot: '/unused',
+    cacheDir: '/unused',
+    firebaseProjectId: 'hoerbuchkinder',
+    ticketSecret: SECRET,
+    ticketTtlSeconds: 3600,
+    allowedOrigins: ['https://hb.example.com'],
+    allowedUids: [],
+    adminUids: [],
+    scanOnStart: false,
+    rescanIntervalMinutes: 0,
+    ...overrides,
+  }
+}
+
+beforeAll(async () => {
+  const { mediaRoot, cacheDir } = await makeLibrary([
+    {
+      path: 'Reihe/01 - Mit Cover',
+      files: [
+        { name: '01.wav', seconds: 2 },
+        { name: '02.wav', seconds: 1 },
+        { name: 'cover.png', content: PNG_1X1 },
+      ],
+    },
+    { path: 'Ohne Cover', files: [{ name: 'a.wav', seconds: 1 }] },
+  ])
+
+  const store = createCatalogStore({ mediaRoot, cacheDir })
+  await store.rescan()
+
+  bookId = store.catalog().books.find((b) => b.title === 'Mit Cover')!.id
+  bookWithoutCoverId = store.catalog().books.find((b) => b.title === 'Ohne Cover')!.id
+  audioBytes = store.catalog().books.find((b) => b.id === bookId)!.files[0]!.bytes
+
+  app = buildServer({
+    config: makeConfig(),
+    store,
+    verifyIdToken: (token) =>
+      token === 'gutes-token'
+        ? Promise.resolve({ uid: UID, email: 'papa@example.com' })
+        : Promise.reject(new Error('ungültig')),
+  })
+
+  ticket = (await issueTicket(SECRET, UID, 3600)).ticket
+})
+
+describe('GET /health', () => {
+  it('antwortet ohne Anmeldung', async () => {
+    const response = await app.inject({ method: 'GET', url: '/health' })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toMatchObject({ ok: true, books: 2 })
+  })
+})
+
+describe('POST /auth/session', () => {
+  it('tauscht ein Firebase-Token gegen ein Ticket', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/session',
+      headers: { authorization: 'Bearer gutes-token' },
+    })
+
+    expect(response.statusCode).toBe(200)
+    const body = response.json<{ ticket: string; expiresAt: string }>()
+    expect(body.ticket).toMatch(/^[\w-]+\.[\w-]+\.[\w-]+$/)
+    expect(Date.parse(body.expiresAt)).toBeGreaterThan(Date.now())
+  })
+
+  it('verlangt einen Authorization-Header', async () => {
+    const response = await app.inject({ method: 'POST', url: '/auth/session' })
+    expect(response.statusCode).toBe(401)
+    expect(response.json()).toEqual({ error: 'authorization_missing' })
+  })
+
+  it('lehnt ein ungültiges Token ab', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: '/auth/session',
+      headers: { authorization: 'Bearer schrott' },
+    })
+    expect(response.statusCode).toBe(401)
+  })
+
+  it('antwortet 403 statt 401, wenn die UID nicht freigeschaltet ist', async () => {
+    // 401 hiesse „hol dir ein neues Token“ – das würde nichts ändern.
+    const restricted = buildServer({
+      config: makeConfig({ allowedUids: ['jemand-anderes'] }),
+      store: createCatalogStore({ mediaRoot: '/unused', cacheDir: '/unused' }),
+      verifyIdToken: () => Promise.resolve({ uid: UID, email: null }),
+    })
+
+    const response = await restricted.inject({
+      method: 'POST',
+      url: '/auth/session',
+      headers: { authorization: 'Bearer gutes-token' },
+    })
+
+    expect(response.statusCode).toBe(403)
+    expect(response.json()).toMatchObject({ error: 'uid_not_allowed', uid: UID })
+  })
+})
+
+describe('GET /library', () => {
+  it('liefert den Katalog mit gültigem Ticket', async () => {
+    const response = await app.inject({ method: 'GET', url: `/library?t=${ticket}` })
+    expect(response.statusCode).toBe(200)
+    expect(response.json<{ books: unknown[] }>().books).toHaveLength(2)
+  })
+
+  it('verlangt ein Ticket', async () => {
+    expect((await app.inject({ method: 'GET', url: '/library' })).statusCode).toBe(401)
+    expect(
+      (await app.inject({ method: 'GET', url: '/library?t=kaputt' })).statusCode,
+    ).toBe(401)
+  })
+
+  it('antwortet 304, wenn sich nichts geändert hat', async () => {
+    const first = await app.inject({ method: 'GET', url: `/library?t=${ticket}` })
+    const etag = first.headers.etag!
+    expect(etag).toBeTruthy()
+
+    const second = await app.inject({
+      method: 'GET',
+      url: `/library?t=${ticket}`,
+      headers: { 'if-none-match': etag },
+    })
+    expect(second.statusCode).toBe(304)
+  })
+
+  it('verrät keine Dateipfade', async () => {
+    const response = await app.inject({ method: 'GET', url: `/library?t=${ticket}` })
+    expect(response.body).not.toContain('/tmp/')
+  })
+})
+
+describe('GET /cover', () => {
+  it('liefert das aufbereitete Cover', async () => {
+    const response = await app.inject({ method: 'GET', url: `/cover/${bookId}.jpg?t=${ticket}` })
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['content-type']).toBe('image/jpeg')
+    expect(response.rawPayload.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]))
+  })
+
+  it('antwortet 404 für ein Buch ohne Cover', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/cover/${bookWithoutCoverId}.jpg?t=${ticket}`,
+    })
+    expect(response.statusCode).toBe(404)
+  })
+})
+
+describe('GET /audio', () => {
+  it('liefert die ganze Datei ohne Range-Header', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/audio/${bookId}/0?t=${ticket}`,
+    })
+
+    expect(response.statusCode).toBe(200)
+    expect(response.headers['accept-ranges']).toBe('bytes')
+    expect(response.headers['content-type']).toBe('audio/wav')
+    expect(Number(response.headers['content-length'])).toBe(audioBytes)
+    expect(response.rawPayload.subarray(0, 4).toString('ascii')).toBe('RIFF')
+  })
+
+  it('beantwortet einen Bereich mit 206 und passendem Content-Range', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/audio/${bookId}/0?t=${ticket}`,
+      headers: { range: 'bytes=0-99' },
+    })
+
+    expect(response.statusCode).toBe(206)
+    expect(response.headers['content-range']).toBe(`bytes 0-99/${audioBytes}`)
+    expect(Number(response.headers['content-length'])).toBe(100)
+    expect(response.rawPayload).toHaveLength(100)
+  })
+
+  it('liefert bei offenem Ende bis zum Dateiende', async () => {
+    const start = audioBytes - 50
+    const response = await app.inject({
+      method: 'GET',
+      url: `/audio/${bookId}/0?t=${ticket}`,
+      headers: { range: `bytes=${start}-` },
+    })
+
+    expect(response.statusCode).toBe(206)
+    expect(response.rawPayload).toHaveLength(50)
+  })
+
+  it('antwortet 416 bei unerfüllbarem Bereich', async () => {
+    const response = await app.inject({
+      method: 'GET',
+      url: `/audio/${bookId}/0?t=${ticket}`,
+      headers: { range: `bytes=${audioBytes + 10}-` },
+    })
+
+    expect(response.statusCode).toBe(416)
+    expect(response.headers['content-range']).toBe(`bytes */${audioBytes}`)
+  })
+
+  it('verlangt ein Ticket', async () => {
+    expect(
+      (await app.inject({ method: 'GET', url: `/audio/${bookId}/0` })).statusCode,
+    ).toBe(401)
+  })
+
+  it('antwortet 404 für unbekannte Bücher und Dateien', async () => {
+    expect(
+      (await app.inject({ method: 'GET', url: `/audio/b_gibtesnicht/0?t=${ticket}` }))
+        .statusCode,
+    ).toBe(404)
+    expect(
+      (await app.inject({ method: 'GET', url: `/audio/${bookId}/99?t=${ticket}` })).statusCode,
+    ).toBe(404)
+    expect(
+      (await app.inject({ method: 'GET', url: `/audio/${bookId}/keine-zahl?t=${ticket}` }))
+        .statusCode,
+    ).toBe(404)
+  })
+
+  it('kommt nicht aus dem Hörbuch-Ordner heraus', async () => {
+    // Der Dienst nimmt nie einen Pfad entgegen, sondern schlägt Buch-ID und
+    // Dateiindex im Katalog nach – Traversal ist strukturell ausgeschlossen.
+    for (const attempt of [
+      '/audio/..%2F..%2Fetc/0',
+      '/audio/%2Fetc%2Fpasswd/0',
+      '/audio/../../../etc/passwd/0',
+      `/cover/..%2F..%2Fetc%2Fpasswd.jpg`,
+    ]) {
+      const response = await app.inject({ method: 'GET', url: `${attempt}?t=${ticket}` })
+      expect([401, 404], `${attempt} → ${String(response.statusCode)}`).toContain(
+        response.statusCode,
+      )
+      expect(response.body).not.toContain('root:')
+    }
+  })
+})
+
+describe('POST /admin/rescan', () => {
+  it('lehnt Nicht-Administratoren ab', async () => {
+    const restricted = buildServer({
+      config: makeConfig({ adminUids: ['nur-papa'] }),
+      store: createCatalogStore({ mediaRoot: '/unused', cacheDir: '/unused' }),
+      verifyIdToken: () => Promise.resolve({ uid: UID, email: null }),
+    })
+
+    const response = await restricted.inject({
+      method: 'POST',
+      url: `/admin/rescan?t=${ticket}`,
+    })
+    expect(response.statusCode).toBe(403)
+  })
+
+  it('verlangt ein Ticket', async () => {
+    expect((await app.inject({ method: 'POST', url: '/admin/rescan' })).statusCode).toBe(401)
+  })
+})

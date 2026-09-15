@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["node"]
+  },
+  "exclude": [],
+  "include": ["src/**/*.test.ts", "test", "vitest.config.ts", "eslint.config.js"]
+}

@@ -1,0 +1,39 @@
+# Container Station auf dem QNAP: "Anwendung erstellen" und diese Datei einfügen.
+# Die Werte in .env danebenlegen (siehe .env.example).
+
+services:
+  hb-media:
+    build:
+      # Der Bau-Kontext ist der Projektstamm, nicht dieser Ordner.
+      context: ../..
+      dockerfile: services/media/Dockerfile
+    image: hb-media:latest
+    container_name: hb-media
+    restart: unless-stopped
+    ports:
+      - '8080:8080'
+    volumes:
+      # Hörbuch-Ordner nur lesend – der Dienst schreibt dort nie hinein.
+      - ${HB_LIBRARY_PATH:?HB_LIBRARY_PATH fehlt}:/media:ro
+      - hb-cache:/cache
+    environment:
+      HB_FIREBASE_PROJECT_ID: ${HB_FIREBASE_PROJECT_ID:?}
+      HB_TICKET_SECRET: ${HB_TICKET_SECRET:?}
+      HB_ALLOWED_ORIGINS: ${HB_ALLOWED_ORIGINS:?}
+      HB_ALLOWED_UIDS: ${HB_ALLOWED_UIDS:-}
+      HB_ADMIN_UIDS: ${HB_ADMIN_UIDS:-}
+      HB_TICKET_TTL_SECONDS: ${HB_TICKET_TTL_SECONDS:-28800}
+
+  # Cloudflare Tunnel: macht den Dienst ohne offenen Port erreichbar.
+  # Das Token stammt aus dem Cloudflare-Dashboard (Zero Trust → Networks →
+  # Tunnels). Zeile samt Token weglassen, wenn du einen anderen Weg nimmst.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: hb-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?}
+    depends_on:
+      - hb-media
+
+volumes:
+  hb-cache:

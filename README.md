@@ -4,8 +4,10 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M2 steht – Anmeldung, Freigabeliste und Kinderprofile
-> funktionieren. Katalog und Player folgen ab M3.
+> **Status:** M3 steht – der Medien-Dienst für das QNAP ist fertig und
+> getestet. Was noch fehlt: ihn aufs NAS deployen (siehe
+> [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)) und die Bibliothek in der App
+> anzeigen (M4).
 
 ## Was die App können soll
 
@@ -41,6 +43,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 |---|---|
 | [`docs/KONZEPT.md`](docs/KONZEPT.md) | Ziele, Bedienkonzept für Kinder, Architektur, Sicherheit, Offline-Strategie, Risiken, Roadmap, **offene Fragen** |
 | [`docs/DATENMODELL.md`](docs/DATENMODELL.md) | Ordnerkonvention auf dem NAS, Katalog-Schema, Firestore-Struktur, API-Verträge |
+| [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md) | Schritt für Schritt: Medien-Dienst aufs NAS bringen, Tunnel einrichten, mit der App verbinden |
 
 ## Roadmap
 
@@ -49,7 +52,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M0 | Konzept | ✅ |
 | M1 | Projektgerüst, PWA-Hülle, CI, Netlify | ✅ |
 | M2 | Firebase Auth + Kinderprofile | ✅ |
-| M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | offen |
+| M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | ✅ |
 | M4 | Bibliothek im Kinderdesign | offen |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | offen |
 | M6 | Geräte-Sync über Firestore | offen |
@@ -110,8 +113,12 @@ apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/ui/            Design-System-Bausteine
   src/lib/           Firebase, Konfiguration, Hilfsfunktionen
   src/sw.ts          Service Worker (eigener Code, kein generierter)
+services/media/      Medien-Dienst für das QNAP (Node, Fastify, Docker)
+  src/auth/          Firebase-Token prüfen, Media-Tickets ausstellen
+  src/catalog/       Scanner, Namensauswertung, Katalogbau
+  src/media/         Range-Header
 tools/               Build-Werkzeuge ausserhalb der App
-docs/                Konzept und Datenmodell
+docs/                Konzept, Datenmodell, NAS-Anleitung
 firestore.rules      Sicherheitsregeln der Datenbank
 ```
 
