@@ -22,6 +22,7 @@ import {
   setMediaPosition,
 } from './mediaSession'
 import { PlayerContext } from './playerContext'
+import { type SleepMode } from './sleepTimer'
 
 /** Abstand, in dem der Fortschritt während der Wiedergabe gesichert wird. */
 const PERSIST_INTERVAL_MS = 5000
@@ -161,6 +162,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       finished: snapshot?.finished ?? false,
       error: snapshot?.error ?? false,
       chapter,
+      sleepMode: snapshot?.sleepMode ?? null,
+      sleepRemainingSec: snapshot?.sleepRemainingSec ?? 0,
       playBook: (next: Book) => {
         playFrom(next, resolveResume(next, getProgress(next.id)).positionSec)
       },
@@ -181,6 +184,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       },
       seekTo: (position: number) => {
         engine?.seekTo(position)
+      },
+      setSleep: (mode: SleepMode | null) => {
+        engine?.setSleep(mode)
       },
       stop: () => {
         persistRef.current()

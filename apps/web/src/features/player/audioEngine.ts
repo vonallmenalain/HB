@@ -1,9 +1,20 @@
 import {
   type Book,
+  chapterAt,
   fileStartSec,
   globalPosition,
   resolvePosition,
 } from '@/features/library/catalog'
+
+import {
+  type SleepMode,
+  type SleepTimer,
+  armSleep,
+  fadeVolume,
+  holdSleep,
+  resumeSleep,
+  sleepRemainingSec,
+} from './sleepTimer'
 
 /**
  * Was der Player von einem Medienelement braucht.
@@ -18,6 +29,7 @@ export interface MediaElement {
   duration: number
   paused: boolean
   playbackRate: number
+  volume: number
   play: () => Promise<void>
   pause: () => void
   load: () => void
@@ -36,6 +48,10 @@ export interface PlayerSnapshot {
   /** Das Buch ist bis zum Ende gelaufen. */
   finished: boolean
   error: boolean
+  /** Eingestellter Einschlaf-Timer, oder `null`. */
+  sleepMode: SleepMode | null
+  /** Restzeit des Einschlaf-Timers in Sekunden. */
+  sleepRemainingSec: number
 }
 
 const EMPTY: PlayerSnapshot = {
@@ -46,6 +62,8 @@ const EMPTY: PlayerSnapshot = {
   loading: false,
   finished: false,
   error: false,
+  sleepMode: null,
+  sleepRemainingSec: 0,
 }
 
 export interface AudioEngine {
@@ -61,6 +79,8 @@ export interface AudioEngine {
   skip: (deltaSec: number) => void
   nextChapter: () => void
   previousChapter: () => void
+  /** Einschlaf-Timer setzen oder mit `null` abschalten. */
+  setSleep: (mode: SleepMode | null) => void
   close: () => void
 }
 
@@ -75,6 +95,8 @@ export const RESUME_REWIND_SEC = 5
 export function createAudioEngine(deps: {
   element: MediaElement
   audioUrl: (bookId: string, fileIdx: number) => string | null
+  /** Nur für Tests: die Uhr, gegen die der Einschlaf-Timer rechnet. */
+  now?: () => number
 }): AudioEngine {
   const { element } = deps
 
@@ -82,6 +104,8 @@ export function createAudioEngine(deps: {
   let fileIdx = 0
   let pendingSeek: number | null = null
   let state: PlayerSnapshot = EMPTY
+  let sleep: SleepTimer | null = null
+  const now = deps.now ?? (() => Date.now())
 
   const listeners = new Set<() => void>()
   const emit = (patch: Partial<PlayerSnapshot>): void => {
@@ -144,13 +168,55 @@ export function createAudioEngine(deps: {
     emit({ loading: false, positionSec: currentGlobal() })
   }
 
+  /** Wie lange das laufende Kapitel noch dauert – für „bis Kapitelende". */
+  function chapterRemainingSec(): number {
+    if (!book) return 0
+    const position = currentGlobal()
+    const chapter = chapterAt(book, position)
+    return chapter === null ? book.durationSec - position : chapter.endSec - position
+  }
+
+  /**
+   * Den Einschlaf-Timer nachführen.
+   *
+   * Aufgerufen wird das aus `timeupdate` – der einzigen Uhr, die auch bei
+   * ausgeschaltetem Bildschirm zuverlässig weitergeht, solange etwas läuft.
+   * Zurückgegeben wird, ob die Wiedergabe jetzt enden soll.
+   */
+  function tickSleep(): boolean {
+    if (sleep === null) return false
+
+    const remaining = sleepRemainingSec(sleep, now(), chapterRemainingSec())
+    if (remaining <= 0) return true
+
+    element.volume = fadeVolume(remaining)
+    emit({ sleepRemainingSec: remaining })
+    return false
+  }
+
+  /** Schluss für heute: erst aufräumen, dann anhalten. */
+  function endSleep(): void {
+    sleep = null
+    element.volume = 1
+    emit({ sleepMode: null, sleepRemainingSec: 0 })
+    pause()
+  }
+
   const onTimeUpdate = (): void => {
     if (state.loading) return
     emit({ positionSec: currentGlobal() })
+    if (tickSleep()) endSleep()
   }
 
   const onEnded = (): void => {
     if (!book) return
+
+    // „Bis zum Kapitelende" heisst: hier ist Schluss, nicht am nächsten Kapitel.
+    if (sleep?.mode.kind === 'chapter') {
+      emit({ positionSec: currentGlobal() })
+      endSleep()
+      return
+    }
 
     const next = book.files.find((file) => fileStartSec(book!, file.idx) > fileStartSec(book!, fileIdx))
     if (next) {
@@ -167,10 +233,14 @@ export function createAudioEngine(deps: {
   }
 
   const onPause = (): void => {
+    // Die Uhr hält mit an: „Noch 15 Minuten hören" meint Hörzeit, und eine
+    // Pause dazwischen soll davon nichts abziehen.
+    if (sleep !== null) sleep = holdSleep(sleep, now())
     if (state.playing) emit({ playing: false })
   }
 
   const onPlay = (): void => {
+    if (sleep !== null) sleep = resumeSleep(sleep, now())
     if (!state.playing) emit({ playing: true })
   }
 
@@ -254,8 +324,28 @@ export function createAudioEngine(deps: {
       load(previous ? previous.startSec : 0, state.playing)
     },
 
+    setSleep: (mode) => {
+      if (mode === null) {
+        sleep = null
+        element.volume = 1
+        emit({ sleepMode: null, sleepRemainingSec: 0 })
+        return
+      }
+
+      sleep = armSleep(mode, now())
+      // Wer im Pausenzustand einstellt, soll nicht sofort Zeit verlieren.
+      if (!state.playing) sleep = holdSleep(sleep, now())
+      element.volume = 1
+      emit({
+        sleepMode: mode,
+        sleepRemainingSec: sleepRemainingSec(sleep, now(), chapterRemainingSec()),
+      })
+    },
+
     close: () => {
       element.pause()
+      sleep = null
+      element.volume = 1
       element.removeEventListener('loadedmetadata', onLoadedMetadata)
       element.removeEventListener('timeupdate', onTimeUpdate)
       element.removeEventListener('ended', onEnded)

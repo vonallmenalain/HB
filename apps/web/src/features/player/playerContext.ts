@@ -2,6 +2,8 @@ import { createContext, use } from 'react'
 
 import { type Book, type Chapter } from '@/features/library/catalog'
 
+import { type SleepMode } from './sleepTimer'
+
 export interface PlayerContextValue {
   book: Book | null
   /** Globale Sekunde im Buch. */
@@ -12,6 +14,10 @@ export interface PlayerContextValue {
   finished: boolean
   error: boolean
   chapter: Chapter | null
+  /** Eingestellter Einschlaf-Timer, oder `null`. */
+  sleepMode: SleepMode | null
+  /** Restzeit des Einschlaf-Timers in Sekunden. */
+  sleepRemainingSec: number
   /** Öffnet das Buch an der gespeicherten Stelle und startet. */
   playBook: (book: Book) => void
   /** Öffnet das Buch an einer bestimmten Sekunde und startet. */
@@ -21,6 +27,8 @@ export interface PlayerContextValue {
   nextChapter: () => void
   previousChapter: () => void
   seekTo: (positionSec: number) => void
+  /** Einschlaf-Timer setzen oder mit `null` abschalten. */
+  setSleep: (mode: SleepMode | null) => void
   stop: () => void
 }
 

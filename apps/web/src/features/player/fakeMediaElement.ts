@@ -33,6 +33,7 @@ export function createFakeMediaElement(
     duration: Number.NaN,
     paused: true,
     playbackRate: 1,
+    volume: 1,
     playCalls: 0,
     loadCalls: 0,
 
@@ -66,6 +67,9 @@ export function createFakeMediaElement(
       fire('loadedmetadata')
     },
     emitEnded: () => {
+      // Ein echtes `ended` kommt erst, wenn die Datei durchgelaufen ist – die
+      // Position steht dann am Ende, nicht dort, wo sie zuletzt war.
+      if (Number.isFinite(element.duration)) element.currentTime = element.duration
       element.paused = true
       fire('ended')
     },
