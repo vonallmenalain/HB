@@ -371,16 +371,23 @@ bekommt `409`.
 | `HB_ADMIN_UIDS` | `abc…` | Darf `/admin/rescan` |
 | `HB_RESCAN_INTERVAL_MINUTES` | `360` | Abstand automatischer Neu-Scans; `0` schaltet sie ab |
 | `HB_SCAN_ON_START` | `true` | Beim Start einmal einlesen |
-| `HB_PORT` | `8080` | Port im Container |
+| `HB_PORT` | `8080` | Port **im Container** |
+| `HB_HOST_PORT` | `18080` | Port auf dem NAS – auf dem QNAP gehört `8080` der QTS-Weboberfläche |
 
 Eingebunden wird der Hörbuch-Ordner in der `docker-compose.yml` read-only:
+
+Die tatsächliche Datei steht in `services/media/docker-compose.yml`; hier nur
+der Kern. Der veröffentlichte Port ist einstellbar, weil auf dem QNAP die
+QTS-Weboberfläche selbst auf 8080 hört – und der Tunnel liegt in einem eigenen
+Profil, damit der Dienst schon läuft, bevor es ihn gibt
+(`docker compose up -d`, später `docker compose --profile tunnel up -d`).
 
 ```yaml
 services:
   hb-media:
     image: ghcr.io/<owner>/hb-media:latest   # oder lokal gebaut
     restart: unless-stopped
-    ports: ["8080:8080"]
+    ports: ["${HB_HOST_PORT:-8080}:8080"]    # auf dem QNAP z. B. 18080
     volumes:
       - /share/Hoerbuecher:/media:ro         # read-only, der Dienst schreibt nie
       - hb-cache:/cache
