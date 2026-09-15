@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Builds
+dist/
+build/
+.vite/
+*.tsbuildinfo
+
+# Environment / Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*-service-account*.json
+serviceAccountKey.json
+
+# Netlify
+.netlify/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Test / Coverage
+coverage/
+.nyc_output/
+
+# Lokale Medien (niemals ins Repo!)
+/media/
+/hoerbuecher/
+*.mp3
+*.m4a
+*.m4b
+*.opus
