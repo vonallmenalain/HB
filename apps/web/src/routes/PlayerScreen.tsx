@@ -107,7 +107,7 @@ export function PlayerScreen() {
         </PlayerButton>
       </div>
 
-      <div className="flex items-center justify-center gap-6 pb-8">
+      <div className="flex items-center justify-center gap-6 pb-4">
         <PlayerButton
           label={`${String(SKIP_SECONDS)} Sekunden zurück`}
           onClick={() => {
@@ -130,6 +130,25 @@ export function PlayerScreen() {
           }}
         >
           ↻
+        </PlayerButton>
+      </div>
+
+      {/*
+        Schluss für heute: anhalten und zumachen. Ohne diesen Knopf bliebe die
+        Leiste am unteren Rand stehen, obwohl niemand mehr hört – und der
+        einzige Weg, sie loszuwerden, wäre die App neu zu starten.
+        Die Stelle geht dabei nicht verloren: Sie steht danach wieder oben auf
+        der Startseite unter „Weiterhören".
+      */}
+      <div className="flex justify-center pb-8">
+        <PlayerButton
+          label="Anhalten und schliessen"
+          onClick={() => {
+            player.stop()
+            void navigate(`/buch/${book.id}`)
+          }}
+        >
+          ■
         </PlayerButton>
       </div>
 

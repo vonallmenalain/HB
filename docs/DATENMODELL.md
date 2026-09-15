@@ -49,6 +49,7 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 |---|---|
 | Ordner enthält Audiodateien | → ist ein Buch |
 | Ordner enthält nur Unterordner | → ist Reihe oder Gruppe; der oberste wird `series`, die dazwischen `group` |
+| Einziger Unterordner heisst `CD1`, `Teil 2`, `01` … | Wird übersprungen: Das Buch erscheint unter dem Namen des Ordners darüber. Sonst hiesse die Folge in der Bibliothek „CD1". Vierstellige Zahlen zählen nicht – `2019` ist eine Jahresangabe |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
 | Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
 | `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet |

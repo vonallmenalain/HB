@@ -21,9 +21,9 @@ describe('AppRoutes', () => {
     )
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hörbücher')
-    // Der Avatar führt zum Bearbeiten des eigenen Bildes – das Kind darf sein
-    // Tier und seine Farbe selbst ändern.
-    expect(screen.getByRole('link', { name: /Emma – Bild und Farbe ändern/ })).toHaveAttribute(
+    // Der Avatar führt zum eigenen Profil: Tier und Farbe für das Kind, und
+    // darunter der Weg für die Erwachsenen.
+    expect(screen.getByRole('link', { name: /Emma – Profil und Einstellungen/ })).toHaveAttribute(
       'href',
       '/profil/bearbeiten',
     )

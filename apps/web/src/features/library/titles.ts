@@ -48,7 +48,9 @@ function normalizeWord(raw: string): string {
 
 function tokenize(text: string): Token[] {
   const tokens: Token[] = []
-  const pattern = /[\p{L}\p{N}]+|\?{2,}/gu
+  // Buchstaben und Ziffern getrennt: „5Freunde" ist derselbe Name wie
+  // „5 Freunde", nur ohne Leerzeichen – und genau so stehen die Ordner da.
+  const pattern = /\p{L}+|\p{N}+|\?{2,}/gu
   let match: RegExpExecArray | null
   while ((match = pattern.exec(text)) !== null) {
     tokens.push({ value: normalizeWord(match[0]), end: match.index + match[0].length })

@@ -81,6 +81,8 @@ export interface AudioEngine {
   previousChapter: () => void
   /** Einschlaf-Timer setzen oder mit `null` abschalten. */
   setSleep: (mode: SleepMode | null) => void
+  /** Hält an und macht den Player zu – danach ist kein Buch mehr offen. */
+  stop: () => void
   close: () => void
 }
 
@@ -203,7 +205,7 @@ export function createAudioEngine(deps: {
   }
 
   const onTimeUpdate = (): void => {
-    if (state.loading) return
+    if (!book || state.loading) return
     emit({ positionSec: currentGlobal() })
     if (tickSleep()) endSleep()
   }
@@ -229,6 +231,10 @@ export function createAudioEngine(deps: {
   }
 
   const onError = (): void => {
+    // Nach dem Zumachen ist ein Fehler keiner: Das Leeren der Quelle löst
+    // selbst ein `error`-Ereignis aus, und ein Player ohne Buch hat nichts,
+    // woran etwas schiefgehen könnte.
+    if (!book) return
     emit({ error: true, loading: false, playing: false })
   }
 
@@ -340,6 +346,26 @@ export function createAudioEngine(deps: {
         sleepMode: mode,
         sleepRemainingSec: sleepRemainingSec(sleep, now(), chapterRemainingSec()),
       })
+    },
+
+    /**
+     * Wiedergabe beenden und den Player zumachen.
+     *
+     * Anders als `pause` bleibt danach nichts stehen: kein Buch, keine Leiste
+     * am unteren Rand. Anders als `close` bleibt die Engine benutzbar – das
+     * nächste Buch startet wie immer.
+     */
+    stop: () => {
+      element.pause()
+      sleep = null
+      element.volume = 1
+      // Die Quelle leeren, sonst hält der Browser den Puffer weiter offen.
+      element.src = ''
+      element.load()
+      book = null
+      fileIdx = -1
+      state = EMPTY
+      for (const listener of listeners) listener()
     },
 
     close: () => {

@@ -130,6 +130,14 @@ describe('stripSeriesPrefix', () => {
     ).toBe('05 - Alarm')
   })
 
+  it('erkennt die Reihe auch ohne Leerzeichen', () => {
+    // So stehen die Ordner auf dem NAS: „5 Freunde" oben, „5Freunde - 001 - …"
+    // darin.
+    expect(stripSeriesPrefix('5Freunde - 001 - beim Wanderzirkus', ['5 Freunde'])).toBe(
+      '001 - beim Wanderzirkus',
+    )
+  })
+
   it('erkennt die Reihe auch in anderer Schreibweise', () => {
     // Ordner heisst „Die 3 Fragezeichen", die Folgen schreiben „Die drei ???".
     expect(stripSeriesPrefix('Die drei ??? - 01 - Der Super-Papagei', ['Die 3 Fragezeichen'])).toBe(

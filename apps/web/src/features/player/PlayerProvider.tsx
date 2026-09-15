@@ -242,9 +242,17 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       setSleep: (mode: SleepMode | null) => {
         engine?.setSleep(mode)
       },
+      /**
+       * Anhalten und zumachen.
+       *
+       * Vorher hielt `stop` nur an – die Leiste am unteren Rand blieb dann
+       * stehen, obwohl niemand mehr hörte. Die Stelle wird vorher gesichert;
+       * sie steht danach wieder oben auf der Startseite unter „Weiterhören".
+       */
       stop: () => {
         persistRef.current()
-        engine?.pause()
+        zaehlenRef.current()
+        engine?.stop()
       },
     }
   }, [engine, book, positionSec, snapshot, chapter, getProgress])

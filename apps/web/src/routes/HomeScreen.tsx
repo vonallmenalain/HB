@@ -75,7 +75,7 @@ export function HomeScreen() {
         {selected ? (
           <Link
             to="/profil/bearbeiten"
-            aria-label={`${selected.name} – Bild und Farbe ändern`}
+            aria-label={`${selected.name} – Profil und Einstellungen`}
             className="flex items-center gap-3 rounded-full focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
             <span className="hidden text-lg font-semibold sm:inline">{selected.name}</span>

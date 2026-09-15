@@ -1,16 +1,21 @@
 # Container Station auf dem QNAP: "Anwendung erstellen" und diese Datei einfügen.
 # Die Werte in .env danebenlegen (siehe .env.example).
 #
-# Ohne Tunnel starten (Schritt 5):   docker compose up -d
-# Mit Tunnel starten (ab Schritt 6): docker compose --profile tunnel up -d
+# Das Image kommt fertig gebaut aus der GitHub Container Registry – auf dem NAS
+# wird nichts mehr kompiliert und es braucht dort auch keinen Quelltext:
+#
+#   Holen und starten:      docker compose pull && docker compose up -d
+#   Mit Tunnel:             docker compose --profile tunnel up -d
+#   Selbst aktuell halten:  docker compose --profile auto-update up -d
+#
+# Selber bauen geht weiterhin (etwa zum Ausprobieren einer Änderung):
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml build
 
 services:
   hb-media:
-    build:
-      # Der Bau-Kontext ist der Projektstamm, nicht dieser Ordner.
-      context: ../..
-      dockerfile: services/media/Dockerfile
-    image: hb-media:latest
+    # HB_IMAGE überschreibt das Image, z. B. auf eine bestimmte Kennung
+    # (`ghcr.io/…/hb-media:1a2b3c4`), um einen Stand zurückzunehmen.
+    image: ${HB_IMAGE:-ghcr.io/vonallmenalain/hb-media:latest}
     container_name: hb-media
     restart: unless-stopped
     ports:
@@ -47,5 +52,26 @@ services:
     depends_on:
       - hb-media
 
+  # Holt neue Images von selbst und startet hb-media damit neu. Damit landet
+  # jede Änderung, die GitHub gebaut hat, ohne Zutun auf dem NAS.
+  #
+  # Bewusst ein eigenes Profil und nicht die Vorgabe: Watchtower braucht den
+  # Docker-Socket und darf damit alles, was Docker darf. Das ist für ein
+  # Heim-NAS vertretbar, aber es soll eine Entscheidung sein und keine
+  # Überraschung. Ohne das Profil bleibt der Weg von Hand:
+  #   docker compose pull && docker compose up -d
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: hb-watchtower
+    profiles: ['auto-update']
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    # Nur hb-media, nichts anderes auf dem NAS. `--cleanup` wirft das alte
+    # Image weg, sonst füllt sich die Platte mit jeder Version.
+    command: --interval ${HB_UPDATE_INTERVAL_SECONDS:-3600} --cleanup hb-media
+
 volumes:
+  # Katalog, gelesene ID3-Daten und aufbereitete Cover. Überlebt Updates und
+  # Neustarts – ohne das Volume liest der erste Start die ganze Bibliothek neu.
   hb-cache:

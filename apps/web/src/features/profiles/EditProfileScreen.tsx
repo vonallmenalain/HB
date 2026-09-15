@@ -1,7 +1,10 @@
 import { Navigate, useNavigate } from 'react-router-dom'
 
+import { useAuth } from '@/features/auth/authContext'
+import { useParents } from '@/features/parents/parentsContext'
 import { Avatar } from '@/ui/Avatar'
 import { BigButton, BigLinkButton } from '@/ui/BigButton'
+import { Notice } from '@/ui/Notice'
 import { Screen, ScreenTitle } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
 
@@ -9,14 +12,17 @@ import { AVATARS, COLORS } from './profile'
 import { useProfiles } from './profilesContext'
 
 /**
- * Das eigene Bild ändern – ohne Eltern-PIN.
+ * Das eigene Bild ändern – und der sichtbare Weg zu allem anderen.
  *
- * Tier und Farbe gehören dem Kind: Es darf sie jederzeit wechseln, und mehr
- * kann es hier nicht. Der Name bleibt im Elternbereich, sonst heisst am
- * Nachmittag jemand „aaaaaa".
+ * Tier und Farbe gehören dem Kind: Es darf sie jederzeit wechseln. Darunter
+ * liegen die Türen für die Erwachsenen. Der Elternbereich war bis M9 nur über
+ * zwei Sekunden Druck auf den Titel zu erreichen – ein Eingang, den niemand
+ * findet, der ihn nicht kennt. Jetzt steht er hier, hinter der PIN.
  */
 export function EditProfileScreen() {
   const { loading, selected, update, clearSelection } = useProfiles()
+  const { hasPin } = useParents()
+  const { isAdmin } = useAuth()
   const navigate = useNavigate()
 
   if (loading) {
@@ -31,7 +37,7 @@ export function EditProfileScreen() {
 
   return (
     <Screen>
-      <ScreenTitle>Dein Bild</ScreenTitle>
+      <ScreenTitle>Dein Profil</ScreenTitle>
 
       <div className="flex flex-col items-center gap-3 pb-6">
         <Avatar avatar={selected.avatar} color={selected.color} size="lg" />
@@ -93,6 +99,27 @@ export function EditProfileScreen() {
           Anderes Kind
         </BigButton>
       </div>
+
+      <section className="flex flex-col gap-3 pt-10">
+        <h2 className="text-xl font-bold text-ink-soft">Für Erwachsene</h2>
+
+        {hasPin ? null : (
+          <Notice>
+            Noch keine PIN gesetzt – der Elternbereich steht damit jedem offen,
+            auch den Kindern. Im Elternbereich lässt sich das in einer Minute ändern.
+          </Notice>
+        )}
+
+        <BigLinkButton to="/eltern" variant="secondary">
+          {hasPin ? '🔒 Elternbereich' : 'Elternbereich'}
+        </BigLinkButton>
+
+        {isAdmin ? (
+          <BigLinkButton to="/admin" variant="secondary">
+            {hasPin ? '🔒 Adminbereich' : 'Adminbereich'}
+          </BigLinkButton>
+        ) : null}
+      </section>
     </Screen>
   )
 }

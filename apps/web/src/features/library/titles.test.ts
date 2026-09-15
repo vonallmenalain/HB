@@ -27,6 +27,12 @@ describe('stripSeriesPrefix', () => {
     )
   })
 
+  it('erkennt die Reihe auch ohne Leerzeichen', () => {
+    expect(stripSeriesPrefix('5Freunde - 001 - beim Wanderzirkus', ['5 Freunde'])).toBe(
+      '001 - beim Wanderzirkus',
+    )
+  })
+
   it('lässt einen Titel stehen, der nur zufällig so anfängt', () => {
     expect(stripSeriesPrefix('Der Fall der Kids', ['Kids'])).toBe('Der Fall der Kids')
     expect(stripSeriesPrefix('Abenteuer mit Bibi Blocksberg - Hexerei', ['Bibi Blocksberg'])).toBe(
