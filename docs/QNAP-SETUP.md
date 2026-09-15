@@ -116,14 +116,20 @@ dort liegt die ausgefüllte `.env` bereits:
 cd /share/CACHEDEV2_DATA/Container/HB/services/media   # der bisherige Ordner
 docker compose down                                    # alten Container anhalten
 curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media/docker-compose.yml
-docker compose pull && docker compose --profile tunnel up -d
+docker compose pull && docker compose up -d
 ```
 
 Das `curl` überschreibt die alte `docker-compose.yml`, die `.env` bleibt
-unangetastet. Das `--profile tunnel` beim Start ist kein Versehen: `down` hält
-auch `hb-tunnel` an, und ohne das Profil käme er nicht wieder mit hoch. Wer stattdessen in den neuen Ordner umzieht, nimmt die `.env` mit
+unangetastet. Wer stattdessen in den neuen Ordner umzieht, nimmt die `.env` mit
 (`cp …/services/media/.env .`) und hält vorher den alten Container an – sonst
 kollidieren Name und Port.
+
+> **Lief bei dir der Cloudflare-Tunnel?** Dann die letzte Zeile mit
+> `docker compose --profile tunnel up -d` ausführen: `down` hält auch
+> `hb-tunnel` an, und ohne das Profil käme er nicht wieder mit hoch. Wer den
+> Dienst anders von aussen erreichbar macht – myQNAPcloud, Tailscale – oder nur
+> im Heimnetz nutzt, lässt das Profil weg; sonst startet ein `cloudflared` ohne
+> Token in einer Neustartschleife.
 
 > **Root-Shell.** Es genügt nicht, dass dein Konto in QTS zur Gruppe
 > *administrators* gehört – das ist Gruppe 0, nicht Benutzer 0. Docker-Befehle
@@ -340,7 +346,7 @@ HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 | Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
 | `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port. Steht in der `.env` `HB_HOST_PORT` gar nicht oder nur leer (`HB_HOST_PORT=`), greift die Vorgabe – Zeile auf `HB_HOST_PORT=18080` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
-| Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` |
+| Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` (nur, wenn der Tunnel vorher lief) |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
 | `401` bei `/library` | Ticket fehlt oder abgelaufen; die App holt normalerweise selbst ein neues |
