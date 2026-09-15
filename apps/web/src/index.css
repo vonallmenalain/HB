@@ -11,9 +11,23 @@
   --color-ink: #1f1b16;
   --color-ink-soft: #5f5546;
   --color-line: #e3d9c9;
+  /*
+   * Rand von Bedienelementen, nicht von Trennlinien.
+   *
+   * Ein sekundärer Knopf hebt sich farblich kaum vom Hintergrund ab; erkannt
+   * wird er an seinem Rand. WCAG 1.4.11 verlangt dafür 3:1 – `--color-line`
+   * schafft gegen Weiss nur 1,4:1 und taugt deshalb nur für Trennlinien, die
+   * nichts identifizieren müssen.
+   */
+  --color-control: #9c8a70;
   --color-primary: #6d28d9;
   --color-on-primary: #ffffff;
-  --color-accent: #ea580c;
+  /*
+   * Akzent = Fehlertext. Das vorherige #ea580c kam gegen Weiss auf 3,6:1 und
+   * verfehlte damit die 4,5:1, die §5.5 verbindlich fordert – ausgerechnet
+   * dort, wo etwas schiefgegangen ist.
+   */
+  --color-accent: #b23a04;
 
   /* Kleinstes Touch-Ziel 64px, Play/Pause 112px */
   --spacing-touch: 4rem;
@@ -38,6 +52,7 @@
     --color-ink: #f6f0e6;
     --color-ink-soft: #b5a894;
     --color-line: #3a3228;
+    --color-control: #7a6e5c;
     --color-primary: #a78bfa;
     --color-on-primary: #1f1b16;
     --color-accent: #fb923c;

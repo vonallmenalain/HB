@@ -13,7 +13,7 @@ export function TextField({ label, className = '', ...props }: Props) {
       <input
         id={id}
         className={
-          'min-h-touch rounded-tile border-2 border-line bg-surface px-4 text-xl ' +
+          'min-h-touch rounded-tile border-2 border-control bg-surface px-4 text-xl ' +
           'focus-visible:border-primary focus-visible:outline-4 focus-visible:outline-offset-1 ' +
           `focus-visible:outline-accent ${className}`
         }

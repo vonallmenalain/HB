@@ -4,12 +4,14 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M7 steht – Hörbücher lassen sich auf das Gerät laden und dann
-> ohne Internet hören. Dazu Wiedergabe mit Hintergrundbetrieb, Kapitelwechsel,
-> Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der Abgleich des
-> Fortschritts über Firestore. Was noch fehlt: den Medien-Dienst aufs NAS
-> deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)); vom Feinschliff
-> stehen Sleep-Timer und Elternmodus mit PIN, offen ist die Barrierefreiheit.
+> **Status:** Alle Meilensteine M0–M8 stehen. Die App ist damit fertig für den
+> Alltag: auswählen, hören, punktgenau weiterhören, über Geräte abgleichen,
+> herunterladen und offline hören, Einschlaf-Timer, Elternbereich mit PIN.
+>
+> **Was noch aussteht, kann nur Alain tun:** den Medien-Dienst aufs QNAP
+> deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)), die Netlify-
+> Variablen setzen, die Firestore-Regeln deployen und die eigene UID
+> freischalten.
 >
 > **Der Elternbereich öffnet sich mit zwei Sekunden Druck auf den Titel
 > „Hörbücher"** – kein sichtbarer Knopf, damit ihn kein Kind findet.
@@ -62,7 +64,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
 | M6 | Geräte-Sync über Firestore | ✅ |
 | M7 | Offline-Downloads, Background Fetch, Verwaltung im Elternmodus | ✅ |
-| M8 | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff | teilweise |
+| M8 | Sleep-Timer, Elternmodus mit PIN, Feinschliff | ✅ |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
 
