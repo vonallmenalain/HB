@@ -75,7 +75,14 @@ export function buildServer(options: ServerOptions): FastifyInstance {
     let user: FirebaseUser
     try {
       user = await verifyIdToken(match[1])
-    } catch {
+    } catch (error) {
+      // Der Grund gehört ins Log: Ein blosser 401 lässt offen, ob das Token
+      // abgelaufen ist, aus einem fremden Projekt stammt oder der Dienst die
+      // Signaturschlüssel gar nicht erst laden konnte.
+      request.log.warn(
+        { reason: error instanceof Error ? error.message : String(error) },
+        'Token-Prüfung fehlgeschlagen',
+      )
       return reply.code(401).send({ error: 'token_invalid' })
     }
 

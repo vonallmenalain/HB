@@ -1,7 +1,12 @@
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from 'jose'
 import { beforeAll, describe, expect, it } from 'vitest'
 
-import { InvalidIdTokenError, isUidAllowed, verifyFirebaseIdToken } from './firebaseToken.js'
+import {
+  GOOGLE_JWKS_URL,
+  InvalidIdTokenError,
+  isUidAllowed,
+  verifyFirebaseIdToken,
+} from './firebaseToken.js'
 
 const PROJECT_ID = 'hoerbuchkinder'
 const KID = 'test-key'
@@ -92,6 +97,17 @@ describe('verifyFirebaseIdToken', () => {
   it('lehnt Unsinn ab', async () => {
     await expect(verify('')).rejects.toBeInstanceOf(InvalidIdTokenError)
     await expect(verify('kein.token')).rejects.toBeInstanceOf(InvalidIdTokenError)
+  })
+})
+
+describe('GOOGLE_JWKS_URL', () => {
+  it('zeigt auf Googles Schlüsselsatz – der Pfad heisst jwk, nicht jwks', () => {
+    // Alle Tests oben arbeiten mit einem lokalen Schlüsselsatz und würden einen
+    // Tippfehler in dieser Adresse nie bemerken. Eine falsche Adresse liefert
+    // 404, und dann scheitert jede Anmeldung am Medien-Dienst mit 401.
+    expect(GOOGLE_JWKS_URL).toBe(
+      'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com',
+    )
   })
 })
 

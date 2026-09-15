@@ -9,7 +9,7 @@ import { type JWTPayload, type JWTVerifyGetKey, createRemoteJWKSet, jwtVerify } 
  * Firebase-Geheimnis.
  */
 export const GOOGLE_JWKS_URL =
-  'https://www.googleapis.com/service_accounts/v1/jwks/securetoken@system.gserviceaccount.com'
+  'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com'
 
 export function googleKeySet(): JWTVerifyGetKey {
   return createRemoteJWKSet(new URL(GOOGLE_JWKS_URL))
