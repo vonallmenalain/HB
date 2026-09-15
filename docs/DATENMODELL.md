@@ -138,7 +138,8 @@ enthält; `offsetSec` ist dann die Position innerhalb dieses Kapitels.
 
 ```
 users/{uid}
-  ├─ pinHash            : string        // Eltern-PIN, gehasht (nie im Klartext)
+  ├─ pinSalt            : string        // zufällig, je Konto
+  ├─ pinHash            : string        // Eltern-PIN, PBKDF2 (nie im Klartext)
   ├─ createdAt          : timestamp
   └─ settings           : map           // { allowSeek, defaultSleepMinutes, … }
 

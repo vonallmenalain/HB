@@ -272,9 +272,27 @@ selbsttätig weiterzuwechseln.
 
 ### 5.7 Elternmodus
 
-Erreichbar über langen Druck (2 s) auf das Logo, gesichert mit 4-stelliger PIN.
-Enthält: Profile verwalten, Downloads verwalten/löschen, freies Spulen erlauben,
-Katalog neu einlesen, Abmelden, Diagnose (ist das NAS erreichbar?).
+Erreichbar über langen Druck (2 s) auf den Titel, gesichert mit 4-stelliger PIN.
+Enthält: Profile verwalten, Downloads verwalten/löschen, Katalog neu einlesen,
+Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden. *Freies Spulen
+erlauben* fehlt noch – dazu bräuchte der Player einen ziehbaren Balken, und
+der ist nach §5.4 bewusst keiner.
+
+**Was die PIN ist und was nicht.** Sie hält ein Kind vom Elternbereich fern.
+Sie ist keine Sicherheitsgrenze: Wer das Gerät in der Hand hat, ist ohnehin
+angemeldet, und vier Ziffern sind zehntausend Möglichkeiten. Gespeichert wird
+sie trotzdem nicht im Klartext und abgeleitet mit PBKDF2 – das kostet nichts
+und macht aus dem Durchprobieren wenigstens Arbeit. Versprochen wird damit
+nichts, was nicht eingehalten werden kann.
+
+**Eine vergessene PIN sperrt niemanden aus.** Wer sich frisch angemeldet hat,
+kommt einmal ohne PIN hinein und kann eine neue setzen. Das ist die richtige
+Hürde: Anmelden kann sich, wer das Konto kennt – ein Kind nicht.
+
+**Der Titel bleibt eine Überschrift.** Ihn zum Knopf zu machen wäre der
+naheliegende Weg und der falsche: Die Seite verlöre ihre Hauptüberschrift. Für
+Tastatur und Vorleseprogramm steht daneben ein eigener Knopf, den nur sie zu
+sehen bekommen – ein Eingang, den nur der Finger kennt, wäre für sie keiner.
 
 ---
 
@@ -619,7 +637,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
-| **M8** | Sleep-Timer ✅, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
+| **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied
