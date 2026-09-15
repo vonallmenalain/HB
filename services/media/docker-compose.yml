@@ -23,6 +23,8 @@ services:
       HB_ALLOWED_UIDS: ${HB_ALLOWED_UIDS:-}
       HB_ADMIN_UIDS: ${HB_ADMIN_UIDS:-}
       HB_TICKET_TTL_SECONDS: ${HB_TICKET_TTL_SECONDS:-28800}
+      HB_RESCAN_INTERVAL_MINUTES: ${HB_RESCAN_INTERVAL_MINUTES:-360}
+      HB_SCAN_ON_START: ${HB_SCAN_ON_START:-true}
 
   # Cloudflare Tunnel: macht den Dienst ohne offenen Port erreichbar.
   # Das Token stammt aus dem Cloudflare-Dashboard (Zero Trust → Networks →

@@ -5,12 +5,14 @@ import { basename, dirname, join, relative } from 'node:path'
 import { parseFile } from 'music-metadata'
 import sharp from 'sharp'
 
-import { type ProbedFile, buildBook, parseOverride } from './build.js'
+import { type ProbedFile, buildBook, coverPath, parseOverride } from './build.js'
+import { bookId } from './ids.js'
 import { audioMime, isCoverFile, naturalCompare } from './naming.js'
 import type { Book, BookLocation, ScanResult } from './types.js'
 import { SCHEMA_VERSION } from './types.js'
 
 const MAX_DEPTH = 4
+const ADDED_AT_FILE = 'added-at.json'
 const COVER_MAX_PIXELS = 600
 const OVERRIDE_FILE = 'buch.json'
 
@@ -77,6 +79,25 @@ async function readOverride(folder: string): Promise<ReturnType<typeof parseOver
   }
 }
 
+/**
+ * Fingerabdruck der Cover-Quelle.
+ *
+ * Bewusst die Quelle und nicht das erzeugte JPEG: Das wird bei jedem Scan neu
+ * geschrieben und bekäme jedes Mal eine neue Änderungszeit – die Adresse würde
+ * sich dann grundlos ändern und jeden Browser-Cache verwerfen.
+ */
+async function coverVersionOf(sourcePath: string): Promise<string | null> {
+  try {
+    const stats = await stat(sourcePath)
+    return createHash('sha1')
+      .update(`${String(stats.size)}:${String(stats.mtimeMs)}`, 'utf8')
+      .digest('hex')
+      .slice(0, 8)
+  } catch {
+    return null
+  }
+}
+
 /** Aufbereitetes Cover in den Cache schreiben. Liefert den Pfad oder null. */
 async function writeCover(
   bookId: string,
@@ -126,6 +147,7 @@ async function scanBook(
   folder: string,
   contents: FolderContents,
   options: ScanOptions,
+  knownAddedAt: ReadonlyMap<string, string>,
 ): Promise<{ book: Book; location: BookLocation } | null> {
   const { mediaRoot, cacheDir } = options
   const relativePath = relative(mediaRoot, folder)
@@ -164,6 +186,17 @@ async function scanBook(
   const override = await readOverride(folder)
   if (override?.hidden === true) return null
 
+  const id = bookId(relativePath)
+
+  // Ein bereits bekanntes Buch behält seinen Zeitpunkt. Sonst würde jeder
+  // Sechs-Stunden-Scan die ganze Bibliothek als „neu dazugekommen" markieren
+  // und die Sortierung auf dem Startbildschirm wertlos machen.
+  const addedAt =
+    knownAddedAt.get(id) ??
+    (await stat(folder)
+      .then((stats) => new Date(stats.mtimeMs).toISOString())
+      .catch(() => (options.now?.() ?? new Date()).toISOString()))
+
   // Erst ohne Cover bauen, um die ID zu bekommen – der Cover-Dateiname hängt
   // daran.
   const withoutCover = buildBook({
@@ -172,31 +205,37 @@ async function scanBook(
     seriesFromParent,
     files,
     coverAvailable: false,
+    coverVersion: null,
     override,
-    addedAt: (options.now?.() ?? new Date()).toISOString(),
+    addedAt,
   })
 
-  let coverPath: string | null = null
+  let writtenCover: string | null = null
+  let coverVersion: string | null = null
+
   if (contents.cover !== null) {
-    coverPath = await writeCover(withoutCover.id, cacheDir, join(folder, contents.cover))
+    const source = join(folder, contents.cover)
+    writtenCover = await writeCover(withoutCover.id, cacheDir, source)
+    coverVersion = await coverVersionOf(source)
   } else if (embeddedPictureFrom !== null) {
     try {
       const metadata = await parseFile(embeddedPictureFrom)
       const picture = metadata.common.picture?.[0]
       if (picture) {
-        coverPath = await writeCover(withoutCover.id, cacheDir, Buffer.from(picture.data))
+        writtenCover = await writeCover(withoutCover.id, cacheDir, Buffer.from(picture.data))
+        coverVersion = await coverVersionOf(embeddedPictureFrom)
       }
     } catch {
-      coverPath = null
+      writtenCover = null
     }
   }
 
   const book: Book =
-    coverPath === null
+    writtenCover === null
       ? withoutCover
-      : { ...withoutCover, cover: `/cover/${withoutCover.id}.jpg` }
+      : { ...withoutCover, cover: coverPath(withoutCover.id, coverVersion) }
 
-  return { book, location: { id: book.id, filePaths, coverPath } }
+  return { book, location: { id: book.id, filePaths, coverPath: writtenCover } }
 }
 
 async function walk(
@@ -204,6 +243,7 @@ async function walk(
   depth: number,
   options: ScanOptions,
   collected: { books: Book[]; locations: Map<string, BookLocation> },
+  knownAddedAt: ReadonlyMap<string, string>,
 ): Promise<void> {
   if (depth > MAX_DEPTH) return
 
@@ -220,7 +260,7 @@ async function walk(
   // Ein Ordner mit Audiodateien ist ein Buch. Einer ohne ist eine Reihe oder
   // schlicht Ablage – dann weiter nach unten.
   if (contents.audio.length > 0) {
-    const result = await scanBook(folder, contents, options)
+    const result = await scanBook(folder, contents, options, knownAddedAt)
     if (result) {
       collected.books.push(result.book)
       collected.locations.set(result.book.id, result.location)
@@ -229,7 +269,7 @@ async function walk(
   }
 
   for (const name of contents.subdirectories) {
-    await walk(join(folder, name), depth + 1, options, collected)
+    await walk(join(folder, name), depth + 1, options, collected, knownAddedAt)
   }
 }
 
@@ -245,12 +285,42 @@ export function sortBooks(books: readonly Book[]): Book[] {
   })
 }
 
+/**
+ * Wann ein Buch zum ersten Mal im Katalog auftauchte.
+ *
+ * Liegt im Cache-Volume und überlebt damit Neustarts – ohne das bekäme nach
+ * jedem Container-Neustart die ganze Bibliothek denselben Zeitpunkt.
+ */
+async function readKnownAddedAt(cacheDir: string): Promise<Map<string, string>> {
+  try {
+    const raw: unknown = JSON.parse(await readFile(join(cacheDir, ADDED_AT_FILE), 'utf8'))
+    if (typeof raw !== 'object' || raw === null) return new Map()
+    return new Map(
+      Object.entries(raw as Record<string, unknown>).filter(
+        (entry): entry is [string, string] => typeof entry[1] === 'string',
+      ),
+    )
+  } catch {
+    return new Map()
+  }
+}
+
 export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
   await mkdir(join(options.cacheDir, 'meta'), { recursive: true })
   await mkdir(join(options.cacheDir, 'covers'), { recursive: true })
 
+  const knownAddedAt = await readKnownAddedAt(options.cacheDir)
   const collected = { books: [] as Book[], locations: new Map<string, BookLocation>() }
-  await walk(options.mediaRoot, 0, options, collected)
+  await walk(options.mediaRoot, 0, options, collected, knownAddedAt)
+
+  await writeFile(
+    join(options.cacheDir, ADDED_AT_FILE),
+    JSON.stringify(Object.fromEntries(collected.books.map((book) => [book.id, book.addedAt]))),
+    'utf8',
+  ).catch(() => {
+    // Ohne die Datei wirken beim nächsten Start alle Bücher gleich alt –
+    // ärgerlich, aber kein Grund, den Scan scheitern zu lassen.
+  })
 
   return {
     catalog: {

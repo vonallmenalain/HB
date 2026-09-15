@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -53,6 +53,15 @@ export interface FixtureBook {
   files: FixtureFile[]
 }
 
+/**
+ * Fester Ausgangszeitpunkt für die Ordner-Änderungszeiten.
+ *
+ * Der Scanner leitet `addedAt` daraus ab. Ohne feste Zeiten wäre jeder Scan
+ * eines frisch angelegten Temp-Ordners anders – und der Vertragstest gegen den
+ * Beispielkatalog könnte nie bestehen.
+ */
+const BASE_MTIME = Date.parse('2026-01-01T00:00:00.000Z')
+
 /** Legt eine Hörbuch-Bibliothek in einem temporären Ordner an. */
 export async function makeLibrary(books: FixtureBook[]): Promise<{
   mediaRoot: string
@@ -64,13 +73,23 @@ export async function makeLibrary(books: FixtureBook[]): Promise<{
   await mkdir(mediaRoot, { recursive: true })
   await mkdir(cacheDir, { recursive: true })
 
-  for (const book of books) {
+  for (const [index, book] of books.entries()) {
     const folder = join(mediaRoot, book.path)
     await mkdir(folder, { recursive: true })
+    // Jedes Buch bekommt einen eigenen, festen Zeitpunkt – ein Tag Abstand.
+    const mtime = new Date(BASE_MTIME + index * 86_400_000)
+
     for (const file of book.files) {
       const content = file.content ?? wav(file.seconds ?? 1)
-      await writeFile(join(folder, file.name), content)
+      const path = join(folder, file.name)
+      await writeFile(path, content)
+      // Auch die Dateien: Aus der Änderungszeit des Covers leitet der Scanner
+      // die Version in der Adresse ab.
+      await utimes(path, mtime, mtime)
     }
+
+    // Zuletzt der Ordner – das Schreiben der Dateien hat ihn eben berührt.
+    await utimes(folder, mtime, mtime)
   }
 
   return { mediaRoot, cacheDir }

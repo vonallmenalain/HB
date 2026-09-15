@@ -22,6 +22,7 @@ function input(overrides: Partial<BookInput> = {}): BookInput {
     seriesFromParent: 'Die drei ???',
     files: [file()],
     coverAvailable: true,
+    coverVersion: 'abcd1234',
     override: null,
     addedAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
@@ -112,7 +113,7 @@ describe('buildBook', () => {
   })
 
   it('verweist nur auf ein Cover, wenn es eins gibt', () => {
-    expect(buildBook(input()).cover).toMatch(/^\/cover\/b_[0-9a-f]{12}\.jpg$/)
+    expect(buildBook(input()).cover).toMatch(/^\/cover\/b_[0-9a-f]{12}\.jpg\?v=abcd1234$/)
     const without = buildBook(input({ coverAvailable: false }))
     expect(without.cover).toBeNull()
     // Ohne Cover braucht die App eine Farbe für die Buchstabenkachel.
@@ -121,13 +122,23 @@ describe('buildBook', () => {
 
   it('ändert den Datei-Fingerabdruck, wenn sich die Dateien ändern', () => {
     const before = buildBook(input()).filesHash
-    const added = buildBook(
-      input({ files: [file(), file({ fileName: '02.mp3' })] }),
-    ).filesHash
+    const added = buildBook(input({ files: [file(), file({ fileName: '02.mp3' })] })).filesHash
     const grown = buildBook(input({ files: [file({ bytes: 2_000_000 })] })).filesHash
+    // Gleiche Grösse, andere Dauer: eine neu kodierte Datei. Die gespeicherte
+    // Stelle als (Datei, Offset) ist dann nicht mehr verlässlich.
+    const reencoded = buildBook(input({ files: [file({ durationSec: 590 })] })).filesHash
 
     expect(added).not.toBe(before)
     expect(grown).not.toBe(before)
+    expect(reencoded).not.toBe(before)
+  })
+
+  it('hängt die Cover-Version an die Adresse', () => {
+    // Ohne Version dürfte das Cover nicht ein Jahr lang als unveränderlich
+    // ausgeliefert werden – ein Wechsel auf dem NAS bliebe sonst unsichtbar.
+    const alt = buildBook(input({ coverVersion: 'ffff0000' }))
+    expect(alt.cover).toContain('?v=ffff0000')
+    expect(buildBook(input({ coverVersion: null })).cover).not.toContain('?v=')
   })
 
   it('rundet Bruchteile von Sekunden weg', () => {

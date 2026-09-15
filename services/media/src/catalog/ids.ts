@@ -16,8 +16,18 @@ export function bookId(relativePath: string): string {
  * Fingerabdruck der Dateiliste. Ändert er sich, ist eine gespeicherte Position
  * als (Datei, Offset) nicht mehr verlässlich und muss über die globale Sekunde
  * neu aufgelöst werden.
+ *
+ * Die Dauer gehört mit hinein: Eine neu kodierte Datei kann zufällig dieselbe
+ * Byte-Grösse behalten, und dann würde der Player eine gespeicherte Stelle für
+ * exakt halten, obwohl sich die Zeitachse verschoben hat. Die Änderungszeit
+ * wäre der naheliegende Kandidat, taugt aber schlechter: Ein blosses `touch`
+ * würde jede exakte Position verwerfen, obwohl sich nichts geändert hat.
  */
-export function filesHash(files: readonly { fileName: string; bytes: number }[]): string {
-  const input = files.map((file) => `${file.fileName}:${String(file.bytes)}`).join('|')
+export function filesHash(
+  files: readonly { fileName: string; bytes: number; durationSec: number }[],
+): string {
+  const input = files
+    .map((file) => `${file.fileName}:${String(file.bytes)}:${String(Math.round(file.durationSec))}`)
+    .join('|')
   return createHash('sha1').update(input, 'utf8').digest('hex').slice(0, 16)
 }

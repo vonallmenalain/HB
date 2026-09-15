@@ -96,12 +96,46 @@ describe('scanLibrary', () => {
     const { catalog, locations } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
     const book = catalog.books[0]!
 
-    expect(book.cover).toBe(`/cover/${book.id}.jpg`)
+    expect(book.cover).toMatch(new RegExp(`^/cover/${book.id}\\.jpg\\?v=[0-9a-f]{8}$`))
     const coverPath = locations.get(book.id)?.coverPath
     expect(coverPath).toBe(join(cacheDir, 'covers', `${book.id}.jpg`))
     // Als JPEG abgelegt, nicht durchgereicht.
     const bytes = await readFile(coverPath!)
     expect(bytes.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xd8]))
+  })
+
+  it('behält den Zeitpunkt eines bereits bekannten Buchs beim zweiten Scan', async () => {
+    // Ohne das markierte jeder Sechs-Stunden-Scan die ganze Bibliothek als
+    // frisch dazugekommen und machte die Sortierung wertlos.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Buch', files: [{ name: 'a.wav' }] },
+    ])
+
+    const first = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    const second = await scanLibrary({
+      mediaRoot,
+      cacheDir,
+      now: () => new Date('2027-06-06T00:00:00.000Z'),
+    })
+
+    expect(second.catalog.books[0]?.addedAt).toBe(first.catalog.books[0]?.addedAt)
+  })
+
+  it('leitet den Zeitpunkt neuer Bücher aus dem Ordner ab, nicht aus der Uhr', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Erstes', files: [{ name: 'a.wav' }] },
+      { path: 'Zweites', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({
+      mediaRoot,
+      cacheDir,
+      now: () => new Date('2099-01-01T00:00:00.000Z'),
+    })
+
+    const zeiten = catalog.books.map((book) => book.addedAt)
+    expect(zeiten).not.toContain('2099-01-01T00:00:00.000Z')
+    expect(new Set(zeiten).size).toBe(2)
   })
 
   it('kommt ohne Cover aus und liefert eine Ersatzfarbe', async () => {

@@ -59,10 +59,32 @@ describe('Katalog-Vertrag', () => {
       [0, 3],
       [3, 5],
     ])
-    expect(papagei?.cover).toBe(`/cover/${papagei?.id ?? ''}.jpg`)
+    // Die Version in der Adresse lässt das Cover unveränderlich ausliefern
+    // und trotzdem sofort umschlagen, wenn auf dem NAS ein anderes liegt.
+    expect(papagei?.cover).toMatch(
+      new RegExp(`^/cover/${papagei?.id ?? ''}\\.jpg\\?v=[0-9a-f]{8}$`),
+    )
 
     const ohneCover = result.catalog.books.find((book) => book.cover === null)
     expect(ohneCover?.coverColor).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  it('hängt das Ticket an eine Cover-Adresse, die schon Parameter hat', async () => {
+    // `?v=` steht bereits drin – das Ticket muss mit `&` angehängt werden,
+    // sonst entsteht eine kaputte Adresse.
+    const { createMediaClient } = await import('./mediaClient')
+    window.localStorage.setItem(
+      'hb.mediaTicket',
+      JSON.stringify({ ticket: 'T', expiresAt: Date.now() + 3_600_000 }),
+    )
+    const client = createMediaClient({
+      baseUrl: 'https://media.example.com',
+      getIdToken: () => Promise.resolve(null),
+    })
+
+    expect(client.coverUrl('/cover/b_1.jpg?v=abcd1234')).toBe(
+      'https://media.example.com/cover/b_1.jpg?v=abcd1234&t=T',
+    )
   })
 
   it('löst Positionen über die Dateigrenze hinweg auf', async () => {

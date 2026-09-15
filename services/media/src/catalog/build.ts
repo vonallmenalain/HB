@@ -31,8 +31,15 @@ export interface BookInput {
   /** Bereits natürlich sortiert. */
   files: ProbedFile[]
   coverAvailable: boolean
+  /** Ändert sich, sobald die Cover-Quelle wechselt – hängt in der Adresse. */
+  coverVersion: string | null
   override: BookOverride | null
   addedAt: string
+}
+
+export function coverPath(bookId: string, version: string | null): string {
+  const base = `/cover/${bookId}.jpg`
+  return version === null ? base : `${base}?v=${version}`
 }
 
 function firstNonEmpty(...values: (string | null | undefined)[]): string | null {
@@ -95,7 +102,10 @@ export function buildBook(input: BookInput): Book {
     author,
     narrator: firstNonEmpty(override?.narrator),
     durationSec: elapsed,
-    cover: input.coverAvailable ? `/cover/${id}.jpg` : null,
+    // Die Version hängt an der Adresse, damit das Cover ein Jahr lang als
+    // unveränderlich ausgeliefert werden darf und trotzdem sofort umschlägt,
+    // wenn auf dem NAS ein anderes Bild liegt.
+    cover: input.coverAvailable ? coverPath(id, input.coverVersion) : null,
     coverColor: tileColor(title),
     tags: override?.tags?.filter((tag) => tag.trim() !== '') ?? [],
     addedAt: input.addedAt,
