@@ -24,6 +24,21 @@ describe('Bibliothek im Elternbereich', () => {
     expect(screen.getByText(/2 Hörbücher vom NAS/)).toBeInTheDocument()
   })
 
+  it('nennt einen zu alten Medien-Dienst beim Namen', () => {
+    // Ohne Reihen im Katalog sieht die Bibliothek aus, als wäre jedes Hörbuch
+    // eine eigene Reihe. Wer das sieht, sucht den Fehler sonst in der App.
+    zeigen({ schemaVersion: 1 })
+
+    expect(screen.getByText(/älter als die App/)).toBeInTheDocument()
+    expect(screen.getByText(/neu bauen/)).toBeInTheDocument()
+  })
+
+  it('schweigt, solange der Dienst aktuell ist', () => {
+    zeigen({ schemaVersion: 2 })
+
+    expect(screen.queryByText(/älter als die App/)).not.toBeInTheDocument()
+  })
+
   it('macht kenntlich, wenn nur der letzte Stand gezeigt wird', () => {
     // Beantwortet die Frage, warum ein neues Hörbuch nicht auftaucht.
     zeigen({ fromCache: true })

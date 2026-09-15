@@ -103,6 +103,33 @@ describe('Bibliothek', () => {
     expect(container.querySelector('img')).toHaveAttribute('src', 'blob:abc')
   })
 
+  it('führt von der Reihenübersicht zurück auf die Startseite', () => {
+    // Die App startet dort, wo man aufgehört hat. Ohne diesen Weg käme man nie
+    // wieder zu Weiterhören, Favoriten und Elternbereich.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({ books: BOOKS }),
+    })
+
+    expect(screen.getByRole('link', { name: /Startseite/ })).toHaveAttribute('href', '/')
+  })
+
+  it('führt bei einer Reihe mit einem einzigen Buch direkt zum Buch', () => {
+    // Eine Reihe mit einem Eintrag ist keine Reihe – der Zwischenschritt wäre
+    // nur ein Tap für eine Liste mit einer Kachel.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({
+        books: [makeBook({ id: 'b_9', title: 'Einzelstück', series: 'Einzelstück' })],
+      }),
+    })
+
+    expect(screen.getByRole('link', { name: /Einzelstück/ })).toHaveAttribute(
+      'href',
+      '/buch/b_9',
+    )
+  })
+
   it('zeigt einen leeren Zustand statt eines Fehlers, wenn nichts da ist', () => {
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/bibliothek',
