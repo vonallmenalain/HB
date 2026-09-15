@@ -21,7 +21,7 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     # Die App braucht keinen Standort, keine Kamera, kein Mikrofon.
     Permissions-Policy = "geolocation=(), camera=(), microphone=(), payment=(), usb=()"
-    Content-Security-Policy = """
+    Content-Security-Policy = """\
       default-src 'self'; \
       base-uri 'self'; \
       object-src 'none'; \
@@ -34,9 +34,9 @@
       font-src 'self'; \
       worker-src 'self'; \
       manifest-src 'self'; \
-      connect-src 'self' blob: https://hb-media.alae.app \
+      connect-src 'self' https://hb-media.alae.app \
         https://identitytoolkit.googleapis.com https://securetoken.googleapis.com \
-        https://firestore.googleapis.com https://*.googleapis.com"""
+        https://firestore.googleapis.com"""
 
 # Der Service Worker darf nie aus dem Browser-Cache kommen, sonst bleibt die
 # App auf einer alten Version stehen.
