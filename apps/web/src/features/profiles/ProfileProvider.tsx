@@ -106,17 +106,19 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (!db) return
 
       // Firestore löscht Unterkollektionen nicht mit dem Dokument. Ohne diesen
-      // Schritt bliebe der Hörfortschritt liegen – obwohl die Rückfrage im
-      // Elternbereich ausdrücklich verspricht, dass er verschwindet.
-      const progressRef = collection(db, 'users', user.uid, 'profiles', id, 'progress')
-      const progress = await getDocs(progressRef)
-      // Ein Batch fasst höchstens 500 Schreibvorgänge.
-      for (let start = 0; start < progress.docs.length; start += 400) {
-        const batch = writeBatch(db)
-        for (const entry of progress.docs.slice(start, start + 400)) {
-          batch.delete(entry.ref)
+      // Schritt blieben Hörfortschritt und Favoriten liegen – obwohl die
+      // Rückfrage im Elternbereich ausdrücklich verspricht, dass sie
+      // verschwinden.
+      for (const name of ['progress', 'favorites']) {
+        const eintraege = await getDocs(collection(db, 'users', user.uid, 'profiles', id, name))
+        // Ein Batch fasst höchstens 500 Schreibvorgänge.
+        for (let start = 0; start < eintraege.docs.length; start += 400) {
+          const batch = writeBatch(db)
+          for (const entry of eintraege.docs.slice(start, start + 400)) {
+            batch.delete(entry.ref)
+          }
+          await batch.commit()
         }
-        await batch.commit()
       }
 
       await deleteDoc(doc(db, 'users', user.uid, 'profiles', id))

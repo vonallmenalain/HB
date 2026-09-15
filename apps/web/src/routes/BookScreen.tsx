@@ -2,6 +2,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { DownloadButton } from '@/features/downloads/DownloadButton'
 import { useDownloads } from '@/features/downloads/downloadsContext'
+import { FavoriteButton } from '@/features/favorites/FavoriteButton'
+import { seriesOf } from '@/features/library/grouping'
 import { useLibrary } from '@/features/library/libraryContext'
 import { usePlayer } from '@/features/player/playerContext'
 import { progressRatio, resolveResume } from '@/features/progress/progress'
@@ -17,7 +19,7 @@ import { Spinner } from '@/ui/Spinner'
 /** Buchseite: Cover, Titel, Abspiel-Knopf, Kapitelliste. */
 export function BookScreen() {
   const { bookId = '' } = useParams()
-  const { status, bookById, client } = useLibrary()
+  const { status, books, bookById, client } = useLibrary()
   const { get: getProgress } = useProgress()
   const { offlineCoverUrl } = useDownloads()
   const player = usePlayer()
@@ -52,11 +54,15 @@ export function BookScreen() {
     offlineCoverUrl(book.id) ??
     (book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null)
 
+  // Zurück dorthin, wo man hergekommen ist: in die Reihe, nicht in die
+  // Übersicht aller Reihen.
+  const reihe = seriesOf(books, book)
+
   return (
     <Screen>
-      <div className="py-4">
+      <div className="flex items-center justify-between py-4">
         <Link
-          to="/bibliothek"
+          to={reihe === null ? '/bibliothek' : `/bibliothek/${reihe.slug}`}
           className="inline-flex min-h-touch items-center gap-2 rounded-tile pr-4 text-lg focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
           <span aria-hidden="true" className="text-3xl">
@@ -64,6 +70,8 @@ export function BookScreen() {
           </span>
           Zurück
         </Link>
+
+        <FavoriteButton book={book} size="lg" />
       </div>
 
       <div className="mx-auto w-full max-w-xs">
@@ -75,6 +83,7 @@ export function BookScreen() {
         {book.series !== null ? (
           <p className="text-ink-soft">
             {book.series}
+            {book.group !== null ? ` · ${book.group}` : ''}
             {book.seriesIndex !== null ? ` · Folge ${String(book.seriesIndex)}` : ''}
           </p>
         ) : null}

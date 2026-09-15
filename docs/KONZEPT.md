@@ -149,26 +149,35 @@ er keine Zugangsdaten, nur Internet-Zugriff. Das spart eine ganze Schicht.
 
 ## 5. Bedienkonzept für Kinder
 
-### 5.1 Nur drei Ebenen – mehr nicht
+### 5.1 Wenige Ebenen – und von der Startseite aus fast immer nur eine
 
 ```
   Profilwahl  →  Start  →  Player
   (nur wenn        │
-   mehrere         └→ Bibliothek (Cover-Raster)  →  Player
-   Profile)
+   mehrere         ├→ Buch → Player
+   Profile)        │
+                   └→ Bibliothek (Reihen) → Reihe (Folgen) → Buch → Player
 ```
 
 Kein Hamburger-Menü, keine Tabs, keine Modals, kein Suchfeld auf der Kinderseite.
 Die Rück-Geste ist immer derselbe grosse Pfeil links oben.
 
+**Die Bibliothek hat seit M9 eine Ebene mehr, und die Startseite dafür weniger.**
+Neun Reihen mit zusammen mehreren hundert Folgen waren als ein einziges Raster
+unbenutzbar – man scrollte an allem vorbei, was man suchte. Alles, was regelmässig
+gehört wird, steht dafür jetzt auf der Startseite und ist von dort aus einen Tap
+entfernt: Weiterhören, Gemerktes, Vorschläge.
+
 ### 5.2 Startbildschirm
 
-Der Startbildschirm ist zu 60 % **eine einzige Kachel**: das zuletzt gehörte Buch,
-mit Cover, Fortschrittsring und dem Wort „Weiterhören". Ein Tap startet die
-Wiedergabe an der gespeicherten Position – ohne Zwischenseite.
+Oben **eine einzige grosse Kachel**: das zuletzt gehörte Buch, mit Cover,
+Fortschritt und dem Wort „Weiterhören". Ein Tap startet die Wiedergabe an der
+gespeicherten Position – ohne Zwischenseite. Darunter, in dieser Reihenfolge,
+was ein Kind sonst noch sucht.
 
 ```
  ┌───────────────────────────────┐
+ │ Hörbücher            [Avatar] │   ← Avatar: Tier und Farbe ändern
  │ ┌───────────────────────────┐ │
  │ │                           │ │
  │ │     [  COVER  GROSS  ]    │ │   ← 1 Tap = weiterhören
@@ -178,21 +187,61 @@ Wiedergabe an der gespeicherten Position – ohne Zwischenseite.
  │ └───────────────────────────┘ │
  │                               │
  │ Zuletzt gehört                │
- │ ┌─────┐ ┌─────┐ ┌─────┐       │   ← seitlich scrollbar
- │ │Cover│ │Cover│ │Cover│       │
+ │ ┌─────┐ ┌─────┐               │
+ │ │Cover│ │Cover│               │
+ │ └─────┘ └─────┘               │
+ │                               │
+ │ Gemerkt                    ★  │
+ │ ┌─────┐ ┌─────┐               │
+ │ └─────┘ └─────┘               │
+ │                               │
+ │ Vielleicht auch etwas für dich│
+ │ ┌─────┐ ┌─────┐ ┌─────┐       │
  │ └─────┘ └─────┘ └─────┘       │
  │                               │
+ │ Alle Hörbücher                │
+ │ ┌─────┐ ┌─────┐               │
+ │ └─────┘ └─────┘               │
  │ ┌───────────────────────────┐ │
- │ │      Alle Hörbücher       │ │   ← ein grosser Button
+ │ │      Alle Hörbücher       │ │   ← in die Reihenübersicht
  │ └───────────────────────────┘ │
  └───────────────────────────────┘
 ```
 
+**Gemerkt.** Ein Stern auf der Buchseite, mehr ist es nicht. Er gehört dem
+Profil, nicht dem Konto: Zwei Geschwister auf demselben Tablet haben
+verschiedene Lieblingsfolgen.
+
+**Vorschläge – bewusst dumm.** Wer Folge 5 hört, bekommt 6, 7 und 8. Gewichtet
+wird nur danach, in welchem Fach am meisten Zeit verbracht wurde; höchstens drei
+Folgen je Fach, sonst besteht die Zeile aus einer einzigen Reihe. Am ersten Tag,
+wenn es noch nichts zu wissen gibt, steht dort das zuletzt Dazugekommene. Nichts
+davon lernt, nichts davon rechnet – und genau deshalb versteht ein Kind das
+Ergebnis ohne Erklärung.
+
+**Der Avatar ist ein Knopf.** Ein Tap darauf führt zu Tier und Farbe. Das ist
+das Einzige am eigenen Profil, was ein Kind ohne Eltern ändern darf – der Name
+bleibt im Elternbereich, sonst heisst am Nachmittag jemand „aaaaaa".
+
 ### 5.3 Bibliothek
 
-Raster aus **grossen Covern**, 2 Spalten auf dem Handy, 3–4 auf dem Tablet.
-Titel klein darunter, aber das Cover trägt die Erkennung. Bücher mit Fortschritt
-bekommen einen Ring, fertige einen Haken, heruntergeladene ein Offline-Symbol.
+Zwei Schritte: **erst die Reihen, dann die Folgen.** Beide sind dasselbe Raster
+aus **grossen Covern**, 2 Spalten auf dem Handy, 3–4 auf dem Tablet. Titel klein
+darunter, aber das Cover trägt die Erkennung. Heruntergeladene Bücher bekommen
+ein Offline-Symbol, gemerkte einen Stern.
+
+Innerhalb einer Reihe stehen Unterordner des NAS als eigene Abschnitte:
+„Adventskalender", „Mini-Fälle". Sie gehören zur Reihe, sind aber nicht die
+Reihe – und in einem Topf mit ihr wären sie an der falschen Stelle einsortiert.
+
+**Titel werden aufgeräumt, nicht abgetippt.** Auf dem NAS heisst ein Ordner
+„Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln", weil er über Jahre so gewachsen
+ist. In der Reihe gelesen steht der Reihenname dann in jeder Zeile noch einmal.
+Der Scanner nimmt ihn deshalb vorn heraus, vereinheitlicht die Trennzeichen und
+trennt die Folgennummer ab; angezeigt wird „68 - Chaos Im Dunkeln". Dieselbe
+Aufbereitung läuft zusätzlich in der App – sonst müsste man auf einen neuen
+NAS-Dienst warten, um ein Ergebnis zu sehen. Wo die Automatik danebenliegt,
+setzt der Adminbereich den Titel von Hand; der gilt dann für alle Geräte.
 
 Bücher ohne Cover bekommen automatisch eine farbige Kachel mit grossem
 Anfangsbuchstaben – nie ein leeres graues Rechteck.
@@ -212,7 +261,7 @@ Anfangsbuchstaben – nie ein leeres graues Rechteck.
  │      Der Super-Papagei        │
  │          Kapitel 4            │
  │                               │
- │  ████████░░░░░░░░░░░░░░░░░░░  │   ← nur Anzeige, nicht ziehbar
+ │  ███████●░░░░░░░░░░░░░░░░░░░  │   ← tippen oder ziehen = spulen
  │  12:04                -18:22  │
  │                               │
  │  |<    -30s    >    +30s   >| │
@@ -220,9 +269,18 @@ Anfangsbuchstaben – nie ein leeres graues Rechteck.
  └───────────────────────────────┘
 ```
 
-**Warum der Fortschrittsbalken nicht ziehbar ist:** Kinder verlieren beim
-versehentlichen Wischen ihre Stelle – genau das, was diese App verhindern soll.
-Springen geht über Kapitel und ±30 s. Freies Spulen schaltet der Elternmodus frei.
+**Der Fortschrittsbalken war bis M8 bewusst nur Anzeige** – aus Sorge, ein Kind
+verliere beim versehentlichen Wischen seine Stelle. In der Praxis fehlte er:
+Wer eine bestimmte Stelle sucht, tippt sonst minutenlang auf ⏪. Seit M9 lässt
+sich hineintippen und ziehen; die ±30-Sekunden-Knöpfe bleiben genau so, wie sie
+waren.
+
+Die ursprüngliche Sorge bleibt berechtigt und wird anders beantwortet als durch
+Weglassen: Der Fortschritt wird laufend gesichert, ein Sprung ist mit demselben
+Balken sofort rückgängig zu machen, und die Fläche zum Ziehen ist ein volles
+Touch-Ziel hoch – man trifft sie absichtlich, nicht im Vorbeiwischen. Technisch
+ist es ein `input[type=range]`: Tastatur und Vorleseprogramm können damit
+umgehen, ohne dass dafür etwas nachgebaut werden müsste.
 
 **Warum zwei Bedienzeilen statt einer:** Fünf Knöpfe nebeneinander brauchen
 368 px, plus die oben geforderten 16 px Abstand zwischen tappbaren Elementen
@@ -294,13 +352,25 @@ Ende. Nach dem Ausblenden folgt deshalb eine echte Pause.
 Bei „bis Kapitelende" endet die Wiedergabe am Kapitelende, statt wie sonst
 selbsttätig weiterzuwechseln.
 
-### 5.7 Elternmodus
+### 5.7 Elternmodus und Adminbereich
 
 Erreichbar über langen Druck (2 s) auf den Titel, gesichert mit 4-stelliger PIN.
 Enthält: Profile verwalten, Downloads verwalten/löschen, Katalog neu einlesen,
-Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden. *Freies Spulen
-erlauben* fehlt noch – dazu bräuchte der Player einen ziehbaren Balken, und
-der ist nach §5.4 bewusst keiner.
+Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden.
+
+**Ein Stockwerk darüber liegt der Adminbereich.** Der Elternmodus ist für alle,
+die das Tablet verwalten; der Adminbereich für das eine Konto, das über Zugänge
+entscheidet. Er enthält drei Dinge, die es sonst nirgends gibt:
+
+| | |
+|---|---|
+| **Zugriffsanfragen** | Wer sich mit einer fremden Adresse anmeldet, erscheint hier mit Namen und Adresse. Ein Tap gibt frei. Vorher stand auf dem Sperrbildschirm eine UID zum Abschreiben, die von Hand in die Firebase-Konsole gehörte – der einzige Schritt der ganzen App, der einen Rechner verlangte. |
+| **Titel** | Was die Automatik aus §5.3 falsch aufräumt, lässt sich hier hinschreiben. Der Eintrag gilt für alle Geräte und alle Kinder. |
+| **Gehört** | Wer hat was wie oft gehört – je Profil, mit den meistgehörten Folgen. Beantwortet die Frage, die sich zu Hause tatsächlich stellt („läuft eigentlich immer nur dieselbe Folge?"), ohne ein Protokoll über den Tag eines Kindes anzulegen: gezählt werden Starts und abgespielte Sekunden, sonst nichts. |
+
+Wer nicht das Administratorkonto ist, sieht den Eingang gar nicht erst – und
+bekäme dort auch nichts zu lesen: Die Firestore-Regeln geben die Listen nur einer
+einzigen, im Deployment hinterlegten Adresse heraus (§9.1).
 
 **Was die PIN ist und was nicht.** Sie hält ein Kind vom Elternbereich fern.
 Sie ist keine Sicherheitsgrenze: Wer das Gerät in der Hand hat, ist ohnehin
@@ -544,9 +614,10 @@ Familienlösung, kein Verteildienst. Entsprechend:
 
 | Ebene | Massnahme |
 |---|---|
-| **Freigabeliste** | Firestore-Kollektion `allowlist`, ein Dokument je erlaubter UID. Nur von Hand in der Firebase-Konsole pflegbar (`allow write: if false`). Ohne Eintrag verweigern die Firestore-Regeln jeden Zugriff. |
+| **Freigabeliste** | Firestore-Kollektion `allowlist`, ein Dokument je erlaubter UID. Geschrieben wird sie ausschliesslich vom Administratorkonto. Ohne Eintrag verweigern die Firestore-Regeln jeden Zugriff. |
+| **Administrator** | Ein einziges Konto, erkannt an der E-Mail-Adresse im Anmelde-Token (`email_verified` zwingend). Die Adresse wird beim Deployen der Regeln aus einem Geheimnis eingesetzt und steht nicht im öffentlichen Repository – siehe [`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md). Es ist das einzige Konto, das freigeben, Titel setzen und die Hörhistorie lesen darf. |
 | Registrierung | Zusätzlich in der Firebase-Konsole abschalten (`Authentication → Settings → User actions → Enable create`). Das reduziert den Lärm, ersetzt die Freigabeliste aber nicht. |
-| App | Ohne gültigen Login und ohne Freigabe kein Katalog, kein Cover, kein Ton. Ein nicht freigeschaltetes Konto sieht seine UID zum Übertragen in die Konsole. |
+| App | Ohne gültigen Login und ohne Freigabe kein Katalog, kein Cover, kein Ton. Ein nicht freigeschaltetes Konto legt eine Anfrage ab (`accessRequests/{uid}`: nur Name, Adresse, Zeitpunkt, Status „offen") und wartet. |
 | NAS-Dienst | Prüft jeden Request gegen ein Media-Ticket; ohne gültiges Ticket **401** |
 | Ticket | Kurzlebiges JWT (HS256, 8 h), enthält nur die Firebase-UID; signiert mit einem Secret, das nur Netlify-Build und NAS kennen |
 | Firestore | Regeln: `users/{uid}/**` nur für genau diese `uid` lesbar/schreibbar |
@@ -662,14 +733,15 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
 | **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff ✅, Barrierefreiheit ✅ | Fertig für den Alltag ✅ |
+| **M9** | Bibliothek nach Reihen, aufgeräumte Titel, Startseite als Dashboard (Favoriten, Vorschläge), Adminbereich mit Freigaben, Titeln und Hörhistorie, Spulen im Player, Regel-Deployment über GitHub | Aus „läuft" wird „macht Freude" ✅ |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied
 zwischen „funktioniert" und „wird täglich benutzt" ausmacht.
 
-Ausbaustufen danach (nicht eingeplant, nur notiert): Serien-Ansicht mit
-Reihenfolge, „Nur diese Bücher für dieses Kind", Cast/Sonos, Transcoding auf dem
-NAS, Katalogspiegel in Firestore, Wiedergabegeschwindigkeit.
+Ausbaustufen danach (nicht eingeplant, nur notiert): „Nur diese Bücher für
+dieses Kind", Cast/Sonos, Transcoding auf dem NAS, Katalogspiegel in Firestore,
+Wiedergabegeschwindigkeit.
 
 ---
 
@@ -701,3 +773,4 @@ Vorgaben weiter.
 ## Verwandte Dokumente
 
 - [`DATENMODELL.md`](./DATENMODELL.md) – Katalog-Schema, Firestore-Struktur, API-Verträge, NAS-Ordnerkonvention
+- [`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md) – Firestore-Regeln aus GitHub deployen: Dienstkonto, Rollen, Geheimnisse

@@ -100,12 +100,23 @@ export function pickContinue(
   entries: readonly Progress[],
   hasBook: (bookId: string) => boolean,
 ): Progress | null {
-  const candidates = entries.filter(
-    (entry) => !entry.finished && hasStarted(entry) && hasBook(entry.bookId),
-  )
-  if (candidates.length === 0) return null
+  return pickRecent(entries, hasBook, 1)[0] ?? null
+}
 
-  return candidates.reduce((latest, entry) =>
-    entry.updatedAt.localeCompare(latest.updatedAt) > 0 ? entry : latest,
-  )
+/**
+ * Die zuletzt angefangenen Bücher, das jüngste zuerst.
+ *
+ * Auf der Startseite steht darüber „Weiterhören": das erste gross, der Rest als
+ * Kacheln daneben. Fertig gehörte Bücher gehören nicht dazu – sie fingen wieder
+ * von vorn an, und das will niemand angeboten bekommen.
+ */
+export function pickRecent(
+  entries: readonly Progress[],
+  hasBook: (bookId: string) => boolean,
+  limit = 6,
+): Progress[] {
+  return entries
+    .filter((entry) => !entry.finished && hasStarted(entry) && hasBook(entry.bookId))
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, limit)
 }

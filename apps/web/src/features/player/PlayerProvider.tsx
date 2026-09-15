@@ -9,6 +9,7 @@ import {
 
 import { type Book, chapterAt, resolvePosition } from '@/features/library/catalog'
 import { useDownloads } from '@/features/downloads/downloadsContext'
+import { useHistory } from '@/features/history/historyContext'
 import { useLibrary } from '@/features/library/libraryContext'
 import { makeProgress, resolveResume } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
@@ -31,6 +32,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { client } = useLibrary()
   const { get: getProgress, save: saveProgress } = useProgress()
   const { offlineUrl, offlineCoverUrl } = useDownloads()
+  const history = useHistory()
 
   const engine = useMemo(() => (typeof document === 'undefined' ? null : getEngine()), [])
 
@@ -70,15 +72,67 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     persistRef.current = persist
   }, [persist])
 
+  // Dasselbe Spiel wie beim Sichern: Der Takt soll nicht neu aufgesetzt
+  // werden, nur weil der Aufzeichner eine neue Funktion bekommen hat.
+  const historyRef = useRef(history)
+  useEffect(() => {
+    historyRef.current = history
+  }, [history])
+
+  // Ein geöffnetes Buch ist ein Hörvorgang – das ist die Zahl, die im
+  // Adminbereich „wie oft gehört" beantwortet.
+  useEffect(() => {
+    if (book) historyRef.current.started(book)
+  }, [book])
+
+  /**
+   * Gehörte Sekunden aus dem Fortschritt, nicht aus dem Takt.
+   *
+   * Ein Takt alle fünf Sekunden heisst nicht fünf Sekunden Ton: Beim Puffern
+   * steht die Zeit still, und im Hintergrund darf der Browser den Takt
+   * strecken. Gezählt wird deshalb, wie weit die Stelle im Buch gewandert ist
+   * – höchstens aber so viel, wie tatsächlich Zeit vergangen ist, damit ein
+   * Sprung nach vorn nicht als Hören zählt.
+   */
+  const zuletztGezaehlt = useRef<{ positionSec: number; zeitMs: number } | null>(null)
+
+  const zaehleGehoertes = useCallback(() => {
+    if (!book) return
+    const jetzt = Date.now()
+    const vorher = zuletztGezaehlt.current
+    zuletztGezaehlt.current = { positionSec, zeitMs: jetzt }
+    if (vorher === null) return
+
+    const gehoert = positionSec - vorher.positionSec
+    const vergangen = (jetzt - vorher.zeitMs) / 1000
+    if (gehoert > 0) historyRef.current.listened(book, Math.min(gehoert, vergangen))
+  }, [book, positionSec])
+
+  const zaehlenRef = useRef(zaehleGehoertes)
+  useEffect(() => {
+    zaehlenRef.current = zaehleGehoertes
+  }, [zaehleGehoertes])
+
+  // Ein neues Buch fängt bei null an, sonst zählte der Sprung vom letzten
+  // Buch als gehörte Zeit.
+  useEffect(() => {
+    zuletztGezaehlt.current = null
+  }, [book])
+
   useEffect(() => {
     if (snapshot?.playing !== true) return
     const timer = setInterval(() => {
       persistRef.current()
+      zaehlenRef.current()
     }, PERSIST_INTERVAL_MS)
     return () => {
       clearInterval(timer)
+      // Beim Anhalten zählt der letzte angefangene Abschnitt noch mit; danach
+      // beginnt die Messung von vorn, damit die Pause nicht mitzählt.
+      zaehlenRef.current()
+      zuletztGezaehlt.current = null
     }
-  }, [snapshot?.playing])
+  }, [snapshot?.playing, book])
 
   // Beim Wegwischen der App bleibt keine Zeit mehr für asynchrone Arbeit –
   // deshalb hier und nicht erst beim Aufräumen.

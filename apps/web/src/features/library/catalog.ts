@@ -9,7 +9,7 @@
  *
  * Schema: docs/DATENMODELL.md §2
  */
-export const SUPPORTED_SCHEMA_VERSION = 1
+export const SUPPORTED_SCHEMA_VERSION = 2
 
 export interface BookFile {
   idx: number
@@ -29,8 +29,19 @@ export interface Chapter {
 
 export interface Book {
   id: string
+  /** Aufbereitet für die Anzeige – siehe `titles.ts`. */
   title: string
+  /**
+   * Der Ordnername auf dem NAS, unverändert – im Adminbereich sichtbar.
+   *
+   * Ältere Dienste liefern ihn nicht; dann steht hier der Titel, und das ist
+   * das Nächstbeste, was es gibt.
+   */
+  folderName: string
+  /** Oberster Ordner: die Reihe, nach der die Bibliothek gliedert. */
   series: string | null
+  /** Ordner zwischen Reihe und Buch, etwa „Mini-Fälle“ – sonst null. */
+  group: string | null
   seriesIndex: number | null
   author: string | null
   narrator: string | null
@@ -117,7 +128,9 @@ export function parseBook(raw: unknown): Book | null {
   return {
     id,
     title,
+    folderName: str(record.folderName) ?? title,
     series: str(record.series),
+    group: str(record.group),
     seriesIndex: num(record.seriesIndex),
     author: str(record.author),
     narrator: str(record.narrator),
@@ -232,11 +245,13 @@ export function chapterAt(book: Book, positionSec: number): Chapter | null {
   )
 }
 
-/** Reihen zusammen, darin nach Nummer – wie im Dienst, aber die App verlässt sich nicht darauf. */
+/** Reihen zusammen, darin nach Gruppe und Nummer – wie im Dienst, aber die App verlässt sich nicht darauf. */
 export function sortBooks(books: readonly Book[]): Book[] {
   return [...books].sort((a, b) => {
     const series = (a.series ?? '').localeCompare(b.series ?? '', 'de')
     if (series !== 0) return series
+    const group = (a.group ?? '').localeCompare(b.group ?? '', 'de')
+    if (group !== 0) return group
     if (a.seriesIndex !== null && b.seriesIndex !== null && a.seriesIndex !== b.seriesIndex) {
       return a.seriesIndex - b.seriesIndex
     }

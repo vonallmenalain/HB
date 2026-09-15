@@ -2,7 +2,15 @@ import type { ReactElement, ReactNode } from 'react'
 import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
+import type { User } from 'firebase/auth'
 
+import { AdminContext, type AdminContextValue } from '@/features/admin/adminContext'
+import { AuthContext, type AuthContextValue } from '@/features/auth/authContext'
+import {
+  FavoritesContext,
+  type FavoritesContextValue,
+} from '@/features/favorites/favoritesContext'
+import { TitlesContext, type TitlesContextValue } from '@/features/library/titlesContext'
 import type { DownloadRecord } from '@/features/downloads/downloads'
 import {
   DownloadsContext,
@@ -41,7 +49,9 @@ export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
     id: 'b_1',
     title: 'Der Super-Papagei',
+    folderName: '01 - Der Super-Papagei',
     series: 'Die drei ???',
+    group: null,
     seriesIndex: 1,
     author: 'Robert Arthur',
     narrator: null,
@@ -183,6 +193,61 @@ export function makePlayerValue(
   }
 }
 
+export function makeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthContextValue {
+  return {
+    state: {
+      status: 'ready',
+      user: { uid: 'u1', email: 'eltern@example.com', metadata: {} } as unknown as User,
+    },
+    isAdmin: false,
+    actions: {
+      signInWithPassword: vi.fn().mockResolvedValue(undefined),
+      signInWithGoogle: vi.fn().mockResolvedValue(undefined),
+      sendLoginLink: vi.fn().mockResolvedValue(undefined),
+      signOut: vi.fn().mockResolvedValue(undefined),
+      recheckAccess: vi.fn().mockResolvedValue(undefined),
+    },
+    linkError: null,
+    clearLinkError: vi.fn(),
+    ...overrides,
+  }
+}
+
+export function makeAdminValue(overrides: Partial<AdminContextValue> = {}): AdminContextValue {
+  return {
+    loading: false,
+    requests: [],
+    accounts: [],
+    error: false,
+    approve: vi.fn().mockResolvedValue(undefined),
+    deny: vi.fn().mockResolvedValue(undefined),
+    revoke: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
+export function makeFavoritesValue(
+  overrides: Partial<FavoritesContextValue> = {},
+): FavoritesContextValue {
+  const ids = overrides.ids ?? new Set<string>()
+  return {
+    ids,
+    isFavorite: (bookId: string) => ids.has(bookId),
+    toggle: vi.fn(),
+    ...overrides,
+  }
+}
+
+export function makeTitlesValue(
+  overrides: Partial<TitlesContextValue> = {},
+): TitlesContextValue {
+  return {
+    titles: new Map(),
+    setTitle: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 export function renderWithProfiles(
   ui: ReactElement,
   value: ProfilesContextValue,
@@ -192,26 +257,42 @@ export function renderWithProfiles(
     progress = makeProgressValue(),
     downloads = makeDownloadsValue(),
     player = makePlayerValue(),
+    auth = makeAuthValue(),
+    admin = makeAdminValue(),
+    favorites = makeFavoritesValue(),
+    titles = makeTitlesValue(),
   }: {
     route?: string
     library?: LibraryContextValue
     progress?: ProgressContextValue
     downloads?: DownloadsContextValue
     player?: PlayerContextValue
+    auth?: AuthContextValue
+    admin?: AdminContextValue
+    favorites?: FavoritesContextValue
+    titles?: TitlesContextValue
   } = {},
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <MemoryRouter initialEntries={[route]}>
-        <ProfilesContext value={value}>
-          <LibraryContext value={library}>
-            <ProgressContext value={progress}>
-              <DownloadsContext value={downloads}>
-                <PlayerContext value={player}>{children}</PlayerContext>
-              </DownloadsContext>
-            </ProgressContext>
-          </LibraryContext>
-        </ProfilesContext>
+        <AuthContext value={auth}>
+          <AdminContext value={admin}>
+            <TitlesContext value={titles}>
+              <ProfilesContext value={value}>
+                <LibraryContext value={library}>
+                  <ProgressContext value={progress}>
+                    <FavoritesContext value={favorites}>
+                      <DownloadsContext value={downloads}>
+                        <PlayerContext value={player}>{children}</PlayerContext>
+                      </DownloadsContext>
+                    </FavoritesContext>
+                  </ProgressContext>
+                </LibraryContext>
+              </ProfilesContext>
+            </TitlesContext>
+          </AdminContext>
+        </AuthContext>
       </MemoryRouter>
     )
   }

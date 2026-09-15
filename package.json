@@ -2,7 +2,7 @@
   "name": "hb",
   "private": true,
   "version": "0.1.0",
-  "description": "H\u00f6rbuch-PWA f\u00fcr Kinder",
+  "description": "Hörbuch-PWA für Kinder",
   "type": "module",
   "workspaces": [
     "apps/*",
@@ -18,9 +18,12 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "icons": "node tools/generate-icons.mjs"
+    "icons": "node tools/generate-icons.mjs",
+    "rules": "node tools/render-rules.mjs",
+    "rules:check": "node tools/render-rules.mjs --probe && npx --yes firebase-tools@^14.0.0 emulators:exec --only firestore --project demo-hb \"node tools/rules-check.mjs\""
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
     "sharp": "^0.35.4"
   }
 }

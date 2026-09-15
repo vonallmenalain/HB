@@ -3,13 +3,16 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { PinGate } from '@/features/parents/PinGate'
+import { EditProfileScreen } from '@/features/profiles/EditProfileScreen'
 import { ManageProfilesScreen } from '@/features/profiles/ManageProfilesScreen'
 import { ProfilePicker } from '@/features/profiles/ProfilePicker'
+import { AdminScreen } from '@/routes/AdminScreen'
 import { BookScreen } from '@/routes/BookScreen'
 import { HomeScreen } from '@/routes/HomeScreen'
 import { LibraryScreen } from '@/routes/LibraryScreen'
 import { NotFoundScreen } from '@/routes/NotFoundScreen'
 import { PlayerScreen } from '@/routes/PlayerScreen'
+import { SeriesScreen } from '@/routes/SeriesScreen'
 import { Screen } from '@/ui/Screen'
 
 import { useRememberView } from './useRememberView'
@@ -55,6 +58,14 @@ export function AppRoutes() {
         }
       />
       <Route
+        path="/bibliothek/:slug"
+        element={
+          <RequireProfile>
+            <SeriesScreen />
+          </RequireProfile>
+        }
+      />
+      <Route
         path="/buch/:bookId"
         element={
           <RequireProfile>
@@ -71,11 +82,22 @@ export function AppRoutes() {
         }
       />
       <Route path="/profil" element={<ProfilePicker />} />
+      <Route path="/profil/bearbeiten" element={<EditProfileScreen />} />
       <Route
         path="/eltern"
         element={
           <PinGate>
             <ManageProfilesScreen />
+          </PinGate>
+        }
+      />
+      {/* Der Adminbereich liegt hinter derselben PIN – und zusätzlich hinter
+          der Adresse, die in den Firestore-Regeln steht. */}
+      <Route
+        path="/admin"
+        element={
+          <PinGate>
+            <AdminScreen />
           </PinGate>
         }
       />

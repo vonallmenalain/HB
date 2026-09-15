@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 import { scanLibrary } from '../src/catalog/scan.js'
+import { SCHEMA_VERSION } from '../src/catalog/types.js'
 
 import { PNG_1X1, makeLibrary, wav } from './fixtures.js'
 
@@ -182,6 +183,22 @@ describe('scanLibrary', () => {
     expect(catalog.books.map((b) => b.title)).toEqual(['Sichtbar'])
   })
 
+  it('gliedert Unterordner einer Reihe als Gruppe', async () => {
+    // Unter „Die drei ??? Kids" liegen „Adventskalender" und „Mini-Fälle".
+    // Beide gehören zur selben Reihe, nur eben in eigenen Fächern.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Kids/Mini-Fälle/05 - Alarm', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/68 - Chaos', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books.map((b) => [b.series, b.group, b.title])).toEqual([
+      ['Kids', null, 'Chaos'],
+      ['Kids', 'Mini-Fälle', 'Alarm'],
+    ])
+  })
+
   it('überspringt Ordner ohne Audiodateien', async () => {
     const { mediaRoot, cacheDir } = await makeLibrary([
       { path: 'Leer/Unterordner', files: [{ name: 'liesmich.txt', content: 'nichts' }] },
@@ -238,7 +255,7 @@ describe('scanLibrary', () => {
     const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
 
     expect(catalog.books).toEqual([])
-    expect(catalog.schemaVersion).toBe(1)
+    expect(catalog.schemaVersion).toBe(SCHEMA_VERSION)
     expect(catalog.generatedAt).toBe('2026-01-01T00:00:00.000Z')
   })
 })

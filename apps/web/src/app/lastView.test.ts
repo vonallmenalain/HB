@@ -7,11 +7,14 @@ describe('Zuletzt gesehene Ansicht', () => {
     window.localStorage.clear()
   })
 
-  it.each(['/bibliothek', '/buch/b_1'])('merkt sich %s', (pfad) => {
-    rememberView(pfad)
+  it.each(['/bibliothek', '/bibliothek/die-drei-kids', '/buch/b_1'])(
+    'merkt sich %s',
+    (pfad) => {
+      rememberView(pfad)
 
-    expect(lastView()).toBe(pfad)
-  })
+      expect(lastView()).toBe(pfad)
+    },
+  )
 
   it('macht aus dem Player die Buchseite', () => {
     // Den Player wiederherzustellen hiesse, dass die App von selbst zu spielen

@@ -12,7 +12,8 @@ export type AuthState =
   | { status: 'config-missing'; missing: string[] }
   | { status: 'loading' }
   | { status: 'signed-out' }
-  | { status: 'denied'; user: User }
+  /** Angemeldet, aber noch nicht freigegeben. `requested`: Die Anfrage liegt beim Administrator. */
+  | { status: 'denied'; user: User; requested: boolean }
   | { status: 'ready'; user: User }
 
 export interface AuthActions {
@@ -25,6 +26,13 @@ export interface AuthActions {
 
 export interface AuthContextValue {
   state: AuthState
+  /**
+   * Ist das angemeldete Konto der Administrator?
+   *
+   * Nur eine Anzeige-Entscheidung – sie blendet den Adminbereich ein. Was
+   * jemand wirklich darf, entscheiden die Firestore-Regeln.
+   */
+  isAdmin: boolean
   actions: AuthActions
   /** Fehler beim Abschliessen eines Anmeldelinks, für den Login-Bildschirm. */
   linkError: string | null

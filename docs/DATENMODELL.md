@@ -12,23 +12,31 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 
 ```
 /share/Hoerbuecher/
-├── Die drei ???/                          ← optional: Serienordner
+├── Die drei ???/                          ← oberster Ordner = Reihe
 │   ├── 01 - Der Super-Papagei/
 │   │   ├── cover.jpg                      ← optional
 │   │   ├── buch.json                      ← optional, überschreibt Erkanntes
 │   │   ├── 01 - Kapitel 1.mp3
 │   │   ├── 02 - Kapitel 2.mp3
 │   │   └── 03 - Kapitel 3.mp3
-│   └── 02 - Der Phantomsee/
-│       ├── cover.jpg
-│       ├── 01 - Kapitel 1.mp3
-│       └── 02 - Kapitel 2.mp3
+│   ├── 02 - Der Phantomsee/
+│   │   ├── cover.jpg
+│   │   ├── 01 - Kapitel 1.mp3
+│   │   └── 02 - Kapitel 2.mp3
+│   └── Mini-Fälle/                        ← Ordner darunter = Gruppe
+│       └── Die drei ??? - 05 - Alarm im Zoo/
+│           └── 01 - Alarm.mp3
 ├── Bibi Blocksberg - Hexerei/
 │   └── ...
 └── .hb-cache/                             ← vom Scanner angelegt
     ├── catalog.json
     └── meta/                              ← gelesene ID3-Daten, hash-basiert
 ```
+
+**Reihe und Gruppe.** Der oberste Ordner unter dem Medien-Stamm ist die Reihe;
+danach kommt die App gliedert. Alles, was dazwischen liegt, ist eine Gruppe
+innerhalb dieser Reihe („Adventskalender", „Mini-Fälle") und steht dort als
+eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 
 **Womit der Scanner liest:** [`music-metadata`](https://github.com/borewit/music-metadata)
 (reines JavaScript, liest ID3v1/ID3v2, Dauer und eingebettete Cover) und
@@ -40,13 +48,18 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 | Situation | Verhalten |
 |---|---|
 | Ordner enthält Audiodateien | → ist ein Buch |
-| Ordner enthält nur Unterordner | → ist eine Serie, Name wird als `series` übernommen |
+| Ordner enthält nur Unterordner | → ist Reihe oder Gruppe; der oberste wird `series`, die dazwischen `group` |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
 | Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
 | `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet |
 | Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
+| Ordnername beginnt mit dem Reihennamen | Der fliegt heraus: `Die Drei Fragezeichen Kids-68-Chaos` → `seriesIndex: 68`, `title: "Chaos"`. Verglichen wird unempfindlich gegen Artikel, Gross-/Kleinschreibung und Zahlwörter, `Die drei ???` gilt als `Die 3 Fragezeichen`. Übersprungen werden dabei nur Füllwörter und eine führende Zahl – `Abenteuer mit Bibi Blocksberg` ist kein Präfix |
+| Reihenname steckt im Satz | Bleibt stehen: `5 Freunde auf der Felseninsel` wird nicht zu `auf der Felseninsel` |
+| Nummer steht vor dem Reihennamen | Sie wird zuerst abgetrennt: `068 - Bibi Blocksberg - Der Schulausflug` → `seriesIndex: 68`, `title: "Der Schulausflug"` |
+| Trennzeichen | `_` wird Leerzeichen; ein Strich gilt als Trenner, wenn Leerraum daneben steht oder auf einer Seite eine Ziffer – `Mini-Fall` behält seinen Bindestrich |
+| Ordnername ist danach leer | Dann bleibt der ursprüngliche Name stehen. Lieber einmal zu viel stehen lassen als einen Titel anschneiden |
 | `buch.json` vorhanden | Felder daraus haben **Vorrang** vor allem Erkannten |
 
 **`buch.json` (optional, alle Felder optional)**
@@ -55,6 +68,7 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 {
   "title": "Der Super-Papagei",
   "series": "Die drei ???",
+  "group": "Mini-Fälle",
   "seriesIndex": 1,
   "author": "Robert Arthur",
   "narrator": "Oliver Rohrbeck",
@@ -77,13 +91,15 @@ Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedAt": "2026-09-15T14:29:30Z",
   "books": [
     {
       "id": "b_4f3a9c2e",              // sha1(relativer Pfad), gekürzt – stabil
-      "title": "Der Super-Papagei",
-      "series": "Die drei ???",
+      "title": "Der Super-Papagei",    // aufgeräumt: ohne Reihe, ohne Nummer
+      "folderName": "01 - Der Super-Papagei",  // wie der Ordner heisst
+      "series": "Die drei ???",        // oberster Ordner = Reihe
+      "group": null,                   // Ordner darunter, sonst null
       "seriesIndex": 1,
       "author": "Robert Arthur",
       "narrator": "Oliver Rohrbeck",
@@ -107,6 +123,15 @@ Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
   ]
 }
 ```
+
+**Schema-Version 2** (seit M9): `group` und `folderName` sind dazugekommen, und
+`series` ist nicht mehr der unmittelbar übergeordnete Ordner, sondern der
+oberste. `folderName` ist der Ordnername, wie er auf dem NAS steht – ohne ihn
+liesse sich im Adminbereich nicht nachvollziehen, woraus ein aufgeräumter Titel
+entstanden ist. Eine ältere App
+lehnt einen neueren Katalog ab und sagt das auch – lieber ehrlich melden als
+raten. Umgekehrt versteht die aktuelle App einen Katalog der Version 1
+weiterhin: `group` fehlt dann schlicht.
 
 **Wichtig:** `startSec`/`endSec` in `chapters` sind **globale** Sekunden im Buch,
 nicht relativ zur Datei. Beim vorliegenden Aufbau (ein Ordner mit MP3s) bildet
@@ -159,7 +184,14 @@ users/{uid}/profiles/{profileId}/progress/{bookId}
   ├─ finished           : boolean
   ├─ updatedAt          : string        // ISO-8601 (UTC) – entscheidet Konflikte
   └─ deviceId           : string        // nur zur Diagnose
+
+users/{uid}/profiles/{profileId}/favorites/{bookId}
+  └─ addedAt            : string        // die Dokument-ID ist die Aussage
 ```
+
+**Favoriten hängen am Profil, nicht am Konto.** Zwei Geschwister auf demselben
+Tablet haben verschiedene Lieblingsfolgen; ein gemeinsamer Stern wäre für beide
+der falsche.
 
 Die Buch-Kennung steht **nur** im Dokumentnamen, nicht noch einmal im Dokument.
 
@@ -193,54 +225,137 @@ eigenen, freigeschalteten Konto. Eine Feldprüfung (etwa „`updatedAt` darf nic
 zurücklaufen") gibt es bewusst nicht: Sie würde die Selbstreparatur oben
 verhindern, und schützen müsste sie ein Konto vor sich selbst.
 
-### Freigabeliste
+### Freigabeliste und Anfragen
 
 ```
-allowlist/{uid}          // Inhalt beliebig, die Dokument-ID ist die Aussage
+allowlist/{uid}
+  ├─ email              : string        // nur zur Anzeige im Adminbereich
+  ├─ name               : string
+  ├─ role               : string        // "admin" beim Administratorkonto, sonst fehlend
+  ├─ approvedAt         : string
+  └─ approvedBy         : string        // UID des Administrators
+
+accessRequests/{uid}
+  ├─ uid                : string        // muss der eigenen UID entsprechen
+  ├─ email              : string        // wie von Google geliefert
+  ├─ name               : string
+  ├─ requestedAt        : string
+  └─ status             : string        // "pending" | "denied"
 ```
 
-Der eigentliche Zugangsriegel. Mit aktivierter Google-Anmeldung kann sich jeder
-*anmelden* – Zugriff bekommt aber nur, wessen UID hier als Dokument steht. Die
-Kollektion ist ausschliesslich über die Firebase-Konsole pflegbar; die Regeln
-verbieten jedes Schreiben aus der App.
+Der eigentliche Zugangsriegel ist weiterhin `allowlist`: Mit aktivierter
+Google-Anmeldung kann sich jeder *anmelden* – Zugriff bekommt nur, wessen UID
+dort als Dokument steht. Geschrieben wird die Liste jetzt aber nicht mehr von
+Hand in der Konsole, sondern vom Administratorkonto in der App.
 
 Ein neues Konto freischalten:
 
-1. In der App anmelden. Es erscheint „Noch kein Zugriff" mit der UID.
-2. UID kopieren, in der Firebase-Konsole unter *Firestore → Daten* in der
-   Kollektion `allowlist` ein Dokument mit dieser ID anlegen (Inhalt egal,
-   z. B. `{ note: "Papa" }`).
-3. In der App auf „Nochmal prüfen" tippen.
+1. In der App anmelden. Die App legt selbst eine Anfrage unter
+   `accessRequests/{uid}` ab und zeigt „Gleich geht's los".
+2. Der Administrator sieht sie im Adminbereich mit Namen und Adresse und tippt
+   auf **Freigeben**. Das legt den `allowlist`-Eintrag an und löscht die Anfrage.
+3. Das wartende Gerät tippt auf „Nochmal prüfen".
+
+Abgelehnte Anfragen bleiben mit `status: "denied"` stehen. Ohne das legte
+dasselbe Gerät bei jedem Start eine neue an, und die Liste füllte sich von
+selbst wieder.
+
+### Gemeinsame Bibliotheksdaten
+
+```
+bookTitles/{bookId}
+  ├─ title              : string        // von Hand im Adminbereich gesetzt
+  ├─ updatedAt          : string
+  └─ updatedBy          : string
+
+listening/{uid}_{profileId}_{bookId}
+  ├─ uid                : string        // muss der eigenen UID entsprechen
+  ├─ profileId          : string
+  ├─ profileName        : string        // mitgeschrieben: der Admin darf fremde Profile nicht lesen
+  ├─ bookId             : string
+  ├─ bookTitle          : string
+  ├─ plays              : number        // increment() – zwei Geräte addieren sich richtig
+  ├─ secondsListened    : number        // increment(), im Minutentakt gebündelt
+  └─ lastPlayedAt       : string
+```
+
+Beide Kollektionen liegen bewusst **ausserhalb** von `users/{uid}`: Titel
+gehören der Bibliothek und nicht einem Konto, und die Hörhistorie muss der
+Administrator lesen können, ohne Zugriff auf fremde Profile und fremden
+Fortschritt zu bekommen.
+
+Die Kennung eines Historien-Eintrags beginnt mit der UID. Das ist keine
+Bequemlichkeit, sondern die Regel: Geschrieben werden darf nur, was mit der
+eigenen UID anfängt. Zwei Geräte desselben Kindes schreiben damit in dasselbe
+Dokument, und `increment()` zählt richtig zusammen, statt sich gegenseitig zu
+überschreiben.
 
 ### Sicherheitsregeln
 
-Die vollständigen Regeln liegen in [`firestore.rules`](../firestore.rules) im
-Projektstamm. Kurzfassung:
+Die vollständigen Regeln liegen als Vorlage in
+[`firestore.rules.tmpl`](../firestore.rules.tmpl). Kurzfassung:
 
 ```js
-function isOwner(uid) {
-  return request.auth != null && request.auth.uid == uid;
+function isAdminByEmail() {          // __ADMIN_EMAIL__ wird beim Deployen eingesetzt
+  return request.auth != null
+      && request.auth.token.get('email_verified', false) == true
+      && request.auth.token.get('email', '').lower() == '__ADMIN_EMAIL__';
+}
+function isAdmin() {                 // zweiter Weg: role == "admin" im eigenen Eintrag
+  return isAdminByEmail() || isAdminByList();
 }
 function isAllowed() {
-  return request.auth != null
-      && exists(/databases/$(database)/documents/allowlist/$(request.auth.uid));
+  return hasAllowlistEntry() || isAdminByEmail();
 }
 
 match /allowlist/{uid} {
-  allow get: if isOwner(uid);       // nur den eigenen Eintrag nachsehen
-  allow list, write: if false;      // Liste unlesbar, Pflege nur in der Konsole
+  allow get: if isOwner(uid) || isAdmin();      // den eigenen Eintrag nachsehen
+  allow list: if isAdmin();                     // die Liste sieht nur der Administrator
+  allow create, update, delete: if isAdmin();   // und nur er gibt frei
 }
 
-match /users/{uid} {
+match /accessRequests/{uid} {
+  allow create: if ownRequest();                // Name, Adresse, Zeit, status "pending"
+  allow update: if ownRequest() && resource.data.status != 'denied';
+  allow list:   if isAdmin();
+}
+
+match /users/{uid}/{document=**} {
   allow read, write: if isOwner(uid) && isAllowed();
-  match /{document=**} {
-    allow read, write: if isOwner(uid) && isAllowed();
-  }
+}
+
+match /bookTitles/{bookId} { allow read: if isAllowed(); allow write: if isAdmin(); }
+
+match /listening/{entryId} {
+  allow read: if isAdmin();
+  allow create, update: if isAllowed()
+      && request.resource.data.uid == request.auth.uid
+      && entryId.matches(request.auth.uid + '_.*');
 }
 ```
 
-Deployen mit `firebase deploy --only firestore:rules` (Konfiguration in
-`firebase.json` und `.firebaserc`).
+**Warum die Adresse ein Platzhalter ist:** Das Repository ist öffentlich, und
+eine private Adresse gehört dort nicht hinein (KONZEPT §9.3). `npm run rules`
+erzeugt aus der Vorlage die deploybare `firestore.rules` und setzt die Adresse
+aus `HB_ADMIN_EMAIL` ein; die erzeugte Datei ist per `.gitignore` gesperrt.
+
+**Warum es zwei Wege zum Administrator gibt:** Die Adresse im Token ist der
+Normalfall. Der `role: "admin"`-Eintrag in der Freigabeliste – beim ersten
+Anmelden selbst angelegt – ist die Rückversicherung, falls beim Deployen einmal
+die falsche Adresse eingesetzt wird. Sonst stünde niemand mehr zur Verfügung,
+der das geraderücken könnte.
+
+Geprüft werden die Regeln mit `npm run rules:check` gegen den
+Firestore-Emulator – knapp dreissig Fälle vom Administrator bis zum abgelehnten
+Konto. Deployt wird bei jeder Änderung an der Vorlage automatisch über
+[`.github/workflows/firestore-rules.yml`](../.github/workflows/firestore-rules.yml);
+die Einrichtung steht in [`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md). Von Hand
+geht es weiterhin:
+
+```bash
+HB_ADMIN_EMAIL=… npm run rules
+firebase deploy --only firestore:rules
+```
 
 > Änderungen an diesen Regeln gehen laut deiner Standardvorgabe **immer** als PR
 > ohne Auto-Merge zu dir.

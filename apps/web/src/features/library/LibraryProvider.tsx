@@ -7,6 +7,8 @@ import { type Book, sortBooks } from './catalog'
 import { loadCachedCatalog, saveCachedCatalog } from './catalogCache'
 import { LibraryContext, type LibraryStatus } from './libraryContext'
 import { type MediaError, createMediaClient } from './mediaClient'
+import { tidyBooks } from './titles'
+import { useTitles } from './titlesContext'
 
 interface State {
   status: LibraryStatus
@@ -26,6 +28,7 @@ const INITIAL: State = {
 
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const { state: authState } = useAuth()
+  const { titles } = useTitles()
   const baseUrl = useMemo(() => readMediaBaseUrl(), [])
 
   // Fehlt die Adresse des Medien-Dienstes, steht das schon beim ersten Rendern
@@ -115,14 +118,29 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     setReloadToken((token) => token + 1)
   }, [])
 
+  /**
+   * Erst hier bekommen die Bücher ihre Anzeigetitel.
+   *
+   * Aufgeräumt und, wo der Adminbereich etwas gesetzt hat, überschrieben – an
+   * einer Stelle für die ganze App. Jeder Bildschirm liest danach einfach
+   * `book.title` und muss von alldem nichts wissen.
+   */
+  // Sortiert wird erst danach: Die Folgennummer steckt manchmal im Titel und
+  // fällt erst beim Aufräumen heraus – vorher sortierte die Reihe nach Text.
+  const books = useMemo(
+    () => sortBooks(tidyBooks(state.books, titles)),
+    [state.books, titles],
+  )
+
   const value = useMemo(
     () => ({
       ...state,
+      books,
       refresh,
-      bookById: (id: string) => state.books.find((book) => book.id === id),
+      bookById: (id: string) => books.find((book) => book.id === id),
       client,
     }),
-    [state, refresh, client],
+    [state, books, refresh, client],
   )
 
   return <LibraryContext value={value}>{children}</LibraryContext>

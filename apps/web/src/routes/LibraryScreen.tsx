@@ -3,10 +3,18 @@ import { EmptyState } from '@/ui/EmptyState'
 import { Notice } from '@/ui/Notice'
 import { Screen, ScreenTitle } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
-import { BookTile } from '@/features/library/BookTile'
+import { SeriesTile } from '@/features/library/SeriesTile'
+import { buildSeries } from '@/features/library/grouping'
 import { useLibrary } from '@/features/library/libraryContext'
 import { libraryErrorMessage } from '@/features/library/errors'
 
+/**
+ * „Alle Hörbücher“ – erst die Reihen, dann die Folgen.
+ *
+ * Neun Reihen mit zusammen mehreren hundert Folgen waren als eine Liste
+ * unbrauchbar: Man scrollte an allem vorbei, was man suchte. Ein Schritt mehr
+ * kostet einen Tap und spart das Suchen.
+ */
 export function LibraryScreen() {
   const { status, books, error, fromCache, refresh } = useLibrary()
 
@@ -36,6 +44,8 @@ export function LibraryScreen() {
     )
   }
 
+  const series = buildSeries(books)
+
   return (
     <Screen>
       <ScreenTitle>Alle Hörbücher</ScreenTitle>
@@ -52,9 +62,9 @@ export function LibraryScreen() {
       ) : null}
 
       <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
-        {books.map((book) => (
-          <li key={book.id}>
-            <BookTile book={book} />
+        {series.map((entry) => (
+          <li key={entry.slug}>
+            <SeriesTile series={entry} />
           </li>
         ))}
       </ul>

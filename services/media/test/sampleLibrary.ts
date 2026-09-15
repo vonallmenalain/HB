@@ -23,6 +23,12 @@ export async function scanSampleLibrary() {
       files: [{ name: '01 - Am See.wav', seconds: 1 }],
     },
     {
+      // Ein Unterordner in der Reihe – und der Reihenname noch einmal im
+      // Ordnernamen der Folge, so wie gewachsene Sammlungen aussehen.
+      path: 'Die drei ???/Mini-Fälle/Die drei ??? - 05 - Alarm im Zoo',
+      files: [{ name: '01 - Alarm.wav', seconds: 1 }],
+    },
+    {
       path: 'Bibi Blocksberg - Hexerei',
       files: [{ name: 'hexerei.wav', seconds: 2 }],
     },

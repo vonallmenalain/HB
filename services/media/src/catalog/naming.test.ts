@@ -3,10 +3,13 @@ import { describe, expect, it } from 'vitest'
 import {
   audioMime,
   chapterTitle,
+  formatSeriesIndex,
   isAudioFile,
   isCoverFile,
   naturalCompare,
   parseBookFolder,
+  stripSeriesPrefix,
+  tidyName,
   tileColor,
 } from './naming.js'
 
@@ -61,6 +64,112 @@ describe('parseBookFolder', () => {
 
   it('verwechselt eine Jahreszahl im Titel nicht mit einer Nummer', () => {
     expect(parseBookFolder('1984')).toEqual({ title: '1984', seriesIndex: null })
+  })
+
+  it('lässt die Zahl stehen, wo sie zum Namen gehört', () => {
+    // „5 Freunde" ohne Trennzeichen dahinter ist eine Reihe, keine Nummer.
+    expect(parseBookFolder('5 Freunde auf der Felseninsel')).toEqual({
+      title: '5 Freunde auf der Felseninsel',
+      seriesIndex: null,
+    })
+  })
+
+  it('räumt Ordnernamen mit Reihe, Nummer und Titel auf', () => {
+    expect(
+      parseBookFolder('Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln', ['Fragezeichen Kids']),
+    ).toEqual({ title: 'Chaos Im Dunkeln', seriesIndex: 68 })
+
+    expect(
+      parseBookFolder('Die Drei Fragezeichen Kids - 05 -Mini-Fall - Alarm, die Ritter kommen!', [
+        'Die 3 Fragezeichen Kids',
+        'Mini-Fälle',
+      ]),
+    ).toEqual({ title: 'Mini-Fall - Alarm, die Ritter kommen!', seriesIndex: 5 })
+  })
+
+  it('versteht ausgeschriebene Folgenangaben', () => {
+    expect(parseBookFolder('Folge 12 - Der Karpatenhund')).toEqual({
+      title: 'Der Karpatenhund',
+      seriesIndex: 12,
+    })
+  })
+
+  it('behält die Nummer, wenn sie vor dem Reihennamen steht', () => {
+    // Zuerst die Nummer, dann die Reihe – sonst wäre die Folge namenlos.
+    expect(
+      parseBookFolder('068 - Bibi Blocksberg - Der Schulausflug', ['Bibi Blocksberg']),
+    ).toEqual({ title: 'Der Schulausflug', seriesIndex: 68 })
+  })
+})
+
+describe('tidyName', () => {
+  it('macht aus jeder Schreibweise denselben Trenner', () => {
+    expect(tidyName('Kids-68-Chaos Im Dunkeln')).toBe('Kids - 68 - Chaos Im Dunkeln')
+    expect(tidyName('05 -Mini-Fall - Alarm, die Ritter kommen!')).toBe(
+      '05 - Mini-Fall - Alarm, die Ritter kommen!',
+    )
+    expect(tidyName('68_Chaos_Im_Dunkeln')).toBe('68 Chaos Im Dunkeln')
+  })
+
+  it('lässt Bindestriche in Wörtern stehen', () => {
+    // „Mini-Fall" ist ein Wort, kein Trenner – das muss der Unterschied
+    // aushalten, sonst steht überall „Mini - Fall".
+    expect(tidyName('Der Super-Papagei')).toBe('Der Super-Papagei')
+    expect(tidyName('Mini-Fall am Wochenende')).toBe('Mini-Fall am Wochenende')
+  })
+
+  it('räumt Reste an den Rändern weg', () => {
+    expect(tidyName('  - Der Phantomsee -  ')).toBe('Der Phantomsee')
+  })
+})
+
+describe('stripSeriesPrefix', () => {
+  it('nimmt den Reihennamen vorn heraus', () => {
+    expect(
+      stripSeriesPrefix('Die Drei Fragezeichen Kids - 05 - Alarm', ['Fragezeichen Kids']),
+    ).toBe('05 - Alarm')
+  })
+
+  it('erkennt die Reihe auch in anderer Schreibweise', () => {
+    // Ordner heisst „Die 3 Fragezeichen", die Folgen schreiben „Die drei ???".
+    expect(stripSeriesPrefix('Die drei ??? - 01 - Der Super-Papagei', ['Die 3 Fragezeichen'])).toBe(
+      '01 - Der Super-Papagei',
+    )
+    expect(stripSeriesPrefix('Fünf Freunde 12 - Auf der Felseninsel', ['5 Freunde'])).toBe(
+      '12 - Auf der Felseninsel',
+    )
+  })
+
+  it('lässt den Namen in Ruhe, wenn die Reihe nicht vorn steht', () => {
+    expect(stripSeriesPrefix('Der Fall der Kids', ['Kids'])).toBe('Der Fall der Kids')
+    expect(stripSeriesPrefix('Chaos im Dunkeln', ['Bibi Blocksberg'])).toBe('Chaos im Dunkeln')
+  })
+
+  it('überspringt keine echten Wörter vor dem Reihennamen', () => {
+    // „Abenteuer mit" gehört zum Titel. Würde es übersprungen, bliebe von der
+    // Folge nur „Hexerei" übrig.
+    expect(stripSeriesPrefix('Abenteuer mit Bibi Blocksberg - Hexerei', ['Bibi Blocksberg'])).toBe(
+      'Abenteuer mit Bibi Blocksberg - Hexerei',
+    )
+  })
+
+  it('lässt den Reihennamen stehen, wo er Teil des Satzes ist', () => {
+    // Bliebe nur „auf der Felseninsel" übrig, wäre der Titel ein Satzfragment.
+    expect(stripSeriesPrefix('5 Freunde auf der Felseninsel', ['5 Freunde'])).toBe(
+      '5 Freunde auf der Felseninsel',
+    )
+  })
+
+  it('schrumpft einen Titel nie auf nichts zusammen', () => {
+    expect(stripSeriesPrefix('Bibi Blocksberg', ['Bibi Blocksberg'])).toBe('Bibi Blocksberg')
+  })
+})
+
+describe('formatSeriesIndex', () => {
+  it('schreibt einstellige Nummern zweistellig', () => {
+    expect(formatSeriesIndex(5)).toBe('05')
+    expect(formatSeriesIndex(68)).toBe('68')
+    expect(formatSeriesIndex(112)).toBe('112')
   })
 })
 
