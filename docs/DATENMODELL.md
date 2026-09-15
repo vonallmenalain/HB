@@ -503,7 +503,7 @@ services:
   hb-media:
     image: ghcr.io/<owner>/hb-media:latest   # oder lokal gebaut
     restart: unless-stopped
-    ports: ["${HB_HOST_PORT:-8080}:8080"]    # auf dem QNAP z. B. 18080
+    ports: ["${HB_HOST_PORT:-18080}:8080"]   # aussen 18080, innen immer 8080
     volumes:
       - /share/Hoerbuecher:/media:ro         # read-only, der Dienst schreibt nie
       - hb-cache:/cache

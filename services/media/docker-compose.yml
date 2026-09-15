@@ -19,9 +19,12 @@ services:
     container_name: hb-media
     restart: unless-stopped
     ports:
-      # Auf dem QNAP hört die QTS-Weboberfläche selbst auf 8080; dort muss
-      # HB_HOST_PORT auf einen freien Port gesetzt werden (z. B. 18080).
-      - '${HB_HOST_PORT:-8080}:8080'
+      # Vorgabe 18080 und nicht 8080: Auf dem QNAP gehört 8080 der
+      # QTS-Weboberfläche, und der Start scheitert dann mit
+      # „address already in use" – auch wenn HB_HOST_PORT in der .env nur leer
+      # steht. Der Port hier ist ohnehin nur für den Blick von aussen; der
+      # Tunnel spricht den Dienst containerintern auf 8080 an.
+      - '${HB_HOST_PORT:-18080}:8080'
     volumes:
       # Hörbuch-Ordner nur lesend – der Dienst schreibt dort nie hinein.
       - ${HB_LIBRARY_PATH:?HB_LIBRARY_PATH fehlt}:/media:ro
