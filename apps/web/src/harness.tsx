@@ -1,3 +1,8 @@
+/* eslint-disable react-refresh/only-export-components --
+ * Einstiegspunkt wie main.tsx: Die Datei wird nie importiert, sondern von
+ * harness.html geladen. Fast Refresh spielt hier keine Rolle.
+ */
+
 /**
  * Vorschau ohne Anmeldung.
  *
@@ -6,17 +11,31 @@
  *
  * Rendert die Bildschirme mit Beispieldaten, damit sich Layout und Verhalten
  * ansehen lassen, ohne ein Firebase-Konto und ein laufendes NAS zu brauchen.
- * Nicht Teil des Produktionsbuilds – `vite build` baut nur index.html.
+ *
+ * Mit `?media=http://localhost:8099&ticket=…` läuft sie stattdessen gegen einen
+ * echten Medien-Dienst: Katalog, Cover und Ton kommen dann von dort. Nur die
+ * Anmeldung bleibt überbrückt – so lässt sich der Player mit echtem Audio
+ * prüfen. Nicht Teil des Produktionsbuilds.
  */
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
 import { MemoryRouter } from 'react-router-dom'
 
 import { AppRoutes } from './app/AppRoutes'
 import type { Book } from './features/library/catalog'
+import { parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
+import { createMediaClient } from './features/library/mediaClient'
+import { NowPlayingBar } from './features/player/NowPlayingBar'
+import { PlayerProvider } from './features/player/PlayerProvider'
+import { ProgressProvider } from './features/progress/ProgressProvider'
 import { ProfilesContext, type ProfilesContextValue } from './features/profiles/profilesContext'
 import './index.css'
+
+const params = new URLSearchParams(window.location.search)
+const route = params.get('route') ?? '/'
+const mediaBase = params.get('media')
+const ticket = params.get('ticket')
 
 const cover = (hue: number) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -41,7 +60,7 @@ const TITLES = [
   ['Ein Fall für die Olchis', 'Die Olchis', 1],
 ] as const
 
-const books: Book[] = TITLES.map(([title, series, index], i) => ({
+const demoBooks: Book[] = TITLES.map(([title, series, index], i) => ({
   id: `b_${String(i)}`,
   title,
   series,
@@ -60,27 +79,24 @@ const books: Book[] = TITLES.map(([title, series, index], i) => ({
   ],
   chapters: [
     { idx: 0, title: 'Ein seltsamer Anruf', fileIdx: 0, startSec: 0, endSec: 1800 },
-    { idx: 1, title: 'Die Spur führt zum See', fileIdx: 1, startSec: 1800, endSec: 3600 + i * 900 },
+    {
+      idx: 1,
+      title: 'Die Spur führt zum See',
+      fileIdx: 1,
+      startSec: 1800,
+      endSec: 3600 + i * 900,
+    },
   ],
 }))
 
-const library: LibraryContextValue = {
-  status: 'ready',
-  books,
-  fromCache: false,
-  error: null,
-  skipped: 0,
-  refresh: () => undefined,
-  bookById: (id) => books.find((book) => book.id === id),
-  client: {
-    ensureTicket: () => Promise.resolve('t'),
-    currentTicket: () => 't',
-    fetchCatalog: () => Promise.resolve({ status: 'not-modified' as const }),
-    coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),
-    audioUrl: () => null,
-    canonicalAudioUrl: () => '',
-    forgetTicket: () => undefined,
-  },
+const demoClient: LibraryContextValue['client'] = {
+  ensureTicket: () => Promise.resolve('t'),
+  currentTicket: () => 't',
+  fetchCatalog: () => Promise.resolve({ status: 'not-modified' as const }),
+  coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),
+  audioUrl: () => null,
+  canonicalAudioUrl: () => '',
+  forgetTicket: () => undefined,
 }
 
 const profile = {
@@ -103,16 +119,68 @@ const profiles: ProfilesContextValue = {
   remove: () => Promise.resolve(),
 }
 
-const route = new URLSearchParams(window.location.search).get('route') ?? '/'
+function Harness() {
+  const [library, setLibrary] = useState<LibraryContextValue>(() => ({
+    status: mediaBase === null ? 'ready' : 'loading',
+    books: mediaBase === null ? demoBooks : [],
+    fromCache: false,
+    error: null,
+    skipped: 0,
+    refresh: () => undefined,
+    bookById: (id) => (mediaBase === null ? demoBooks : []).find((book) => book.id === id),
+    client: demoClient,
+  }))
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
+  useEffect(() => {
+    if (mediaBase === null || ticket === null) return
+
+    // Echter Client, aber mit vorab ausgestelltem Ticket statt Firebase-Anmeldung.
+    const client = createMediaClient({
+      baseUrl: mediaBase,
+      getIdToken: () => Promise.resolve(null),
+    })
+    window.localStorage.setItem(
+      'hb.mediaTicket',
+      JSON.stringify({ ticket, expiresAt: Date.now() + 3_600_000 }),
+    )
+
+    void (async () => {
+      const response = await fetch(
+        `${mediaBase}/library?t=${encodeURIComponent(ticket)}`,
+      )
+      const parsed = parseCatalog(await response.json())
+      const books = parsed.ok ? sortBooks(parsed.catalog.books) : []
+      setLibrary({
+        status: 'ready',
+        books,
+        fromCache: false,
+        error: null,
+        skipped: parsed.ok ? parsed.skipped : 0,
+        refresh: () => undefined,
+        bookById: (id) => books.find((book) => book.id === id),
+        client,
+      })
+    })()
+  }, [])
+
+  return (
     <MemoryRouter initialEntries={[route]}>
       <ProfilesContext value={profiles}>
         <LibraryContext value={library}>
-          <AppRoutes />
+          <ProgressProvider>
+            <PlayerProvider>
+              <AppRoutes />
+              <NowPlayingBar />
+            </PlayerProvider>
+          </ProgressProvider>
         </LibraryContext>
       </ProfilesContext>
     </MemoryRouter>
+  )
+}
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <Harness />
   </StrictMode>,
 )

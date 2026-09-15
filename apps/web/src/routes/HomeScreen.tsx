@@ -2,6 +2,9 @@ import { Link } from 'react-router-dom'
 
 import { BookTile } from '@/features/library/BookTile'
 import { useLibrary } from '@/features/library/libraryContext'
+import { ContinueTile } from '@/features/player/ContinueTile'
+import { pickContinue } from '@/features/progress/progress'
+import { useProgress } from '@/features/progress/progressContext'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { Avatar } from '@/ui/Avatar'
 import { BigLinkButton } from '@/ui/BigButton'
@@ -12,17 +15,18 @@ import { Spinner } from '@/ui/Spinner'
 /**
  * Startbildschirm.
  *
- * Ganz oben steht später die grosse „Weiterhören“-Kachel (M5/M6). Bis es
- * Fortschritt gibt, zeigt die Seite die zuletzt hinzugekommenen Bücher – das
- * ist für ein Kind immer noch ein Bild zum Antippen.
+ * Ganz oben die „Weiterhören"-Kachel – ein Tap, und es läuft weiter. Erst
+ * darunter kommt alles andere.
  */
 export function HomeScreen() {
   const { selected } = useProfiles()
-  const { status, books } = useLibrary()
+  const { status, books, bookById } = useLibrary()
+  const { entries } = useProgress()
 
-  const neueste = [...books]
-    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
-    .slice(0, 6)
+  const weiter = pickContinue([...entries.values()], (id) => bookById(id) !== undefined)
+  const weiterBuch = weiter ? bookById(weiter.bookId) : undefined
+
+  const neueste = [...books].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 6)
 
   return (
     <Screen>
@@ -39,6 +43,12 @@ export function HomeScreen() {
         ) : null}
       </div>
 
+      {weiter && weiterBuch ? (
+        <div className="pb-8">
+          <ContinueTile book={weiterBuch} progress={weiter} />
+        </div>
+      ) : null}
+
       {status === 'loading' ? <Spinner label="Bücher werden geladen" /> : null}
 
       {status !== 'loading' && books.length === 0 ? (
@@ -51,13 +61,17 @@ export function HomeScreen() {
 
       {books.length > 0 ? (
         <>
-          <h2 className="pb-3 text-xl font-bold">Zuletzt dazugekommen</h2>
+          <h2 className="pb-3 text-xl font-bold">
+            {weiter ? 'Andere Hörbücher' : 'Zuletzt dazugekommen'}
+          </h2>
           <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
-            {neueste.map((book) => (
-              <li key={book.id}>
-                <BookTile book={book} />
-              </li>
-            ))}
+            {neueste
+              .filter((book) => book.id !== weiter?.bookId)
+              .map((book) => (
+                <li key={book.id}>
+                  <BookTile book={book} />
+                </li>
+              ))}
           </ul>
           <BigLinkButton to="/bibliothek">Alle Hörbücher</BigLinkButton>
         </>

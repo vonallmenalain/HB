@@ -201,6 +201,27 @@ export function resolvePosition(
     : { fileIdx: 0, offsetSec: 0 }
 }
 
+/** Globale Sekunde, an der eine Datei im Buch beginnt. */
+export function fileStartSec(book: Book, fileIdx: number): number {
+  let elapsed = 0
+  for (const file of book.files) {
+    if (file.idx === fileIdx) return elapsed
+    elapsed += file.durationSec
+  }
+  return 0
+}
+
+/**
+ * Globale Sekunde aus Datei und Position darin.
+ *
+ * Der Player kennt immer nur die laufende Datei; alles andere – Fortschritt,
+ * Kapitelanzeige, gespeicherte Stelle – rechnet in globalen Sekunden.
+ */
+export function globalPosition(book: Book, fileIdx: number, offsetSec: number): number {
+  const start = fileStartSec(book, fileIdx)
+  return Math.min(book.durationSec, Math.max(0, start + Math.max(0, offsetSec)))
+}
+
 /** Welches Kapitel gehört zu dieser globalen Sekunde? */
 export function chapterAt(book: Book, positionSec: number): Chapter | null {
   const target = Math.max(0, positionSec)

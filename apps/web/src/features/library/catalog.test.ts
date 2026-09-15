@@ -210,3 +210,42 @@ describe('coverLetter', () => {
     expect(coverLetter('🦊 Fuchs')).toBe('🦊')
   })
 })
+
+describe('fileStartSec / globalPosition', () => {
+  const dreiTeile = book({
+    files: [
+      { idx: 0, durationSec: 600, bytes: 0, mime: 'audio/mpeg' },
+      { idx: 1, durationSec: 700, bytes: 0, mime: 'audio/mpeg' },
+      { idx: 2, durationSec: 500, bytes: 0, mime: 'audio/mpeg' },
+    ],
+    durationSec: 1800,
+  })
+
+  it('kennt den Anfang jeder Datei im Buch', async () => {
+    const { fileStartSec } = await import('./catalog')
+    expect(fileStartSec(dreiTeile, 0)).toBe(0)
+    expect(fileStartSec(dreiTeile, 1)).toBe(600)
+    expect(fileStartSec(dreiTeile, 2)).toBe(1300)
+  })
+
+  it('rechnet Datei und Versatz in eine globale Sekunde um', async () => {
+    const { globalPosition } = await import('./catalog')
+    expect(globalPosition(dreiTeile, 0, 0)).toBe(0)
+    expect(globalPosition(dreiTeile, 1, 100)).toBe(700)
+    expect(globalPosition(dreiTeile, 2, 500)).toBe(1800)
+  })
+
+  it('ist die Umkehrung von resolvePosition', async () => {
+    const { globalPosition, resolvePosition } = await import('./catalog')
+    for (const position of [0, 1, 599, 600, 1000, 1299, 1300, 1799]) {
+      const { fileIdx, offsetSec } = resolvePosition(dreiTeile, position)
+      expect(globalPosition(dreiTeile, fileIdx, offsetSec)).toBe(position)
+    }
+  })
+
+  it('bleibt in den Grenzen des Buchs', async () => {
+    const { globalPosition } = await import('./catalog')
+    expect(globalPosition(dreiTeile, 0, -100)).toBe(0)
+    expect(globalPosition(dreiTeile, 2, 99999)).toBe(1800)
+  })
+})

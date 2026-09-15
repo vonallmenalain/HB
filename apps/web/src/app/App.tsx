@@ -6,6 +6,9 @@ import { ConfigMissingScreen } from '@/features/auth/ConfigMissingScreen'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { useAuth } from '@/features/auth/authContext'
 import { LibraryProvider } from '@/features/library/LibraryProvider'
+import { NowPlayingBar } from '@/features/player/NowPlayingBar'
+import { PlayerProvider } from '@/features/player/PlayerProvider'
+import { ProgressProvider } from '@/features/progress/ProgressProvider'
 import { ProfileProvider } from '@/features/profiles/ProfileProvider'
 import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
@@ -41,7 +44,12 @@ function AuthGate() {
       return (
         <ProfileProvider>
           <LibraryProvider>
-            <AppRoutes />
+            <ProgressProvider>
+              <PlayerProvider>
+                <AppRoutes />
+                <NowPlayingBar />
+              </PlayerProvider>
+            </ProgressProvider>
           </LibraryProvider>
         </ProfileProvider>
       )
