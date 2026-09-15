@@ -20,13 +20,20 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 │   │   ├── 02 - Kapitel 2.mp3
 │   │   └── 03 - Kapitel 3.mp3
 │   └── 02 - Der Phantomsee/
-│       └── phantomsee.m4b                 ← Einzeldatei mit Kapiteln
+│       ├── cover.jpg
+│       ├── 01 - Kapitel 1.mp3
+│       └── 02 - Kapitel 2.mp3
 ├── Bibi Blocksberg - Hexerei/
 │   └── ...
 └── .hb-cache/                             ← vom Scanner angelegt
     ├── catalog.json
-    └── probe/                             ← ffprobe-Ergebnisse, hash-basiert
+    └── meta/                              ← gelesene ID3-Daten, hash-basiert
 ```
+
+**Womit der Scanner liest:** [`music-metadata`](https://github.com/borewit/music-metadata)
+(reines JavaScript, liest ID3v1/ID3v2, Dauer und eingebettete Cover) und
+[`sharp`](https://sharp.pixelplumbing.com/) zum Verkleinern der Cover. Kein
+`ffmpeg` im Image nötig.
 
 **Regeln des Scanners**
 
@@ -35,9 +42,9 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 | Ordner enthält Audiodateien | → ist ein Buch |
 | Ordner enthält nur Unterordner | → ist eine Serie, Name wird als `series` übernommen |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
-| Eine `.m4b`/`.m4a` mit Kapitelatomen | Kapitel aus der Datei, eine einzige `file` |
+| Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
 | `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet |
-| Kein Cover-File | Eingebettetes Bild aus ID3/MP4 extrahieren |
+| Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
 | `buch.json` vorhanden | Felder daraus haben **Vorrang** vor allem Erkannten |
@@ -96,8 +103,9 @@ Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
 ```
 
 **Wichtig:** `startSec`/`endSec` in `chapters` sind **globale** Sekunden im Buch,
-nicht relativ zur Datei. Damit funktioniert dieselbe Rechnung für MP3-Ordner und
-für eine einzelne M4B-Datei.
+nicht relativ zur Datei. Beim vorliegenden Aufbau (ein Ordner mit MP3s) bildet
+jedes Kapitel genau auf eine Datei ab – die Trennung der beiden Listen kostet
+nichts und würde später auch Dateien mit mehreren Kapiteln abdecken.
 
 **Umrechnung global ↔ Datei**
 
@@ -115,7 +123,8 @@ function resolve(positionSec: number, files: File[]) {
 }
 ```
 
-Bei einer M4B mit nur einer Datei ist `fileIdx` immer 0 und `offsetSec === positionSec`.
+Bei MP3-Ordnern trifft die Schleife immer die Datei, die das aktuelle Kapitel
+enthält; `offsetSec` ist dann die Position innerhalb dieses Kapitels.
 
 ---
 
@@ -245,8 +254,8 @@ Content-Length: <bytes>
 Content-Range: bytes 1024-2047/22118400
 ```
 
-Ohne Range-Support kann im Player nicht gesprungen werden und iOS startet die
-Wiedergabe gar nicht erst.
+Ohne Range-Support kann im Player nicht gesprungen werden, und viele Browser
+starten die Wiedergabe gar nicht erst.
 
 ### `POST /admin/rescan?t=<ticket>`
 Nur für UIDs in `HB_ADMIN_UIDS`. Stösst einen inkrementellen Scan an.
@@ -273,6 +282,29 @@ Nur für UIDs in `HB_ADMIN_UIDS`. Stösst einen inkrementellen Scan an.
 | `HB_ADMIN_UIDS` | `abc…` | Darf `/admin/rescan` |
 | `HB_SCAN_CRON` | `0 4 * * *` | Nächtlicher Scan |
 
+Eingebunden wird der Hörbuch-Ordner in der `docker-compose.yml` read-only:
+
+```yaml
+services:
+  hb-media:
+    image: ghcr.io/<owner>/hb-media:latest   # oder lokal gebaut
+    restart: unless-stopped
+    ports: ["8080:8080"]
+    volumes:
+      - /share/Hoerbuecher:/media:ro         # read-only, der Dienst schreibt nie
+      - hb-cache:/cache
+    environment:
+      HB_MEDIA_ROOT: /media
+      HB_FIREBASE_PROJECT_ID: ${HB_FIREBASE_PROJECT_ID}
+      HB_TICKET_SECRET: ${HB_TICKET_SECRET}
+      HB_ALLOWED_ORIGINS: ${HB_ALLOWED_ORIGINS}
+volumes:
+  hb-cache:
+```
+
+> Der Cache liegt bewusst in einem eigenen Volume und nicht im Hörbuch-Ordner –
+> so bleibt die Freigabe wirklich read-only.
+
 ---
 
 ## 6. Projektstruktur (geplant)
@@ -296,7 +328,7 @@ HB/
 │   │   └── sw.ts                # eigener Service Worker
 │   └── vite.config.ts
 ├── services/media/              # NAS-Dienst
-│   ├── src/                     # server, auth, scanner, range
+│   ├── src/                     # server, auth, scanner (ID3), range
 │   ├── Dockerfile
 │   └── docker-compose.yml       # für Container Station
 ├── docs/

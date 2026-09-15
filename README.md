@@ -26,6 +26,15 @@ React-PWA auf Netlify · Firebase für Login und Fortschritt · ein kleiner
 Node-Dienst im Docker-Container auf dem QNAP liefert Katalog und Audio (mit
 Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage.
 
+## Rahmenbedingungen
+
+| | |
+|---|---|
+| Zielgeräte | Android (Tablet/Handy) – damit steht die Background Fetch API für echte Hintergrund-Downloads zur Verfügung |
+| Audioformat | Ein Ordner pro Buch mit nummerierten MP3-Dateien, Metadaten aus den ID3-Tags |
+| NAS | QNAP mit Container Station (Docker) |
+| Repository | Öffentlich – deshalb gehören Mediendateien, echte Buchtitel, Adressen und Zugangsdaten **nie** hier hinein |
+
 ## Dokumentation
 
 | Dokument | Inhalt |
@@ -51,6 +60,11 @@ Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
 
 ## Hinweis zu Inhalten
 
-Dieses Repository enthält **ausschliesslich Quellcode und Dokumentation**.
-Hörbücher, Cover, Kataloge mit echten Titeln sowie sämtliche Zugangsdaten
-gehören nicht hierher und sind über `.gitignore` gesperrt.
+Dieses Repository ist **öffentlich** und enthält ausschliesslich Quellcode und
+Dokumentation. Hörbücher, Cover, Kataloge mit echten Titeln sowie sämtliche
+Zugangsdaten gehören nicht hierher; `.gitignore` sperrt Medien-Endungen,
+`.env`-Dateien und Service-Account-Schlüssel. Alle Beispiele in der
+Dokumentation sind erfunden.
+
+Der Schutz der Inhalte liegt im Login und im Ticket-Mechanismus, nicht in der
+Geheimhaltung des Quellcodes – siehe [Konzept, Kapitel 9](docs/KONZEPT.md#9-sicherheit-und-urheberrecht).

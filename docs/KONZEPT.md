@@ -29,6 +29,17 @@ QNAP-NAS, die App läuft als installierbare PWA auf Tablets und Handys.
 **Ausdrücklich nicht Ziel (v1):** Öffentliche Nutzung, Fremd-Accounts,
 Empfehlungen, Bewertungen, Streaming an Dritte, Ausleihe, Podcast-Feeds.
 
+### Festgelegte Rahmenbedingungen
+
+Diese vier Punkte sind entschieden und prägen das ganze Konzept:
+
+| Punkt | Entscheidung | Was daraus folgt |
+|---|---|---|
+| **Zielgeräte** | **Nur Android** | Background Fetch API steht zur Verfügung → echte Hintergrund-Downloads. Sämtliche iOS-Sonderwege entfallen (siehe Kapitel 8). |
+| **Audioformat** | **Ordner mit MP3s**, eine Datei pro Kapitel | Kein `ffmpeg`/`ffprobe` nötig; Metadaten und Cover kommen aus den ID3-Tags. Die M4B-Unterstützung bleibt im Datenmodell vorbereitet, wird aber nicht gebaut. |
+| **NAS** | QNAP mit **laufender Container Station** | Der Medien-Dienst wird als Docker-Image mit `docker-compose.yml` ausgeliefert. |
+| **Repository** | Bleibt **öffentlich** | Verschärfte Disziplin bei allem, was committet wird – siehe Kapitel 9.3. |
+
 ---
 
 ## 2. Nutzer und Kernszenarien
@@ -94,7 +105,7 @@ Antippen.
  │ │  · /library  (Katalog als JSON)                 │ │
  │ │  · /cover    (Cover-Bilder)                     │ │
  │ │  · /audio    (Streaming mit Range-Support)      │ │
- │ │  · Scanner (ffprobe: Dauer, Kapitel, Tags)      │ │
+ │ │  · Scanner (ID3-Tags: Dauer, Titel, Cover)      │ │
  │ └─────────────────────────────────────────────────┘ │
  │ Dedizierter Ordner: /share/Hoerbuecher/ (read-only) │
  └─────────────────────────────────────────────────────┘
@@ -122,16 +133,17 @@ er keine Zugangsdaten, nur Internet-Zugriff. Das spart eine ganze Schicht.
 |---|---|---|---|
 | Frontend | Vite + React + TypeScript | Schnell, typsicher, kleines Bundle, gute PWA-Tooling-Unterstützung | Next.js (zu viel für eine statische App), Vanilla JS (Wartbarkeit) |
 | Styling | Tailwind CSS | Design-Tokens für grosse Touch-Ziele zentral steuerbar | CSS-Module (mehr Handarbeit) |
-| PWA | `vite-plugin-pwa` im `injectManifest`-Modus | Manifest + Workbox-Precache automatisch, aber eigener Service Worker für die Audio-Logik | `generateSW` (kein Platz für eigene Range-/Cache-Logik) |
+| PWA | `vite-plugin-pwa` im `injectManifest`-Modus | Manifest + Workbox-Precache automatisch, eigener Service Worker für Background Fetch | `generateSW` (kein Platz für die Download-Logik) |
 | State | Zustand (Player-Store) + React Query-artiger Cache für Katalog | Sehr klein, kein Boilerplate | Redux (Overkill) |
-| Audio | **Ein einziges** `<audio>`-Element, wiederverwendet | iOS erlaubt Wiedergabe nur nach Nutzergeste; ein wiederverwendetes Element behält die Freigabe über Kapitelwechsel | Neues Element pro Track (bricht auf iOS) |
+| Audio | **Ein einziges** `<audio>`-Element, wiederverwendet | Browser erlauben Wiedergabe nur nach einer Nutzergeste; ein wiederverwendetes Element behält diese Freigabe über Kapitelwechsel hinweg | Neues Element pro Track (verliert die Freigabe) |
 | Hintergrund/Lockscreen | Media Session API | Lockscreen-Cover, Titel, Play/Pause, ±30 s, Kapitelwechsel | Nichts (Bedienung nur in der App) |
-| Medien-Zugriff | Kurzlebiges **Media-Ticket** in der URL (`?t=…`) | Funktioniert für `<audio src>`, Range-Requests, Downloads und auf iOS – im Gegensatz zu Authorization-Headern | Header (auf iOS bei Media-Elementen unzuverlässig), Cookies (nur bei eigener Domain sauber) |
+| Medien-Zugriff | Kurzlebiges **Media-Ticket** in der URL (`?t=…`) | `<audio src>` kann keine eigenen Header setzen; die URL trägt die Berechtigung durch Streaming, Range-Requests und Background Fetch gleichermassen | Authorization-Header (geht bei Media-Elementen nicht), Cookies (nur bei eigener Domain sauber) |
 | Offline-Speicher | **Cache Storage** für Audio, IndexedDB für Metadaten | Cache Storage ist für grosse Responses gebaut; Metadaten gehören in eine Datenbank | Alles in IndexedDB (Blob-Handling umständlicher) |
-| Offline-Wiedergabe | Blob aus dem Cache holen und per Object-URL abspielen | Umgeht die iOS-Schwäche, dass Media-Requests nicht zuverlässig durch den Service Worker laufen | Nur SW-Interception (auf iOS fragil) |
+| Offline-Wiedergabe | Blob aus dem Cache holen und per Object-URL abspielen | Der Player fragt direkt den Cache, ohne Umweg über den Service Worker – damit entfällt das Nachbauen von 206-Range-Antworten im SW komplett | SW-Interception mit Workbox-`RangeRequestsPlugin` (mehr bewegliche Teile ohne Mehrwert) |
 | Katalog | Vom NAS erzeugt, in IndexedDB gespiegelt | Eine Quelle der Wahrheit (der Ordner), trotzdem offline browsebar | Katalog in Firestore pflegen (doppelte Pflege) – siehe Ausbaustufe 7.3 |
 | Tunnel | Cloudflare Tunnel (`cloudflared` im Container) | Gratis, kein offener Port, HTTPS inklusive | Portfreigabe + DDNS (Angriffsfläche), Tailscale (Client auf jedem Gerät nötig) |
-| NAS-Dienst | Node 20 + Fastify in Docker (Container Station) | Range-Support in wenigen Zeilen, `ffprobe` für Kapitel/Dauer | QNAP Multimedia/DLNA (kein Auth-Modell, das zu Firebase passt) |
+| NAS-Dienst | Node 20 + Fastify in Docker (Container Station) | Range-Support in wenigen Zeilen; Container Station läuft bereits | QNAP Multimedia/DLNA (kein Auth-Modell, das zu Firebase passt) |
+| Metadaten lesen | `music-metadata` (reines JS) + `sharp` fürs Cover | Liest ID3-Tags, Dauer und eingebettete Cover ohne externe Binaries → schlankes Image, kein `ffmpeg` | `ffprobe`/`ffmpeg` (nur nötig, falls später doch M4B dazukommt) |
 
 ---
 
@@ -246,11 +258,12 @@ Katalog neu einlesen, Abmelden, Diagnose (ist das NAS erreichbar?).
 
 - Ein `<audio>`-Element wird beim ersten Tap auf „Play" freigeschaltet und danach
   **nie ersetzt**, nur die `src` gewechselt. Das erhält die Wiedergabe-Erlaubnis
-  auf iOS über Kapitelgrenzen hinweg.
-- Ton ist nie stumm und nie lautstärke-0, sonst beendet iOS die
-  Hintergrundwiedergabe.
+  über Kapitelgrenzen hinweg.
+- Ton ist nie stumm und nie lautstärke-0 – Browser stufen das als „spielt nicht"
+  ein und beenden die Hintergrundwiedergabe.
 - Die installierte PWA (`display: standalone`) spielt bei ausgeschaltetem
-  Bildschirm weiter – auf iOS wie auf Android.
+  Bildschirm weiter. Auf Android hält die aktive Media Session die Wiedergabe
+  am Leben, auch wenn die App im Hintergrund ist.
 - Kein Wake-Lock während der Wiedergabe: der Bildschirm **soll** ausgehen.
 
 ### 6.2 Lockscreen-Steuerung (Media Session API)
@@ -270,15 +283,17 @@ Damit funktionieren Lockscreen, Kopfhörer-Tasten, Autoradio und Smartwatch.
 Der nächste Track wird ab 30 Sekunden vor Ende vorgeladen (`preload`-Element bzw.
 Cache-Warmup). Bei `ended` wird sofort die nächste Quelle gesetzt und gestartet.
 
-### 6.4 Zwei Dateiformate, ein Modell
+### 6.4 Dateiformat
 
-| Quelle auf dem NAS | Wie die App es sieht |
-|---|---|
-| Ordner mit `01.mp3`, `02.mp3`, … | Mehrere Dateien, jede Datei = ein Kapitel |
-| Eine `buch.m4b` mit eingebetteten Kapiteln | Eine Datei, Kapitel = Sprungmarken (vom Scanner via `ffprobe` ausgelesen) |
+Gebaut wird für den vorliegenden Fall: **ein Ordner pro Buch mit nummerierten
+MP3-Dateien**, jede Datei ein Kapitel. Dauer, Titel, Autor und das eingebettete
+Cover liest der Scanner aus den ID3-Tags.
 
-Im Katalog gibt es darum getrennt `files[]` (was geladen wird) und `chapters[]`
-(was das Kind sieht). Beide Fälle laufen durch denselben Player-Code.
+Im Katalog bleiben `files[]` (was geladen wird) und `chapters[]` (was das Kind
+sieht) trotzdem getrennte Listen, auch wenn sie hier 1:1 aufeinander abbilden.
+Das kostet nichts und hält die Tür offen: Kämen später M4B-Dateien mit
+eingebetteten Kapiteln dazu, wären das mehrere `chapters` auf einer `file` – der
+Player-Code bliebe unverändert, nur der Scanner bekäme einen zweiten Zweig.
 
 ---
 
@@ -341,26 +356,41 @@ Ab 97 % gilt ein Buch als beendet: Haken in der Bibliothek, verschwindet aus
    ohne alles neu zu laden.
 5. Cover und Katalogeintrag werden mitgespeichert.
 
-### 8.2 Im Hintergrund – was geht und was nicht
+### 8.2 Im Hintergrund
 
-| Plattform | Verhalten |
-|---|---|
-| Android / Chrome | **Background Fetch API**: echter Systemdownload mit Benachrichtigung, läuft weiter, wenn die App geschlossen wird |
-| iOS / Safari | Keine vergleichbare API. Download läuft nur, solange die App offen ist. Gegenmassnahme: `navigator.wakeLock` hält den Bildschirm an, Fortschritt gross sichtbar, pro Datei fortsetzbar |
+Da nur Android-Geräte im Einsatz sind, steht die **Background Fetch API** zur
+Verfügung – und das ist ein grosser Unterschied:
 
-Das ist eine echte Plattformgrenze, keine Bequemlichkeit. Auf iPad heisst
-„Hörbuch für die Reise laden" also: App offen lassen, bis der Balken voll ist.
-Bei einem 300-MB-Hörbuch im WLAN sind das typischerweise ein bis zwei Minuten.
+- Der Download wird an das Betriebssystem übergeben und läuft weiter, **auch wenn
+  die App geschlossen oder das Gerät gesperrt wird**.
+- Android zeigt eine eigene Fortschrittsbenachrichtigung, die das Kind (oder die
+  Eltern) abbrechen kann.
+- Nach Abschluss weckt Android den Service Worker, der die Dateien in den Cache
+  übernimmt und den Status in IndexedDB auf `done` setzt.
+- Unterbrochene Downloads nimmt das System selbst wieder auf, sobald wieder
+  WLAN da ist.
+
+„Hörbuch für die Reise laden" heisst damit schlicht: antippen und weglegen.
+
+Als Rückfallebene bleibt der Download im Vordergrund (Datei für Datei per
+`fetch`, Fortschritt in IndexedDB), falls Background Fetch auf einem Gerät
+fehlt oder scheitert. Der gleiche Code deckt auch den Desktop-Browser ab.
 
 ### 8.3 Abspielen von heruntergeladenen Büchern
 
 Die App fragt vor jedem Track: liegt er im Cache?
 
 - **Ja** → Blob aus dem Cache holen, `URL.createObjectURL()`, abspielen. Kein
-  Netzwerk, kein Service Worker, kein Ticket. Funktioniert garantiert auch auf iOS.
+  Netzwerk, kein Service Worker, kein Ticket, kein abgelaufenes Ticket.
 - **Nein** → signierte Stream-URL vom NAS.
 
 Object-URLs werden beim Trackwechsel wieder freigegeben.
+
+Der Umweg über den Blob statt über eine vom Service Worker abgefangene Anfrage
+ist bewusst gewählt: Ein `<audio>`-Element stellt Range-Requests, und die müsste
+der Service Worker aus der vollständigen Cache-Antwort selbst als `206 Partial
+Content` nachbauen. Bei einzelnen Kapitel-MP3s von 20–30 MB ist der Blob
+einfacher, schneller und hat eine Fehlerquelle weniger.
 
 ### 8.4 Speicher
 
@@ -369,10 +399,14 @@ Object-URLs werden beim Trackwechsel wieder freigegeben.
 - `navigator.storage.estimate()` vor dem Download prüfen und warnen, wenn es eng wird.
 - Im Elternmodus: Liste der heruntergeladenen Bücher mit Grösse und „Löschen".
 
-**Bekannte Einschränkung:** iOS räumt Website-Daten nach längerer Nichtnutzung
-auf. Bei installierten PWAs mit `persist()` ist das deutlich entschärft, aber
-nicht ausgeschlossen. Die App erkennt fehlende Dateien und bietet
-Neu-Herunterladen an, statt einen Fehler zu zeigen.
+Auf Android gewährt Chrome einer installierten PWA typischerweise einen grossen
+Teil des freien Gerätespeichers, und `persist()` wird bei installierten Apps in
+der Regel ohne Rückfrage gewährt. Das Kontingent ist damit praktisch das, was auf
+dem Tablet frei ist – nicht die App ist die Grenze, sondern das Gerät.
+
+Trotzdem gilt: Die App prüft vor jedem Download, ob genug Platz da ist, erkennt
+nachträglich fehlende Dateien und bietet stilles Neu-Herunterladen an, statt
+einen Fehler zu zeigen.
 
 ---
 
@@ -408,25 +442,41 @@ Familienlösung, kein Verteildienst. Entsprechend:
 ```
 
 Warum das Ticket in der URL und nicht im Header: Ein `<audio src="…">` kann keine
-eigenen Header setzen, und Range-Requests von Media-Elementen laufen auf iOS
-nicht zuverlässig durch den Service Worker. Die URL ist der einzige Weg, der auf
-allen Zielgeräten funktioniert. Das Ticket ist deshalb kurzlebig und enthält
-keine verwertbaren Daten ausser der UID.
+eigenen Header setzen, und die Background Fetch API lädt ebenfalls schlicht eine
+URL. Die URL ist damit der einzige Ort, an dem die Berechtigung durch Streaming,
+Range-Requests und Hintergrund-Download gleichermassen durchkommt. Das Ticket ist
+deshalb kurzlebig und enthält keine verwertbaren Daten ausser der UID.
 
 ### 9.3 Was nie ins Repository gehört
 
-- Audiodateien, Cover, Kataloge mit echten Titeln
-- `HB_TICKET_SECRET`, Firebase-Service-Account-Keys, Tunnel-Credentials
-- Die konkrete Tunnel-Adresse des NAS (kommt aus Umgebungsvariablen)
+**Das Repository bleibt öffentlich.** Das ist eine bewusste Entscheidung und für
+die Sicherheit der Inhalte unproblematisch – der Schutz liegt im Login und im
+Ticket-Mechanismus, nicht in der Geheimhaltung des Quellcodes. Es bedeutet aber,
+dass jede einzelne Zeile, die hier landet, für alle lesbar ist. Deshalb gilt
+strikt:
 
-Die `.gitignore` sperrt Medien-Endungen und `.env`-Dateien bereits.
+| Nie im Repo | Stattdessen |
+|---|---|
+| Audiodateien, Cover | Bleiben auf dem NAS; `.gitignore` sperrt die Endungen |
+| Kataloge mit echten Buchtiteln | Beispieldaten in der Doku sind erfunden (`Die drei ???` steht hier nur als Muster) |
+| `HB_TICKET_SECRET`, Service-Account-Keys, Tunnel-Zugangsdaten | Umgebungsvariablen; `.env.example` zeigt nur die Namen |
+| Die echte Tunnel-Adresse des NAS | `VITE_MEDIA_BASE_URL` als Netlify-Umgebungsvariable, in der Doku immer `media.example.com` |
+| Echte Firebase-UIDs, E-Mail-Adressen, Pfade der Freigaben | Platzhalter |
 
-> **Empfehlung: Repository auf `private` umstellen.**
-> Es ist aktuell öffentlich. Der Code selbst enthält keine Geheimnisse (die
-> Firebase-Web-Konfiguration ist per Design öffentlich), aber die Struktur der
-> NAS-Schnittstelle, die Endpunkte und die Betriebsdokumentation müssen nicht für
-> jeden lesbar sein. Umstellen unter `Settings → General → Danger Zone → Change
-> repository visibility`.
+Die Firebase-Web-Konfiguration (API-Key, Projekt-ID) darf dagegen offen im Code
+stehen – sie ist per Design öffentlich, der Schutz kommt von den
+Firestore-Regeln und der abgeschalteten Registrierung.
+
+Konkrete Massnahmen im Projekt:
+
+- `.gitignore` sperrt Medien-Endungen, `.env*` und `*-service-account*.json`
+- GitHub **Secret Scanning** und **Push Protection** in den Repo-Einstellungen
+  aktivieren (bei öffentlichen Repos gratis) – fängt versehentlich committete
+  Schlüssel ab, bevor sie draussen sind
+- Vor jedem Commit ein Blick in den Diff: keine echten Titel, keine echten Adressen
+
+> Falls du später doch umstellen willst: `Settings → General → Danger Zone →
+> Change repository visibility`. Die Architektur ändert sich dadurch nicht.
 
 ### 9.4 Rechtlicher Rahmen
 
@@ -462,11 +512,12 @@ das Veröffentlichen bleibt ein bewusster Klick.
 |---|---|---|---|
 | R1 | Cloudflares Nutzungsbedingungen beschränken das Ausliefern grosser Mengen Nicht-HTML-Inhalte (Audio/Video) über den kostenlosen Proxy | Tunnel könnte theoretisch beanstandet werden | Bei Familiennutzung praktisch unkritisch. Trotzdem: Die Medien-Basis-URL ist **eine Konfigurationsvariable**, der Tunnel ist in 10 Minuten gegen QNAPs eigenes `myQNAPcloud` + Let's Encrypt oder Tailscale austauschbar. |
 | R2 | NAS nicht erreichbar (Strom, Internet, Neustart) | Kein Streaming | Katalog und heruntergeladene Bücher funktionieren weiter. Die App zeigt „Nur heruntergeladene Bücher" statt eines Fehlers. |
-| R3 | iOS räumt Offline-Daten weg | Heruntergeladenes Buch weg | `persist()` anfordern, fehlende Dateien erkennen, stilles Neu-Laden anbieten |
-| R4 | Kein Hintergrund-Download auf iOS | Laden dauert „sichtbar" | Wake-Lock, klare Fortschrittsanzeige, pro Datei fortsetzbar (Kapitel 8.2) |
+| R3 | Android räumt Website-Daten bei Speichermangel weg | Heruntergeladenes Buch weg | `persist()` anfordern (bei installierten PWAs meist automatisch gewährt), fehlende Dateien erkennen, stilles Neu-Laden anbieten |
+| R4 | Versehentlich committete Zugangsdaten sind im öffentlichen Repo sofort öffentlich | Tunnel oder Firebase-Projekt kompromittiert | Secret Scanning + Push Protection aktivieren, alles Sensible nur in Umgebungsvariablen, Diff-Kontrolle vor dem Commit (Kapitel 9.3) |
 | R5 | Upload-Bandbreite zuhause zu klein | Ruckeln beim Streaming | Prüfen: Ein 128-kbit/s-MP3 braucht ~0,13 Mbit/s – selbst schwache Anschlüsse reichen für 2–3 gleichzeitige Streams. Notfalls Transcoding auf dem NAS (Ausbaustufe). |
 | R6 | Kind tippt sich aus dem Konto | Kann sich nicht neu anmelden | Kein Logout im Kinderbereich, nur im PIN-geschützten Elternmodus |
-| R7 | Katalog wächst, Scan wird langsam | Neue Bücher erscheinen spät | Inkrementeller Scan (nur geänderte Ordner), `ffprobe`-Ergebnisse gecacht |
+| R7 | Katalog wächst, Scan wird langsam | Neue Bücher erscheinen spät | Inkrementeller Scan (nur geänderte Ordner); Metadaten-Ergebnisse werden pro Datei gecacht. Bei MP3s ohne VBR-Header muss die Dauer einmalig durch Lesen der ganzen Datei ermittelt werden – deshalb ist der Cache wichtig, nicht optional. |
+| R8 | Ein Kind lädt aus Versehen die halbe Bibliothek herunter | Tablet voll | Downloads pro Profil freischaltbar (`allowDownload`); Speicherwarnung vor dem Start; Übersicht mit Grössen im Elternmodus |
 
 ---
 
@@ -479,11 +530,11 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M0** | Konzept (dieses Dokument) | Gemeinsames Verständnis ✅ |
 | **M1** | Projektgerüst: Vite/React/TS/Tailwind, Manifest, Icons, Service Worker, `netlify.toml`, GitHub-Actions-CI | App ist auf Netlify installierbar (noch ohne Inhalt) |
 | **M2** | Firebase Auth, dauerhafte Session, Profilwahl, geschützte Routen | Login funktioniert, Kind wählt Avatar |
-| **M3** | NAS-Dienst `hb-media` + Scanner + Docker + Tunnel, `/library`, `/cover`, `/audio` | Katalog und Audio sind authentifiziert abrufbar |
+| **M3** | NAS-Dienst `hb-media` (Docker) + ID3-Scanner + Tunnel, `/library`, `/cover`, `/audio` | Katalog und Audio sind authentifiziert abrufbar |
 | **M4** | Bibliothek und Buchseite im Kinderdesign | Bücher sind sichtbar und auswählbar |
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät |
-| **M7** | Offline-Download (Cache Storage, Background Fetch, Verwaltung) | Reisetauglich |
+| **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich |
 | **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
@@ -496,19 +547,28 @@ NAS, Katalogspiegel in Firestore, Wiedergabegeschwindigkeit.
 
 ---
 
-## 13. Offene Fragen an dich
+## 13. Geklärt und noch offen
 
-Diese Punkte ändern die Umsetzung spürbar – alles andere kann ich selbst entscheiden.
+### Geklärt
 
-| # | Frage | Warum es zählt |
+| Frage | Antwort | Auswirkung |
 |---|---|---|
-| **F1** | Welches QNAP-Modell, und ist **Container Station** (Docker) verfügbar? | Ohne Docker braucht der Medien-Dienst einen anderen Weg (Node direkt via Entware, oder doch eine Cloud-Zwischenschicht) |
-| **F2** | In welchem Format liegen die Hörbücher – **Ordner mit MP3s**, einzelne **M4B**, oder gemischt? | Bestimmt den Scanner und die Kapitel-Logik (Kapitel 6.4) |
-| **F3** | Grobe Grössenordnung: wie viele Bücher, wie viel GB insgesamt? | Relevant für Scan-Strategie und Offline-Speicherplanung |
-| **F4** | Welche Geräte nutzen die Kinder – **iPad/iPhone**, **Android**, oder beides? | iOS hat die härteren Einschränkungen (Kapitel 8.2); bei reinem Android wird der Download deutlich komfortabler |
-| **F5** | Hast du eine **eigene Domain** für den Tunnel, oder soll ich mit einer Cloudflare-Subdomain planen? | Beeinflusst Tunnel-Setup und CORS-Konfiguration |
-| **F6** | Wie viele **Kinderprofile**, und sollen Kinder selbst herunterladen dürfen? | Bestimmt Umfang von M2 und M7 |
-| **F7** | Soll das Repository auf **privat** umgestellt werden? | Siehe Kapitel 9.3 – meine Empfehlung ist ja |
+| Zielgeräte | Nur Android | Background Fetch statt iOS-Kompromissen (Kapitel 8.2); Risiken R3/R4 alter Fassung entfallen |
+| Audioformat | Ordner mit MP3s | Scanner ohne `ffmpeg`; Metadaten aus ID3-Tags (Kapitel 6.4) |
+| Container Station | Läuft bereits | Medien-Dienst als Docker-Image mit `docker-compose.yml` |
+| Repo-Sichtbarkeit | Bleibt öffentlich | Verschärfte Commit-Disziplin, Secret Scanning (Kapitel 9.3) |
+
+### Noch offen – blockiert M1 nicht
+
+Diese Punkte brauche ich erst später; ich baue bis dahin mit sinnvollen
+Vorgaben weiter.
+
+| # | Frage | Gebraucht ab | Vorgabe, solange keine Antwort |
+|---|---|---|---|
+| **F1** | Wie viele Bücher, wie viel GB insgesamt? | M3 | Scanner wird inkrementell gebaut und skaliert bis einige Tausend Dateien |
+| **F2** | Eigene Domain für den Tunnel, oder Cloudflare-Subdomain? | M3 | Ich plane mit einer Cloudflare-Subdomain; ein Wechsel ist eine Änderung an einer Umgebungsvariablen |
+| **F3** | Wie viele Kinderprofile, und dürfen Kinder selbst herunterladen? | M2 / M7 | Beliebig viele Profile möglich; `allowDownload` standardmässig **aus**, im Elternmodus pro Kind einschaltbar |
+| **F4** | Sollen die Kinder unterschiedliche Bücher sehen („nur diese für Emma")? | Ausbaustufe | Alle Profile sehen alles; Einschränkung wäre eine spätere Erweiterung |
 
 ---
 
