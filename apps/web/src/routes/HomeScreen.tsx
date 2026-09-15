@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { BookTile } from '@/features/library/BookTile'
 import { useLibrary } from '@/features/library/libraryContext'
+import { ParentEntry } from '@/features/parents/ParentEntry'
 import { ContinueTile } from '@/features/player/ContinueTile'
 import { pickContinue } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
@@ -31,7 +32,7 @@ export function HomeScreen() {
   return (
     <Screen>
       <div className="flex items-center gap-4 py-6">
-        <h1 className="flex-1 text-3xl font-bold tracking-tight">Hörbücher</h1>
+        <ParentEntry>Hörbücher</ParentEntry>
         {selected ? (
           <Link
             to="/profil"

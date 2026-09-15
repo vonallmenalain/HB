@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { useProfiles } from '@/features/profiles/profilesContext'
+import { PinGate } from '@/features/parents/PinGate'
 import { ManageProfilesScreen } from '@/features/profiles/ManageProfilesScreen'
 import { ProfilePicker } from '@/features/profiles/ProfilePicker'
 import { BookScreen } from '@/routes/BookScreen'
@@ -66,7 +67,14 @@ export function AppRoutes() {
         }
       />
       <Route path="/profil" element={<ProfilePicker />} />
-      <Route path="/eltern" element={<ManageProfilesScreen />} />
+      <Route
+        path="/eltern"
+        element={
+          <PinGate>
+            <ManageProfilesScreen />
+          </PinGate>
+        }
+      />
       <Route path="*" element={<NotFoundScreen />} />
     </Routes>
   )

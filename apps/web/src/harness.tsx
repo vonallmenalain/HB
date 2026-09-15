@@ -40,6 +40,7 @@ import { PlayerProvider } from './features/player/PlayerProvider'
 import type { ProgressCloud } from './features/progress/cloud'
 import type { Progress } from './features/progress/progress'
 import { DownloadProvider } from './features/downloads/DownloadProvider'
+import { ParentProvider } from './features/parents/ParentProvider'
 import { ProgressStore } from './features/progress/ProgressProvider'
 import { parseRemoteProgress, toRemoteDoc } from './features/progress/sync'
 import { ProfilesContext, type ProfilesContextValue } from './features/profiles/profilesContext'
@@ -61,7 +62,11 @@ const syncDemo = params.get('sync') === '1'
 const auth: AuthContextValue = {
   state: {
     status: 'ready',
-    user: { uid: 'uid-vorschau', email: 'vorschau@example.com' } as User,
+    user: {
+      uid: 'uid-vorschau',
+      email: 'vorschau@example.com',
+      metadata: {},
+    } as unknown as User,
   },
   actions: {
     signInWithPassword: () => Promise.resolve(),
@@ -258,20 +263,22 @@ function Harness() {
   return (
     <MemoryRouter initialEntries={[route]}>
       <AuthContext value={auth}>
-        <ProfilesContext value={profiles}>
-          <LibraryContext value={library}>
-            {/* Ohne `?sync=1` gibt es keine Cloud-Seite – der Fortschritt läuft
-                dann rein lokal, genau wie in der App bei fehlendem Netz. */}
-            <ProgressStore cloudFor={syncDemo ? localStorageCloud : undefined}>
-              <DownloadProvider>
-                <PlayerProvider>
-                  <AppRoutes />
-                  <NowPlayingBar />
-                </PlayerProvider>
-              </DownloadProvider>
-            </ProgressStore>
-          </LibraryContext>
-        </ProfilesContext>
+        <ParentProvider>
+          <ProfilesContext value={profiles}>
+            <LibraryContext value={library}>
+              {/* Ohne `?sync=1` gibt es keine Cloud-Seite – der Fortschritt
+                  läuft dann rein lokal, wie in der App bei fehlendem Netz. */}
+              <ProgressStore cloudFor={syncDemo ? localStorageCloud : undefined}>
+                <DownloadProvider>
+                  <PlayerProvider>
+                    <AppRoutes />
+                    <NowPlayingBar />
+                  </PlayerProvider>
+                </DownloadProvider>
+              </ProgressStore>
+            </LibraryContext>
+          </ProfilesContext>
+        </ParentProvider>
       </AuthContext>
     </MemoryRouter>
   )

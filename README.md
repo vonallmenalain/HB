@@ -9,7 +9,10 @@ Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört h
 > Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der Abgleich des
 > Fortschritts über Firestore. Was noch fehlt: den Medien-Dienst aufs NAS
 > deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)); vom Feinschliff
-> steht der Sleep-Timer, offen sind Elternmodus mit PIN und Barrierefreiheit.
+> stehen Sleep-Timer und Elternmodus mit PIN, offen ist die Barrierefreiheit.
+>
+> **Der Elternbereich öffnet sich mit zwei Sekunden Druck auf den Titel
+> „Hörbücher"** – kein sichtbarer Knopf, damit ihn kein Kind findet.
 
 ## Was die App können soll
 
@@ -59,7 +62,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
 | M6 | Geräte-Sync über Firestore | ✅ |
 | M7 | Offline-Downloads, Background Fetch, Verwaltung im Elternmodus | ✅ |
-| M8 | Sleep-Timer ✅, Elternmodus mit PIN, Feinschliff | teilweise |
+| M8 | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff | teilweise |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
 
