@@ -106,6 +106,7 @@ export function makeProgressValue(
   return {
     entries,
     loading: false,
+    syncState: 'off',
     get: (bookId: string) => entries.get(bookId) ?? null,
     save: vi.fn(),
     reset: vi.fn(),

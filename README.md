@@ -4,11 +4,12 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M5 steht – die App ist benutzbar. Wiedergabe mit
-> Hintergrundbetrieb, Kapitelwechsel, Sperrbildschirm-Steuerung und
-> punktgenauem Weiterhören funktionieren. Was noch fehlt: den Medien-Dienst
+> **Status:** M6 steht – die App ist benutzbar, und der Hörfortschritt folgt
+> dem Kind aufs nächste Gerät. Wiedergabe mit Hintergrundbetrieb,
+> Kapitelwechsel, Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der
+> Abgleich über Firestore funktionieren. Was noch fehlt: den Medien-Dienst
 > aufs NAS deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)),
-> Geräte-Abgleich (M6), Offline-Downloads (M7) und der Feinschliff (M8).
+> Offline-Downloads (M7) und der Feinschliff (M8).
 
 ## Was die App können soll
 
@@ -56,7 +57,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | ✅ |
 | M4 | Bibliothek im Kinderdesign | ✅ |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
-| M6 | Geräte-Sync über Firestore | offen |
+| M6 | Geräte-Sync über Firestore | ✅ |
 | M7 | Offline-Downloads | offen |
 | M8 | Sleep-Timer, Elternmodus, Feinschliff | offen |
 
@@ -132,6 +133,10 @@ firestore.rules      Sicherheitsregeln der Datenbank
 `npm run dev`, dann `http://localhost:5173/harness.html?route=/bibliothek`.
 Die Vorschau rendert jeden Bildschirm mit Beispieldaten – ohne Firebase-Konto
 und ohne laufendes NAS. Sie ist nicht Teil des Produktionsbuilds.
+
+Mit `&sync=1` tritt an die Stelle von Firestore eine Cloud aus localStorage.
+Zwei offene Tabs sind dann zwei Geräte: Was im einen läuft, erscheint im
+anderen als „Weiterhören".
 
 Mit einem laufenden Medien-Dienst geht auch echtes Audio, weiterhin ohne
 Anmeldung:

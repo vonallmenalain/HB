@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from 'react'
 
 import { useAuth } from '@/features/auth/authContext'
+import { SyncNotice } from '@/features/progress/SyncNotice'
 import { Avatar } from '@/ui/Avatar'
 import { BigButton, BigLinkButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
@@ -197,6 +198,8 @@ export function ManageProfilesScreen() {
           </BigButton>
         </form>
       </section>
+
+      <SyncNotice />
 
       <section className="flex flex-col gap-4 pt-8">
         <h2 className="text-2xl font-bold">Konto</h2>
