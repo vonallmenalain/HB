@@ -41,7 +41,9 @@ export function makeBook(overrides: Partial<Book> = {}): Book {
   return {
     id: 'b_1',
     title: 'Der Super-Papagei',
+    sourceTitle: 'Der Super-Papagei',
     series: 'Die drei ???',
+    group: null,
     seriesIndex: 1,
     author: 'Robert Arthur',
     narrator: null,

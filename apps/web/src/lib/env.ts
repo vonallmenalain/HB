@@ -49,6 +49,27 @@ export function readFirebaseConfig(env: Record<string, unknown> = import.meta.en
   return { ok: true, config: config as FirebaseConfig }
 }
 
+/**
+ * Die E-Mail-Adresse des Administrators.
+ *
+ * Steht bewusst in einer Umgebungsvariablen und nicht im Quelltext: Das
+ * Repository ist öffentlich, und eine private Adresse gehört dort nicht hinein
+ * (KONZEPT §9.3). Dieselbe Adresse setzt der Regel-Workflow beim Deployen in
+ * `firestore.rules` ein – dort wird sie durchgesetzt, hier entscheidet sie nur,
+ * wer den Adminbereich zu sehen bekommt.
+ */
+export function readAdminEmail(env: Record<string, unknown> = import.meta.env): string | null {
+  const value = env.VITE_ADMIN_EMAIL
+  if (typeof value !== 'string' || value.trim() === '') return null
+  return value.trim().toLowerCase()
+}
+
+/** Vergleicht zwei Adressen so, wie Firebase es tut: ohne Rücksicht auf Gross-/Kleinschreibung. */
+export function isAdminEmail(email: string | null, adminEmail: string | null): boolean {
+  if (email === null || adminEmail === null) return false
+  return email.trim().toLowerCase() === adminEmail
+}
+
 /** Basis-URL des Medien-Dienstes auf dem NAS. Erst ab M3 in Gebrauch. */
 export function readMediaBaseUrl(
   env: Record<string, unknown> = import.meta.env,

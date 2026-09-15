@@ -13,11 +13,12 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc, setDoc } from 'firebase/firestore'
 
-import { readFirebaseConfig } from '@/lib/env'
+import { isAdminEmail, readAdminEmail, readFirebaseConfig } from '@/lib/env'
 import { getFirebase } from '@/lib/firebase'
 import { readLocal, removeLocal, writeLocal } from '@/lib/localStore'
 
 import { AuthContext, type AuthState } from './authContext'
+import { toRequestDoc } from './accessRequest'
 import { authErrorMessage } from './authErrors'
 
 const EMAIL_FOR_LINK_KEY = 'hb.emailForSignIn'
@@ -53,6 +54,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     initialLinkError(services?.auth),
   )
 
+  const adminEmail = useMemo(() => readAdminEmail(), [])
+
+  /**
+   * Meldet dem Administrator, dass hier jemand hereinmöchte.
+   *
+   * Das ersetzt die abgetippte UID: Der Bildschirm sagt „warte kurz", und im
+   * Adminbereich steht die Anfrage mit Namen und Adresse. Scheitert das
+   * Schreiben – keine Regeln deployt, kein Netz –, sagt der Bildschirm das,
+   * statt einen Erfolg vorzutäuschen.
+   */
+  const requestAccess = useCallback(
+    async (user: User): Promise<boolean> => {
+      if (!services) return false
+      try {
+        await setDoc(
+          doc(services.db, 'accessRequests', user.uid),
+          toRequestDoc(user.uid, user.email, user.displayName),
+          { merge: true },
+        )
+        return true
+      } catch {
+        return false
+      }
+    },
+    [services],
+  )
+
   /**
    * Prüft die Freigabeliste.
    *
@@ -65,18 +93,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const checkAccess = useCallback(
     async (user: User): Promise<boolean> => {
       if (!services) return false
+
+      const gewaehren = async (): Promise<true> => {
+        writeLocal(accessKey(user.uid), 'granted')
+        // Das Stammdokument trägt PIN und Einstellungen.
+        await setDoc(
+          doc(services.db, 'users', user.uid),
+          { lastSeenAt: new Date().toISOString() },
+          { merge: true },
+        )
+        return true
+      }
+
       try {
         const snapshot = await getDoc(doc(services.db, 'allowlist', user.uid))
-        if (snapshot.exists()) {
-          writeLocal(accessKey(user.uid), 'granted')
-          // Das Stammdokument trägt später PIN und Einstellungen.
+        if (snapshot.exists()) return await gewaehren()
+
+        // Das Administratorkonto trägt sich selbst ein. Sonst bliebe genau das
+        // eine Konto, das freischalten darf, selbst ausgesperrt – und man wäre
+        // wieder bei der Konsole, die dieser ganze Umbau abschaffen soll.
+        if (isAdminEmail(user.email, adminEmail)) {
           await setDoc(
-            doc(services.db, 'users', user.uid),
-            { lastSeenAt: new Date().toISOString() },
+            doc(services.db, 'allowlist', user.uid),
+            {
+              role: 'admin',
+              email: user.email ?? '',
+              name: user.displayName ?? '',
+              approvedAt: new Date().toISOString(),
+            },
             { merge: true },
           )
-          return true
+          return await gewaehren()
         }
+
         removeLocal(accessKey(user.uid))
         return false
       } catch {
@@ -84,7 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return readLocal(accessKey(user.uid)) === 'granted'
       }
     },
-    [services],
+    [services, adminEmail],
   )
 
   const applyUser = useCallback(
@@ -93,18 +142,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState({ status: 'signed-out' })
         return
       }
+
+      const ablehnen = async (): Promise<void> => {
+        const requested = await requestAccess(user)
+        setState({ status: 'denied', user, requested })
+      }
+
       // Bekannte Freigabe sofort anwenden, damit die App offline durchstartet.
       if (readLocal(accessKey(user.uid)) === 'granted') {
         setState({ status: 'ready', user })
-        void checkAccess(user).then((allowed) => {
-          if (!allowed) setState({ status: 'denied', user })
+        void checkAccess(user).then(async (allowed) => {
+          if (!allowed) await ablehnen()
         })
         return
       }
-      const allowed = await checkAccess(user)
-      setState(allowed ? { status: 'ready', user } : { status: 'denied', user })
+
+      if (await checkAccess(user)) setState({ status: 'ready', user })
+      else await ablehnen()
     },
-    [checkAccess],
+    [checkAccess, requestAccess],
   )
 
   // Anmeldelink aus der E-Mail abschliessen, bevor der Zustand gesetzt wird.
@@ -163,16 +219,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       recheckAccess: async () => {
         const user = services?.auth.currentUser
         if (!user) return
-        const allowed = await checkAccess(user)
-        setState(allowed ? { status: 'ready', user } : { status: 'denied', user })
+        if (await checkAccess(user)) {
+          setState({ status: 'ready', user })
+          return
+        }
+        setState({ status: 'denied', user, requested: await requestAccess(user) })
       },
     }),
-    [services, checkAccess],
+    [services, checkAccess, requestAccess],
   )
 
+  const isAdmin =
+    state.status === 'ready' && isAdminEmail(state.user.email, adminEmail)
+
   const value = useMemo(
-    () => ({ state, actions, linkError, clearLinkError: () => { setLinkError(null) } }),
-    [state, actions, linkError],
+    () => ({
+      state,
+      isAdmin,
+      actions,
+      linkError,
+      clearLinkError: () => {
+        setLinkError(null)
+      },
+    }),
+    [state, isAdmin, actions, linkError],
   )
 
   return <AuthContext value={value}>{children}</AuthContext>

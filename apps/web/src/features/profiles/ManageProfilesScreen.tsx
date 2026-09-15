@@ -22,7 +22,7 @@ import { useProfiles } from './profilesContext'
  */
 export function ManageProfilesScreen() {
   const { profiles, create, update, remove } = useProfiles()
-  const { state, actions } = useAuth()
+  const { state, actions, isAdmin } = useAuth()
 
   const [name, setName] = useState('')
   const [avatar, setAvatar] = useState<string>(AVATARS[0])
@@ -215,6 +215,12 @@ export function ManageProfilesScreen() {
         {state.status === 'ready' && state.user.email !== null ? (
           <p className="text-ink-soft">Angemeldet als {state.user.email}</p>
         ) : null}
+
+        {/* Nur das Administratorkonto sieht diesen Weg. Wer sonst darauf
+            stösst, bekommt dort ohnehin nichts zu lesen: Die Firestore-Regeln
+            geben die Listen nur einer einzigen Adresse heraus. */}
+        {isAdmin ? <BigLinkButton to="/admin">Adminbereich</BigLinkButton> : null}
+
         <BigLinkButton to="/profil" variant="secondary">
           Zurück zur Profilauswahl
         </BigLinkButton>

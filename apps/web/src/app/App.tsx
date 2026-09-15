@@ -1,13 +1,17 @@
 import { BrowserRouter } from 'react-router-dom'
 
-import { AccessDeniedScreen } from '@/features/auth/AccessDeniedScreen'
+import { AdminProvider } from '@/features/admin/AdminProvider'
+import { AccessPendingScreen } from '@/features/auth/AccessPendingScreen'
 import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ConfigMissingScreen } from '@/features/auth/ConfigMissingScreen'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { useAuth } from '@/features/auth/authContext'
 import { DownloadProvider } from '@/features/downloads/DownloadProvider'
+import { FavoriteProvider } from '@/features/favorites/FavoriteProvider'
+import { HistoryProvider } from '@/features/history/HistoryProvider'
 import { ParentProvider } from '@/features/parents/ParentProvider'
 import { LibraryProvider } from '@/features/library/LibraryProvider'
+import { TitleProvider } from '@/features/library/TitleProvider'
 import { NowPlayingBar } from '@/features/player/NowPlayingBar'
 import { PlayerProvider } from '@/features/player/PlayerProvider'
 import { ProgressProvider } from '@/features/progress/ProgressProvider'
@@ -41,21 +45,38 @@ function AuthGate() {
     case 'signed-out':
       return <LoginScreen />
     case 'denied':
-      return <AccessDeniedScreen uid={state.user.uid} email={state.user.email} />
+      return (
+        <AccessPendingScreen
+          uid={state.user.uid}
+          email={state.user.email}
+          requested={state.requested}
+        />
+      )
     case 'ready':
+      // Die Reihenfolge ist keine Geschmacksfrage: Die Bibliothek braucht die
+      // von Hand gesetzten Titel, der Player den Aufzeichner, und beide
+      // brauchen das aktive Profil.
       return (
         <ParentProvider>
           <ProfileProvider>
-            <LibraryProvider>
-              <ProgressProvider>
-                <DownloadProvider>
-                  <PlayerProvider>
-                    <AppRoutes />
-                    <NowPlayingBar />
-                  </PlayerProvider>
-                </DownloadProvider>
-              </ProgressProvider>
-            </LibraryProvider>
+            <AdminProvider>
+              <TitleProvider>
+                <LibraryProvider>
+                  <ProgressProvider>
+                    <FavoriteProvider>
+                      <HistoryProvider>
+                        <DownloadProvider>
+                          <PlayerProvider>
+                            <AppRoutes />
+                            <NowPlayingBar />
+                          </PlayerProvider>
+                        </DownloadProvider>
+                      </HistoryProvider>
+                    </FavoriteProvider>
+                  </ProgressProvider>
+                </LibraryProvider>
+              </TitleProvider>
+            </AdminProvider>
           </ProfileProvider>
         </ParentProvider>
       )

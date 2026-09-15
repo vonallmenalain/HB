@@ -1,4 +1,4 @@
-import { screen } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -78,17 +78,35 @@ describe('Player', () => {
     expect(nextChapter).toHaveBeenCalled()
   })
 
-  it('zeigt den Fortschritt als Balken, der sich nicht ziehen lässt', () => {
+  it('zeigt die Stelle im Buch als Balken zum Spulen', () => {
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/player/b_1',
       library: makeLibraryValue({ books: [BOOK] }),
       player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800 }),
     })
 
-    const bar = screen.getByRole('progressbar', { name: 'Fortschritt im Hörbuch' })
-    expect(bar).toHaveAttribute('aria-valuenow', '50')
-    // Kein Schieberegler: Kinder verlieren beim Wischen sonst ihre Stelle.
-    expect(screen.queryByRole('slider')).not.toBeInTheDocument()
+    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
+    expect(balken).toHaveValue('900')
+    // Die Zeitangabe gehört dazu: „900" sagt einem Vorleseprogramm nichts.
+    expect(balken).toHaveAttribute('aria-valuetext', '15:00 von 30:00')
+  })
+
+  it('springt beim Loslassen an die gezogene Stelle', () => {
+    const seekTo = vi.fn()
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [BOOK] }),
+      player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800, seekTo }),
+    })
+
+    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
+    fireEvent.change(balken, { target: { value: '1200' } })
+    // Während des Ziehens passiert nichts – sonst ruckelte der Ton bei jedem
+    // Zwischenwert.
+    expect(seekTo).not.toHaveBeenCalled()
+
+    fireEvent.pointerUp(balken)
+    expect(seekTo).toHaveBeenCalledWith(1200)
   })
 })
 

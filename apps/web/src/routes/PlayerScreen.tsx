@@ -10,14 +10,15 @@ import { BigLinkButton } from '@/ui/BigButton'
 import { BookCover } from '@/ui/BookCover'
 import { EmptyState } from '@/ui/EmptyState'
 import { PlayerButton } from '@/ui/PlayerButton'
-import { ProgressBar } from '@/ui/ProgressBar'
+import { SeekBar } from '@/ui/SeekBar'
 import { Screen } from '@/ui/Screen'
 
 /**
  * Der Player.
  *
- * Grosse Knöpfe, kein ziehbarer Balken, nichts zum Kaputtmachen. Ein Kind
- * soll hier nur zwei Dinge tun: anhalten und weiterhören.
+ * Grosse Knöpfe, nichts zum Kaputtmachen. Ein Kind soll hier vor allem zwei
+ * Dinge tun: anhalten und weiterhören. Wer eine bestimmte Stelle sucht, zieht
+ * am Balken oder springt in 30-Sekunden-Schritten.
  */
 export function PlayerScreen() {
   const { bookId = '' } = useParams()
@@ -76,11 +77,13 @@ export function PlayerScreen() {
         <h1 className="text-2xl font-bold">{book.title}</h1>
       </div>
 
-      <ProgressBar
-        ratio={book.durationSec > 0 ? player.positionSec / book.durationSec : 0}
-        label="Fortschritt im Hörbuch"
+      <SeekBar
+        positionSec={player.positionSec}
+        durationSec={book.durationSec}
+        onSeek={player.seekTo}
+        label="Stelle im Hörbuch"
       />
-      <div className="flex justify-between pt-2 pb-8 tabular-nums text-ink-soft">
+      <div className="flex justify-between pb-8 tabular-nums text-ink-soft">
         <span>{formatTime(player.positionSec)}</span>
         <span>{formatCountdown(remaining)}</span>
       </div>

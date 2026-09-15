@@ -98,6 +98,71 @@
   }
 }
 
+/*
+ * Der Fortschrittsbalken im Player, zum Spulen.
+ *
+ * Ein `input[type=range]` bringt Tastatur, Vorleseprogramm und Ziehen schon
+ * mit; nur aussehen muss er wie der Rest der App. Die Fläche ist bewusst so
+ * hoch wie ein Touch-Ziel, sichtbar bleibt der schmale Balken – so trifft ihn
+ * auch ein Kind, ohne dass er die halbe Seite einnimmt.
+ */
+@layer components {
+  .seek {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: var(--spacing-touch);
+    background: transparent;
+    /* Ohne das scrollt Android beim Ziehen die Seite statt zu spulen. */
+    touch-action: none;
+  }
+
+  .seek::-webkit-slider-runnable-track {
+    height: 0.75rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-primary) var(--seek-fill, 0%),
+      var(--color-surface-sunken) var(--seek-fill, 0%)
+    );
+  }
+
+  .seek::-moz-range-track {
+    height: 0.75rem;
+    border-radius: 9999px;
+    background: linear-gradient(
+      to right,
+      var(--color-primary) var(--seek-fill, 0%),
+      var(--color-surface-sunken) var(--seek-fill, 0%)
+    );
+  }
+
+  .seek::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 2rem;
+    height: 2rem;
+    margin-top: -0.625rem;
+    border: 3px solid var(--color-surface);
+    border-radius: 9999px;
+    background: var(--color-primary);
+  }
+
+  .seek::-moz-range-thumb {
+    width: 2rem;
+    height: 2rem;
+    border: 3px solid var(--color-surface);
+    border-radius: 9999px;
+    background: var(--color-primary);
+  }
+
+  .seek:focus-visible {
+    outline: 4px solid var(--color-accent);
+    outline-offset: 2px;
+    border-radius: 9999px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

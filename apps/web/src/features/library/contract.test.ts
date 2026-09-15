@@ -42,7 +42,7 @@ describe('Katalog-Vertrag', () => {
     if (!result.ok) return
     // Kein einziger Eintrag darf beim Einlesen verloren gehen.
     expect(result.skipped).toBe(0)
-    expect(result.catalog.books).toHaveLength(3)
+    expect(result.catalog.books).toHaveLength(4)
   })
 
   it('liest Reihen, Kapitel und Cover wie erwartet', () => {
@@ -67,6 +67,17 @@ describe('Katalog-Vertrag', () => {
 
     const ohneCover = result.catalog.books.find((book) => book.cover === null)
     expect(ohneCover?.coverColor).toMatch(/^#[0-9a-f]{6}$/)
+  })
+
+  it('liest die Gruppe eines Unterordners mit', () => {
+    // Danach gliedert die Bibliothek innerhalb einer Reihe.
+    const result = parseCatalog(sample)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const miniFall = result.catalog.books.find((book) => book.group !== null)
+    expect(miniFall?.series).toBe('Die drei ???')
+    expect(miniFall?.group).toBe('Mini-Fälle')
   })
 
   it('hängt das Ticket an eine Cover-Adresse, die schon Parameter hat', async () => {

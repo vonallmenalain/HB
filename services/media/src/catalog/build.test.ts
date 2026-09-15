@@ -19,7 +19,7 @@ function input(overrides: Partial<BookInput> = {}): BookInput {
   return {
     relativePath: 'Die drei ???/01 - Der Super-Papagei',
     folderName: '01 - Der Super-Papagei',
-    seriesFromParent: 'Die drei ???',
+    folderChain: ['Die drei ???'],
     files: [file()],
     coverAvailable: true,
     coverVersion: 'abcd1234',
@@ -34,7 +34,37 @@ describe('buildBook', () => {
     const book = buildBook(input())
     expect(book.title).toBe('Der Super-Papagei')
     expect(book.series).toBe('Die drei ???')
+    expect(book.group).toBeNull()
     expect(book.seriesIndex).toBe(1)
+  })
+
+  it('macht aus dem Ordner unter der Reihe eine Gruppe', () => {
+    // So sieht es auf dem NAS aus: unter der Reihe liegen „Adventskalender"
+    // und „Mini-Fälle" – die gehören in der Bibliothek zusammen, nicht in neun
+    // einzelne Reihen.
+    const book = buildBook(
+      input({
+        relativePath: 'Die drei ??? Kids/Mini-Fälle/05 - Alarm',
+        folderName: '05 - Alarm',
+        folderChain: ['Die drei ??? Kids', 'Mini-Fälle'],
+      }),
+    )
+    expect(book.series).toBe('Die drei ??? Kids')
+    expect(book.group).toBe('Mini-Fälle')
+  })
+
+  it('nimmt den Reihennamen aus dem Ordnernamen der Folge heraus', () => {
+    // Gewachsene Sammlungen schreiben die Reihe in jeden Ordnernamen. In der
+    // Reihe gelesen stünde sonst neunmal dasselbe untereinander.
+    const book = buildBook(
+      input({
+        relativePath: 'Fragezeichen Kids/Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln',
+        folderName: 'Die Drei Fragezeichen Kids-68-Chaos Im Dunkeln',
+        folderChain: ['Fragezeichen Kids'],
+      }),
+    )
+    expect(book.title).toBe('Chaos Im Dunkeln')
+    expect(book.seriesIndex).toBe(68)
   })
 
   it('vergibt eine stabile ID aus dem Pfad', () => {

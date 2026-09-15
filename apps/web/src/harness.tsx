@@ -34,6 +34,7 @@ import { AuthContext, type AuthContextValue } from './features/auth/authContext'
 import type { Book } from './features/library/catalog'
 import { parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
+import { tidyBook, tidyBooks } from './features/library/titles'
 import { createMediaClient } from './features/library/mediaClient'
 import { NowPlayingBar } from './features/player/NowPlayingBar'
 import { PlayerProvider } from './features/player/PlayerProvider'
@@ -68,6 +69,9 @@ const auth: AuthContextValue = {
       metadata: {},
     } as unknown as User,
   },
+  // In der Vorschau ist der Adminbereich offen – sonst liesse er sich gar
+  // nicht ansehen, ohne sich anzumelden.
+  isAdmin: true,
   actions: {
     signInWithPassword: () => Promise.resolve(),
     signInWithGoogle: () => Promise.resolve(),
@@ -146,20 +150,27 @@ const cover = (hue: number) =>
     </svg>`,
   )}`
 
-const TITLES = [
-  ['Der Super-Papagei', 'Die drei ???', 1],
-  ['Der Phantomsee', 'Die drei ???', 2],
-  ['Das Bergmonster', 'Die drei ???', 3],
+/**
+ * Beispieltitel, absichtlich so krumm wie auf einem echten NAS: Reihenname im
+ * Ordnernamen, Nummern mit und ohne Leerzeichen, ein Unterordner. So zeigt die
+ * Vorschau, was das Aufräumen der Titel tatsächlich tut.
+ */
+const TITLES: [string, string | null, string | null][] = [
+  ['Die drei ??? Kids - 01 - Der Super-Papagei', 'Die drei ??? Kids', null],
+  ['Die drei ??? Kids-02-Der Phantomsee', 'Die drei ??? Kids', null],
+  ['Die Drei Fragezeichen Kids - 05 -Mini-Fall - Alarm, die Ritter kommen!', 'Die drei ??? Kids', 'Mini-Fälle'],
   ['Hexerei in der Schule', 'Bibi Blocksberg', null],
   ['Der Weihnachtsmann in der Klemme', null, null],
-  ['Ein Fall für die Olchis', 'Die Olchis', 1],
-] as const
+  ['Die Olchis - 01 - Ein Fall für die Olchis', 'Die Olchis', null],
+]
 
-const demoBooks: Book[] = TITLES.map(([title, series, index], i) => ({
+const rohBooks: Book[] = TITLES.map(([sourceTitle, series, group], i) => ({
   id: `b_${String(i)}`,
-  title,
+  title: sourceTitle,
+  sourceTitle,
   series,
-  seriesIndex: index,
+  group,
+  seriesIndex: null,
   author: 'Beispiel-Autorin',
   narrator: null,
   durationSec: 3600 + i * 900,
@@ -183,6 +194,8 @@ const demoBooks: Book[] = TITLES.map(([title, series, index], i) => ({
     },
   ],
 }))
+
+const demoBooks = sortBooks(rohBooks.map((book) => tidyBook(book)))
 
 const demoClient: LibraryContextValue['client'] = {
   ensureTicket: () => Promise.resolve('t'),
@@ -246,7 +259,7 @@ function Harness() {
         `${mediaBase}/library?t=${encodeURIComponent(ticket)}`,
       )
       const parsed = parseCatalog(await response.json())
-      const books = parsed.ok ? sortBooks(parsed.catalog.books) : []
+      const books = parsed.ok ? tidyBooks(sortBooks(parsed.catalog.books)) : []
       setLibrary({
         status: 'ready',
         books,

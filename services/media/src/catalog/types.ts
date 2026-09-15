@@ -2,7 +2,7 @@
  * Katalog-Schema. Entspricht docs/DATENMODELL.md §2 – Änderungen hier müssen
  * dort mitziehen und `schemaVersion` erhöhen.
  */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 export interface BookFile {
   idx: number
@@ -23,7 +23,13 @@ export interface Chapter {
 export interface Book {
   id: string
   title: string
+  /** Oberster Ordner unter dem Medien-Stamm – die Reihe, nach der die App gliedert. */
   series: string | null
+  /**
+   * Ordner zwischen Reihe und Buch, etwa „Adventskalender" oder „Mini-Fälle".
+   * Null, wenn das Buch direkt in der Reihe liegt.
+   */
+  group: string | null
   seriesIndex: number | null
   author: string | null
   narrator: string | null

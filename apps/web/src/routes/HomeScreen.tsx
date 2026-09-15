@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom'
 
-import { BookTile } from '@/features/library/BookTile'
+import { useFavorites } from '@/features/favorites/favoritesContext'
+import { BookShelf } from '@/features/library/BookShelf'
 import { useLibrary } from '@/features/library/libraryContext'
+import { suggestBooks } from '@/features/library/suggestions'
 import { ParentEntry } from '@/features/parents/ParentEntry'
 import { ContinueTile } from '@/features/player/ContinueTile'
-import { pickContinue } from '@/features/progress/progress'
+import { pickRecent } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { Avatar } from '@/ui/Avatar'
@@ -14,20 +16,47 @@ import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
 
 /**
- * Startbildschirm.
+ * Die Startseite.
  *
- * Ganz oben die „Weiterhören"-Kachel – ein Tap, und es läuft weiter. Erst
- * darunter kommt alles andere.
+ * Von oben nach unten: wer hier hört, wo es weitergeht, was gemerkt ist, was
+ * dazu passt – und erst ganz unten die ganze Bibliothek. Die Reihenfolge ist
+ * die Antwort auf „was will ein Kind, das die App öffnet": weiterhören, fast
+ * immer.
  */
 export function HomeScreen() {
   const { selected } = useProfiles()
   const { status, books, bookById } = useLibrary()
   const { entries } = useProgress()
+  const { ids: favoriten } = useFavorites()
 
-  const weiter = pickContinue([...entries.values()], (id) => bookById(id) !== undefined)
+  const zuletzt = pickRecent([...entries.values()], (id) => bookById(id) !== undefined, 5)
+  const weiter = zuletzt[0] ?? null
   const weiterBuch = weiter ? bookById(weiter.bookId) : undefined
 
-  const neueste = [...books].sort((a, b) => b.addedAt.localeCompare(a.addedAt)).slice(0, 6)
+  const weitereAngefangene = zuletzt
+    .slice(1)
+    .map((entry) => bookById(entry.bookId))
+    .filter((book) => book !== undefined)
+
+  const gemerkt = books.filter((book) => favoriten.has(book.id))
+
+  // Was oben schon steht, gehört nicht noch einmal in die Vorschläge.
+  const schonZuSehen = new Set([
+    ...zuletzt.map((entry) => entry.bookId),
+    ...gemerkt.map((book) => book.id),
+  ])
+
+  const vorschlaege = suggestBooks({
+    books,
+    entries: [...entries.values()],
+    exclude: schonZuSehen,
+    limit: 6,
+  })
+
+  const neueste = [...books]
+    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
+    .filter((book) => !schonZuSehen.has(book.id))
+    .slice(0, 4)
 
   return (
     <Screen>
@@ -35,10 +64,11 @@ export function HomeScreen() {
         <ParentEntry>Hörbücher</ParentEntry>
         {selected ? (
           <Link
-            to="/profil"
-            aria-label={`Angemeldet als ${selected.name}. Profil wechseln.`}
-            className="rounded-full focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            to="/profil/bearbeiten"
+            aria-label={`${selected.name} – Bild und Farbe ändern`}
+            className="flex items-center gap-3 rounded-full focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
           >
+            <span className="hidden text-lg font-semibold sm:inline">{selected.name}</span>
             <Avatar avatar={selected.avatar} color={selected.color} size="sm" />
           </Link>
         ) : null}
@@ -60,22 +90,16 @@ export function HomeScreen() {
         />
       ) : null}
 
+      <BookShelf title="Zuletzt gehört" books={weitereAngefangene} />
+      <BookShelf title="Gemerkt" books={gemerkt} />
+      <BookShelf title="Vielleicht auch etwas für dich" books={vorschlaege} />
+
       {books.length > 0 ? (
-        <>
-          <h2 className="pb-3 text-xl font-bold">
-            {weiter ? 'Andere Hörbücher' : 'Zuletzt dazugekommen'}
-          </h2>
-          <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
-            {neueste
-              .filter((book) => book.id !== weiter?.bookId)
-              .map((book) => (
-                <li key={book.id}>
-                  <BookTile book={book} />
-                </li>
-              ))}
-          </ul>
-          <BigLinkButton to="/bibliothek">Alle Hörbücher</BigLinkButton>
-        </>
+        <BookShelf
+          title="Alle Hörbücher"
+          books={neueste}
+          action={<BigLinkButton to="/bibliothek">Alle Hörbücher</BigLinkButton>}
+        />
       ) : null}
     </Screen>
   )

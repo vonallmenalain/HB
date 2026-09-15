@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
-import { basename, dirname, join, relative } from 'node:path'
+import { basename, dirname, join, relative, sep } from 'node:path'
 
 import { parseFile } from 'music-metadata'
 import sharp from 'sharp'
@@ -152,7 +152,9 @@ async function scanBook(
   const { mediaRoot, cacheDir } = options
   const relativePath = relative(mediaRoot, folder)
   const parent = dirname(relativePath)
-  const seriesFromParent = parent === '.' || parent === '' ? null : basename(parent)
+  // Alle Ordner über dem Buch: der oberste ist die Reihe, alles darunter eine
+  // Gruppe darin („Adventskalender", „Mini-Fälle").
+  const folderChain = parent === '.' || parent === '' ? [] : parent.split(sep)
 
   const files: ProbedFile[] = []
   const filePaths: string[] = []
@@ -202,7 +204,7 @@ async function scanBook(
   const withoutCover = buildBook({
     relativePath,
     folderName: basename(folder),
-    seriesFromParent,
+    folderChain,
     files,
     coverAvailable: false,
     coverVersion: null,
@@ -273,11 +275,13 @@ async function walk(
   }
 }
 
-/** Sortiert für die Anzeige: Reihen zusammen, darin nach Nummer, sonst nach Titel. */
+/** Sortiert für die Anzeige: Reihen zusammen, darin nach Gruppe und Nummer, sonst nach Titel. */
 export function sortBooks(books: readonly Book[]): Book[] {
   return [...books].sort((a, b) => {
     const seriesCompare = (a.series ?? '').localeCompare(b.series ?? '', 'de')
     if (seriesCompare !== 0) return seriesCompare
+    const groupCompare = (a.group ?? '').localeCompare(b.group ?? '', 'de')
+    if (groupCompare !== 0) return groupCompare
     if (a.seriesIndex !== null && b.seriesIndex !== null && a.seriesIndex !== b.seriesIndex) {
       return a.seriesIndex - b.seriesIndex
     }

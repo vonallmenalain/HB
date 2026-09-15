@@ -1,4 +1,4 @@
-import { chapterTitle, parseBookFolder, tileColor } from './naming.js'
+import { chapterTitle, parseBookFolder, tidyName, tileColor } from './naming.js'
 import { bookId, filesHash } from './ids.js'
 import type { Book, BookFile, Chapter } from './types.js'
 
@@ -16,6 +16,7 @@ export interface ProbedFile {
 export interface BookOverride {
   title?: string
   series?: string
+  group?: string
   seriesIndex?: number
   author?: string
   narrator?: string
@@ -27,7 +28,11 @@ export interface BookInput {
   /** Pfad relativ zum Medien-Stamm. Bestimmt die dauerhafte ID. */
   relativePath: string
   folderName: string
-  seriesFromParent: string | null
+  /**
+   * Die Ordner über dem Buch, von oben nach unten – ohne den Buchordner selbst.
+   * `['Die drei ??? Kids', 'Mini-Fälle']` heisst: Reihe oben, Gruppe darunter.
+   */
+  folderChain: string[]
   /** Bereits natürlich sortiert. */
   files: ProbedFile[]
   coverAvailable: boolean
@@ -58,9 +63,15 @@ function firstNonEmpty(...values: (string | null | undefined)[]): string | null 
  */
 export function buildBook(input: BookInput): Book {
   const { override } = input
-  const parsed = parseBookFolder(input.folderName)
+  const seriesFromPath = input.folderChain[0] ?? null
+  const groupFromPath =
+    input.folderChain.length > 1 ? input.folderChain.slice(1).join(' · ') : null
 
-  const title = firstNonEmpty(override?.title, parsed.title) ?? input.folderName
+  // Der Reihenname steht auf dem NAS oft auch noch im Namen jeder Folge. In
+  // der Reihe gelesen ist das nur Rauschen, also fliegt er heraus.
+  const parsed = parseBookFolder(input.folderName, input.folderChain)
+
+  const title = firstNonEmpty(override?.title, parsed.title) ?? tidyName(input.folderName)
   const id = bookId(input.relativePath)
 
   const files: BookFile[] = input.files.map((file, idx) => ({
@@ -97,7 +108,8 @@ export function buildBook(input: BookInput): Book {
   return {
     id,
     title,
-    series: firstNonEmpty(override?.series, input.seriesFromParent),
+    series: firstNonEmpty(override?.series, seriesFromPath),
+    group: firstNonEmpty(override?.group, groupFromPath),
     seriesIndex: override?.seriesIndex ?? parsed.seriesIndex,
     author,
     narrator: firstNonEmpty(override?.narrator),
@@ -123,6 +135,7 @@ export function parseOverride(raw: unknown): BookOverride | null {
 
   if (typeof record.title === 'string') override.title = record.title
   if (typeof record.series === 'string') override.series = record.series
+  if (typeof record.group === 'string') override.group = record.group
   if (typeof record.author === 'string') override.author = record.author
   if (typeof record.narrator === 'string') override.narrator = record.narrator
   if (typeof record.seriesIndex === 'number' && Number.isFinite(record.seriesIndex)) {

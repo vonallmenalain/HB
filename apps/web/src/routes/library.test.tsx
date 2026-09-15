@@ -11,6 +11,7 @@ import {
   renderWithProfiles,
 } from '@/test/renderWithProfiles'
 import { AppRoutes } from '@/app/AppRoutes'
+import { seriesSlug } from '@/features/library/grouping'
 
 const EMMA = makeProfile()
 const profiles = () => makeProfilesValue({ profiles: [EMMA], selected: EMMA })
@@ -26,27 +27,57 @@ const BOOKS = [
 ]
 
 describe('Bibliothek', () => {
-  it('zeigt jedes Buch als anklickbare Kachel', () => {
+  it('zeigt zuerst die Reihen, nicht alle Folgen', () => {
+    // Neun Reihen mit hunderten Folgen als eine Liste sind unbrauchbar. Der
+    // erste Bildschirm zeigt deshalb die Reihen.
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/bibliothek',
       library: makeLibraryValue({ books: BOOKS }),
     })
 
-    expect(screen.getByRole('link', { name: /Der Super-Papagei/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Die drei \?\?\?/ })).toHaveAttribute(
+      'href',
+      `/bibliothek/${seriesSlug('Die drei ???')}`,
+    )
+    expect(screen.queryByRole('link', { name: /Phantomsee/ })).not.toBeInTheDocument()
+  })
+
+  it('zeigt in der Reihe jede Folge mit Nummer', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: `/bibliothek/${seriesSlug('Die drei ???')}`,
+      library: makeLibraryValue({ books: BOOKS }),
+    })
+
+    expect(screen.getByRole('link', { name: /01 - Der Super-Papagei/ })).toHaveAttribute(
       'href',
       '/buch/b_1',
     )
-    expect(screen.getByRole('link', { name: /Der Phantomsee/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /02 - Der Phantomsee/ })).toHaveAttribute(
       'href',
       '/buch/b_2',
     )
+  })
+
+  it('stellt Unterordner einer Reihe als eigene Abschnitte dar', () => {
+    const books = [
+      ...BOOKS,
+      makeBook({ id: 'b_3', title: 'Alarm', group: 'Mini-Fälle', seriesIndex: 5 }),
+    ]
+
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: `/bibliothek/${seriesSlug('Die drei ???')}`,
+      library: makeLibraryValue({ books }),
+    })
+
+    expect(screen.getByRole('heading', { name: 'Mini-Fälle' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /05 - Alarm/ })).toBeInTheDocument()
   })
 
   it('zeigt an, welche Bücher auf dem Gerät liegen', () => {
     // Im Flugzeug ist das die einzige Auskunft, die zählt – und sie muss ohne
     // Lesen zu erkennen sein.
     renderWithProfiles(<AppRoutes />, profiles(), {
-      route: '/bibliothek',
+      route: `/bibliothek/${seriesSlug('Die drei ???')}`,
       library: makeLibraryValue({ books: BOOKS }),
       downloads: makeDownloadsValue({
         records: new Map([['b_1', makeDownloadRecord({ bookId: 'b_1' })]]),
@@ -63,7 +94,7 @@ describe('Bibliothek', () => {
 
   it('nimmt das Cover vom Gerät, sobald es dort liegt', () => {
     const { container } = renderWithProfiles(<AppRoutes />, profiles(), {
-      route: '/bibliothek',
+      route: `/bibliothek/${seriesSlug('Die drei ???')}`,
       library: makeLibraryValue({ books: [makeBook({ id: 'b_1', cover: '/cover/b_1.jpg' })] }),
       downloads: makeDownloadsValue({ offlineCoverUrl: () => 'blob:abc' }),
     })
@@ -81,6 +112,15 @@ describe('Bibliothek', () => {
     expect(screen.getByText('Die Bibliothek ist leer')).toBeInTheDocument()
   })
 
+  it('führt aus einer verschwundenen Reihe zurück', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek/gibtesnicht',
+      library: makeLibraryValue({ books: BOOKS }),
+    })
+
+    expect(screen.getByText('Diese Reihe gibt es nicht mehr')).toBeInTheDocument()
+  })
+
   it('zeigt bei fehlender Verbindung den zuletzt bekannten Stand statt nichts', () => {
     // Genau der Fall unterwegs: NAS aus, heruntergeladene Bücher sollen
     // trotzdem auffindbar bleiben.
@@ -89,7 +129,7 @@ describe('Bibliothek', () => {
       library: makeLibraryValue({ books: BOOKS, fromCache: true, error: 'offline' }),
     })
 
-    expect(screen.getByRole('link', { name: /Der Super-Papagei/ })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Die drei \?\?\?/ })).toBeInTheDocument()
     expect(screen.getByText(/NAS ist gerade nicht erreichbar/)).toBeInTheDocument()
   })
 
@@ -108,6 +148,18 @@ describe('Bibliothek', () => {
 })
 
 describe('Buchseite', () => {
+  it('führt von der Buchseite zurück in seine Reihe', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/buch/b_1',
+      library: makeLibraryValue({ books: BOOKS }),
+    })
+
+    expect(screen.getByRole('link', { name: /Zurück/ })).toHaveAttribute(
+      'href',
+      `/bibliothek/${seriesSlug('Die drei ???')}`,
+    )
+  })
+
   it('zeigt Titel, Reihe und Kapitel', () => {
     const book = makeBook({
       id: 'b_1',

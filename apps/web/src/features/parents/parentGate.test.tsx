@@ -38,6 +38,7 @@ function makeAuth(lastSignInTime: string | undefined): AuthContextValue {
         ? U
         : never,
     },
+    isAdmin: false,
     actions: {
       signInWithPassword: vi.fn().mockResolvedValue(undefined),
       signInWithGoogle: vi.fn().mockResolvedValue(undefined),

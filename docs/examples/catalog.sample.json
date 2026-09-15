@@ -1,11 +1,12 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "generatedAt": "2026-01-01T00:00:00.000Z",
   "books": [
     {
       "id": "b_d38c8b005a24",
       "title": "Bibi Blocksberg - Hexerei",
       "series": null,
+      "group": null,
       "seriesIndex": null,
       "author": null,
       "narrator": null,
@@ -13,7 +14,7 @@
       "cover": null,
       "coverColor": "#0369a1",
       "tags": [],
-      "addedAt": "2026-01-03T00:00:00.000Z",
+      "addedAt": "2026-01-04T00:00:00.000Z",
       "filesHash": "ca502d2c1e98bb89",
       "files": [
         {
@@ -37,6 +38,7 @@
       "id": "b_d2a345997cb8",
       "title": "Der Super-Papagei",
       "series": "Die drei ???",
+      "group": null,
       "seriesIndex": 1,
       "author": null,
       "narrator": null,
@@ -81,6 +83,7 @@
       "id": "b_106cf6dcebdc",
       "title": "Der Phantomsee",
       "series": "Die drei ???",
+      "group": null,
       "seriesIndex": 2,
       "author": null,
       "narrator": null,
@@ -102,6 +105,38 @@
         {
           "idx": 0,
           "title": "Am See",
+          "fileIdx": 0,
+          "startSec": 0,
+          "endSec": 1
+        }
+      ]
+    },
+    {
+      "id": "b_204ce0e1e890",
+      "title": "Alarm im Zoo",
+      "series": "Die drei ???",
+      "group": "Mini-Fälle",
+      "seriesIndex": 5,
+      "author": null,
+      "narrator": null,
+      "durationSec": 1,
+      "cover": null,
+      "coverColor": "#4338ca",
+      "tags": [],
+      "addedAt": "2026-01-03T00:00:00.000Z",
+      "filesHash": "deee78d5c90c335c",
+      "files": [
+        {
+          "idx": 0,
+          "durationSec": 1,
+          "bytes": 16044,
+          "mime": "audio/wav"
+        }
+      ],
+      "chapters": [
+        {
+          "idx": 0,
+          "title": "Alarm",
           "fileIdx": 0,
           "startSec": 0,
           "endSec": 1

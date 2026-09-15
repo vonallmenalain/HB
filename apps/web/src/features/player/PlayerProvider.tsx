@@ -9,6 +9,7 @@ import {
 
 import { type Book, chapterAt, resolvePosition } from '@/features/library/catalog'
 import { useDownloads } from '@/features/downloads/downloadsContext'
+import { useHistory } from '@/features/history/historyContext'
 import { useLibrary } from '@/features/library/libraryContext'
 import { makeProgress, resolveResume } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
@@ -31,6 +32,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   const { client } = useLibrary()
   const { get: getProgress, save: saveProgress } = useProgress()
   const { offlineUrl, offlineCoverUrl } = useDownloads()
+  const history = useHistory()
 
   const engine = useMemo(() => (typeof document === 'undefined' ? null : getEngine()), [])
 
@@ -70,15 +72,31 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     persistRef.current = persist
   }, [persist])
 
+  // Dasselbe Spiel wie beim Sichern: Der Takt soll nicht neu aufgesetzt
+  // werden, nur weil der Aufzeichner eine neue Funktion bekommen hat.
+  const historyRef = useRef(history)
+  useEffect(() => {
+    historyRef.current = history
+  }, [history])
+
+  // Ein geöffnetes Buch ist ein Hörvorgang – das ist die Zahl, die im
+  // Adminbereich „wie oft gehört" beantwortet.
+  useEffect(() => {
+    if (book) historyRef.current.started(book)
+  }, [book])
+
   useEffect(() => {
     if (snapshot?.playing !== true) return
     const timer = setInterval(() => {
       persistRef.current()
+      // Der Takt läuft nur, solange wirklich abgespielt wird – damit sind das
+      // gehörte Sekunden und nicht Sekunden mit offener App.
+      if (book) historyRef.current.listened(book, PERSIST_INTERVAL_MS / 1000)
     }, PERSIST_INTERVAL_MS)
     return () => {
       clearInterval(timer)
     }
-  }, [snapshot?.playing])
+  }, [snapshot?.playing, book])
 
   // Beim Wegwischen der App bleibt keine Zeit mehr für asynchrone Arbeit –
   // deshalb hier und nicht erst beim Aufräumen.
