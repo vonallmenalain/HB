@@ -5,6 +5,9 @@ import { type Book } from '@/features/library/catalog'
 import { type DownloadRecord } from './downloads'
 import { type StorageInfo } from './mediaCache'
 
+/** Wie ein Download gerade übertragen wird. */
+export type TransferMode = 'background' | 'foreground'
+
 export interface DownloadsContextValue {
   /** Stand je Buch, nach Buch-ID. */
   records: ReadonlyMap<string, DownloadRecord>
@@ -16,10 +19,17 @@ export interface DownloadsContextValue {
   /** Kann dieses Gerät überhaupt speichern? */
   supported: boolean
   /**
-   * Übernimmt das Betriebssystem den Download? Dann läuft er weiter, auch
-   * wenn die App geschlossen ist.
+   * **Kann** das Betriebssystem den Download übernehmen? Sagt nichts darüber,
+   * ob es das für einen bestimmten Download auch tut.
    */
   background: boolean
+  /**
+   * Wie gerade tatsächlich übertragen wird, oder `null`, wenn nichts läuft.
+   *
+   * Braucht auch nur ein laufender Download die offene App, steht hier
+   * `foreground`: Wegzulegen ist das Tablet dann nicht.
+   */
+  transfer: TransferMode | null
   storage: StorageInfo | null
   get: (bookId: string) => DownloadRecord | null
   start: (book: Book) => void

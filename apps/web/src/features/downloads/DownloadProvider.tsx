@@ -24,7 +24,7 @@ import {
   matchesCatalog,
   totalBytes,
 } from './downloads'
-import { DownloadsContext } from './downloadsContext'
+import { DownloadsContext, type TransferMode } from './downloadsContext'
 import { type DownloadTarget, runDownload } from './downloader'
 import {
   type StorageInfo,
@@ -39,6 +39,7 @@ import {
 } from './mediaCache'
 
 const NO_RECORDS: ReadonlyMap<string, DownloadRecord> = new Map()
+const NO_MODES: ReadonlyMap<string, TransferMode> = new Map()
 const NO_URLS: ReadonlyMap<string, string> = new Map()
 
 const audioKey = (bookId: string, fileIdx: number): string => `${bookId}:${String(fileIdx)}`
@@ -64,6 +65,15 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
   const [storage, setStorage] = useState<StorageInfo | null>(null)
   const [supported, setSupported] = useState(false)
   const [background, setBackground] = useState(false)
+  /**
+   * Wie ein laufender Download gerade übertragen wird.
+   *
+   * `background` allein sagt nur, ob das Gerät die Übergabe **kann**. Lehnt es
+   * eine einzelne ab – kein Platz, schon in der Schlange –, lädt die App im
+   * Vordergrund weiter. Im Elternbereich stünde sonst „die App darf zu sein",
+   * während Schliessen den Download abbricht.
+   */
+  const [modes, setModes] = useState<ReadonlyMap<string, TransferMode>>(NO_MODES)
 
   // Der Cache wird einmal geöffnet und dann herumgereicht; die Schlange und
   // die Abbruchwünsche leben ausserhalb des Renderns.
@@ -90,6 +100,29 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
   }, [])
 
   /**
+   * Einen Stand nur anzeigen, ohne ihn zu schreiben.
+   *
+   * Für den laufenden Fortschritt einer Übergabe: Der Service Worker rechnet
+   * am Ende die tatsächlich geladenen Bytes auf den gespeicherten Stand
+   * **auf**. Stünde dort schon der Zwischenstand, zählte er doppelt.
+   */
+  const setMode = useCallback((bookId: string, mode: TransferMode | null) => {
+    setModes((previous) => {
+      if ((previous.get(bookId) ?? null) === mode) return previous
+      const next = new Map(previous)
+      if (mode === null) next.delete(bookId)
+      else next.set(bookId, mode)
+      return next
+    })
+  }, [])
+
+  const showRecord = useCallback((record: DownloadRecord) => {
+    const next = new Map(recordsRef.current).set(record.bookId, record)
+    recordsRef.current = next
+    setRecords(next)
+  }, [])
+
+  /**
    * Einen Stand übernehmen, der schon in IndexedDB steht.
    *
    * Der Service Worker schreibt dort hinein, während die App zu ist – beim
@@ -102,6 +135,13 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     setRecords(next)
     // Damit die Adressen für das fertige Buch neu vorbereitet werden.
     primedRef.current.delete(record.bookId)
+    // Fertig oder gescheitert: Dann wird gerade nichts mehr übertragen.
+    setModes((previous) => {
+      if (!previous.has(record.bookId)) return previous
+      const next = new Map(previous)
+      next.delete(record.bookId)
+      return next
+    })
   }, [])
 
   /** Den Fortschritt einer laufenden Übergabe mitführen, solange die App offen ist. */
@@ -112,18 +152,18 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
           registration.removeEventListener('progress', onProgress)
           return
         }
-        applyRecord({
+        // Nur anzeigen, nicht schreiben: Was vor dieser Übergabe schon dalag,
+        // steht gespeichert – der Service Worker rechnet am Ende darauf auf.
+        showRecord({
           ...base,
           status: 'running',
-          // Was vor diesem Versuch schon dalag, zählt mit – sonst spränge der
-          // Balken bei einem zweiten Versuch zurück auf null.
-          bytesDone: base.bytesDone + registration.downloaded,
+          bytesDone: Math.min(base.bytesTotal, base.bytesDone + registration.downloaded),
           updatedAt: new Date().toISOString(),
         })
       }
       registration.addEventListener('progress', onProgress)
     },
-    [applyRecord],
+    [showRecord],
   )
 
   useEffect(() => {
@@ -164,13 +204,16 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
 
         const known = recordsRef.current.get(bookId)
         if (known === undefined) continue
-        const laufend: DownloadRecord = {
+
+        // Aufaddieren, nicht ersetzen: Im gespeicherten Stand stecken die
+        // Dateien früherer Versuche, `downloaded` zählt nur diese Übergabe.
+        showRecord({
           ...known,
           status: 'running',
-          bytesDone: registration.downloaded,
+          bytesDone: Math.min(known.bytesTotal, known.bytesDone + registration.downloaded),
           updatedAt: new Date().toISOString(),
-        }
-        applyRecord(laufend)
+        })
+        setMode(bookId, 'background')
         watchBackground(registration, known)
       }
     })()
@@ -178,7 +221,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true
     }
-  }, [applyRecord, watchBackground])
+  }, [showRecord, setMode, watchBackground])
 
   /**
    * Object-URLs für alles, was schon auf dem Gerät liegt.
@@ -307,6 +350,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
           bytesTotal: totalBytes(book),
         }
         applyRecord(base)
+        setMode(book.id, 'foreground')
 
         const outcome = await runDownload({
           targets,
@@ -326,6 +370,8 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
           },
           aborted: () => cancelledRef.current.has(book.id),
         })
+
+        setMode(book.id, null)
 
         if (outcome === 'aborted') {
           cancelledRef.current.delete(book.id)
@@ -353,7 +399,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
     } finally {
       runningRef.current = false
     }
-  }, [applyRecord, applyUrls, collect, targetsFor])
+  }, [applyRecord, applyUrls, collect, setMode, targetsFor])
 
   /**
    * Der Service Worker meldet, dass er einen Download übernommen hat.
@@ -446,6 +492,11 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
             return
           }
 
+          // Das Nachsehen im Cache dauert – in dieser Zeit kann jemand
+          // abgebrochen haben. Ohne diese Prüfung liefe der Download trotzdem
+          // los, und zwar dort, wo ihn niemand mehr anhalten kann.
+          if (cancelledRef.current.has(book.id)) return
+
           const registration = await startBackgroundFetch(manager, {
             bookId: book.id,
             title: book.title,
@@ -455,6 +506,12 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
           })
 
           if (registration !== null) {
+            // Und noch einmal: Das Übergeben selbst braucht ebenfalls Zeit.
+            if (cancelledRef.current.has(book.id)) {
+              await registration.abort().catch(() => false)
+              return
+            }
+
             if (cover !== undefined) void fetchCover(cover)
             const laufend: DownloadRecord = {
               ...base,
@@ -463,10 +520,13 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
               bytesDone: schonDa,
             }
             applyRecord(laufend)
+            setMode(book.id, 'background')
             watchBackground(registration, laufend)
             return
           }
         }
+
+        if (cancelledRef.current.has(book.id)) return
 
         // Kein Android, keine Erlaubnis, schon in der Schlange: dann eben
         // im Vordergrund, solange die App offen bleibt.
@@ -474,13 +534,14 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
         void pump()
       })()
     },
-    [applyRecord, applyUrls, collect, fetchCover, pump, targetsFor, watchBackground],
+    [applyRecord, applyUrls, collect, fetchCover, pump, setMode, targetsFor, watchBackground],
   )
 
   const cancel = useCallback(
     (bookId: string) => {
       cancelledRef.current.add(bookId)
       queueRef.current = queueRef.current.filter((queued) => queued.id !== bookId)
+      setMode(bookId, null)
 
       const record = recordsRef.current.get(bookId)
       if (record?.status === 'queued') applyRecord({ ...record, status: 'idle' })
@@ -496,7 +557,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
         })
       }
     },
-    [applyRecord],
+    [applyRecord, setMode],
   )
 
   const remove = useCallback(
@@ -556,6 +617,12 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
       allowed: selected?.allowDownload ?? false,
       supported,
       background,
+      // Muss auch nur ein laufender Download die offene App brauchen, gilt das
+      // für den ganzen Hinweis: Wegzulegen ist das Tablet dann nicht.
+      transfer:
+        [...modes.values()].find((mode) => mode === 'foreground') ??
+        [...modes.values()][0] ??
+        null,
       storage,
       get: (bookId: string) => records.get(bookId) ?? null,
       start,
@@ -569,6 +636,7 @@ export function DownloadProvider({ children }: { children: ReactNode }) {
       selected,
       supported,
       background,
+      modes,
       storage,
       start,
       cancel,

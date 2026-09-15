@@ -3,6 +3,7 @@ import { BigButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
 
 import { formatBytes, isDownloaded } from './downloads'
+import { transferHinweis } from './transferHinweis'
 import { useDownloads } from './downloadsContext'
 
 /**
@@ -13,7 +14,7 @@ import { useDownloads } from './downloadsContext'
  * warum das Tablet voll ist.
  */
 export function DownloadsSection() {
-  const { records, supported, background, storage, remove } = useDownloads()
+  const { records, supported, background, transfer, storage, remove } = useDownloads()
   const { bookById } = useLibrary()
 
   if (!supported) return null
@@ -25,11 +26,7 @@ export function DownloadsSection() {
     <section className="flex flex-col gap-4 pt-8">
       <h2 className="text-2xl font-bold">Heruntergeladen</h2>
 
-      <Notice>
-        {background
-          ? 'Das Gerät lädt im Hintergrund weiter – die App darf dabei zu sein.'
-          : 'Dieses Gerät lädt nur, solange die App offen ist. Lass sie beim Herunterladen bitte offen.'}
-      </Notice>
+      <Notice>{transferHinweis(transfer, background)}</Notice>
 
       {geladen.length === 0 ? (
         <Notice>

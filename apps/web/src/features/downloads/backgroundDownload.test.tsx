@@ -219,7 +219,7 @@ describe('Download an das Betriebssystem übergeben', () => {
   it('greift eine Übergabe wieder auf, die beim Öffnen noch läuft', async () => {
     // Android hat weitergeladen, während die App zu war. Ohne diesen Schritt
     // stünde der Eintrag auf „nichts läuft", obwohl gerade geladen wird.
-    const registration = fakeRegistration()
+    const registration = Object.assign(fakeRegistration(), { downloaded: 500_000 })
     const manager: BackgroundFetchManager = {
       fetch: vi.fn(() => Promise.resolve(registration)),
       get: vi.fn(() => Promise.resolve(registration)),
@@ -227,7 +227,15 @@ describe('Download an das Betriebssystem übergeben', () => {
     }
     installServiceWorker(manager)
     vi.mocked(readAllDownloads).mockResolvedValue([
-      makeDownloadRecord({ bookId: 'b_1', status: 'running', filesTotal: 2, filesDone: 1 }),
+      makeDownloadRecord({
+        bookId: 'b_1',
+        status: 'running',
+        filesTotal: 2,
+        filesDone: 1,
+        bytesTotal: 4_000_000,
+        // Aus einem früheren Versuch: Diese Datei liegt schon im Cache.
+        bytesDone: 1_000_000,
+      }),
     ])
 
     renderProvider()
@@ -235,6 +243,8 @@ describe('Download an das Betriebssystem übergeben', () => {
     await waitFor(() => {
       expect(screen.getByTestId('status')).toHaveTextContent('running')
     })
+    // Aufaddiert, nicht ersetzt – sonst spränge der Balken zurück.
+    expect(screen.getByTestId('bytes')).toHaveTextContent('1500000')
   })
 
   it('übernimmt, was der Service Worker inzwischen abgelegt hat', async () => {
@@ -287,6 +297,52 @@ describe('Download an das Betriebssystem übergeben', () => {
     await waitFor(() => {
       expect(abort).toHaveBeenCalled()
     })
+  })
+
+  it('übergibt nichts mehr, wenn währenddessen abgebrochen wurde', async () => {
+    // Zwischen „laden" und der Übergabe wird im Cache nachgesehen, und das
+    // dauert. Wer in dieser Zeit abbricht, hat sonst einen Download am Hals,
+    // den niemand mehr angefordert hat – und der in Androids Warteschlange
+    // sitzt, wo ihn die App nicht mehr sieht.
+    const manager: BackgroundFetchManager = {
+      fetch: vi.fn(() => Promise.resolve(fakeRegistration())),
+      get: vi.fn(() => Promise.resolve(undefined)),
+      getIds: vi.fn(() => Promise.resolve([])),
+    }
+    installServiceWorker(manager)
+
+    // Das Nachsehen im Cache künstlich anhalten – ein Tor für alle Abfragen,
+    // nicht nur für die erste: Sonst bliebe die zweite Datei hängen und der
+    // Test käme nie an die Stelle, um die es geht.
+    let oeffnen = () => undefined as void
+    const tor = new Promise<void>((resolve) => {
+      oeffnen = resolve
+    })
+    vi.stubGlobal('caches', {
+      open: () =>
+        Promise.resolve({
+          match: async () => {
+            await tor
+            return undefined
+          },
+          put: () => Promise.resolve(),
+          delete: () => Promise.resolve(true),
+        }),
+    })
+
+    renderProvider()
+    await waitFor(() => {
+      expect(screen.getByTestId('background')).toHaveTextContent('true')
+    })
+
+    await userEvent.click(screen.getByRole('button', { name: 'laden' }))
+    await userEvent.click(screen.getByRole('button', { name: 'abbrechen' }))
+    oeffnen()
+
+    await waitFor(() => {
+      expect(screen.getByTestId('status')).toHaveTextContent('idle')
+    })
+    expect(manager.fetch).not.toHaveBeenCalled()
   })
 
   it('meldet ohne Schnittstelle, dass nichts übergeben wird', async () => {

@@ -23,18 +23,17 @@ function show(overrides: Partial<DownloadsContextValue> = {}) {
 }
 
 describe('Downloads im Elternbereich', () => {
-  it('sagt, ob das Gerät im Hintergrund weiterlädt', () => {
-    // Die Frage, die sich beim Herunterladen wirklich stellt: Kann ich das
-    // Tablet weglegen?
-    show({ background: true })
+  it('sagt, ob das Tablet gerade weggelegt werden darf', () => {
+    // Die Frage, die sich beim Herunterladen wirklich stellt.
+    show({ background: true, transfer: 'background' })
 
     expect(screen.getByText(/App darf dabei zu sein/)).toBeInTheDocument()
   })
 
-  it('bittet sonst darum, die App offen zu lassen', () => {
-    show({ background: false })
+  it('warnt, wenn der laufende Download die offene App braucht', () => {
+    show({ background: true, transfer: 'foreground' })
 
-    expect(screen.getByText(/bitte offen/)).toBeInTheDocument()
+    expect(screen.getByText(/Lass sie bitte offen/)).toBeInTheDocument()
   })
 
   it('listet jedes geladene Buch mit seiner Grösse', () => {
