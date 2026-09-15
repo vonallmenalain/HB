@@ -99,6 +99,31 @@ curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media
 mv .env.example .env
 ```
 
+> **Die `.env` muss neben der `docker-compose.yml` liegen.** Compose liest sie
+> ausschliesslich aus dem Ordner, in dem der Befehl läuft – nicht aus dem
+> Heimatverzeichnis und nicht aus dem alten Ordner. Fehlt sie, bricht schon
+> `docker compose pull` ab:
+>
+> ```
+> required variable HB_LIBRARY_PATH is missing a value
+> ```
+
+**Umstieg von der bisherigen Einrichtung.** Wer den Dienst schon aus dem
+Quelltext betrieben hat, bleibt am einfachsten in seinem bisherigen Ordner –
+dort liegt die ausgefüllte `.env` bereits:
+
+```bash
+cd /share/CACHEDEV2_DATA/Container/HB/services/media   # der bisherige Ordner
+docker compose down                                    # alten Container anhalten
+curl -LO https://raw.githubusercontent.com/vonallmenalain/HB/main/services/media/docker-compose.yml
+docker compose pull && docker compose up -d
+```
+
+Das `curl` überschreibt die alte `docker-compose.yml`, die `.env` bleibt
+unangetastet. Wer stattdessen in den neuen Ordner umzieht, nimmt die `.env` mit
+(`cp …/services/media/.env .`) und hält vorher den alten Container an – sonst
+kollidieren Name und Port.
+
 > **Root-Shell.** Es genügt nicht, dass dein Konto in QTS zur Gruppe
 > *administrators* gehört – das ist Gruppe 0, nicht Benutzer 0. Docker-Befehle
 > über SSH brauchen echte Root-Rechte, sonst bricht schon der Start ab mit
@@ -306,6 +331,8 @@ HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 
 | Beobachtung | Wahrscheinliche Ursache |
 |---|---|
+| `required variable … is missing a value` | Die `.env` liegt nicht neben der `docker-compose.yml` oder heisst noch `.env.example`. `ls -la` im Ordner zeigt es; `docker compose config` prüft die Auflösung, bevor etwas startet |
+| `container name "/hb-media" is already in use` | Der alte Container läuft noch – im alten Ordner `docker compose down` |
 | `denied` oder `unauthorized` bei `docker compose pull` | Das Paket in GitHub steht auf *privat* – öffentlich schalten oder auf dem NAS bei ghcr.io anmelden (Schritt 3) |
 | `no matching manifest for linux/...` | Das NAS hat eine Architektur, für die nicht gebaut wird – im Workflow `platforms` ergänzen |
 | `permission denied` auf `.qpkg/container-station/homes/…` | Docker ohne Root-Shell aufgerufen – `sudo -s` (Schritt 3) |
