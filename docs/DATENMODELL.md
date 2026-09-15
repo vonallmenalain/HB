@@ -69,6 +69,12 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 
 Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
 
+> Ein echter Ausgabestand liegt in
+> [`examples/catalog.sample.json`](./examples/catalog.sample.json). Beide Seiten
+> prüfen dagegen: Der Dienst, dass er ihn so erzeugt, die App, dass sie ihn
+> vollständig versteht. Weicht eine Seite ab, schlägt der Test fehl, statt dass
+> es im Betrieb auffällt.
+
 ```jsonc
 {
   "schemaVersion": 1,
@@ -290,7 +296,10 @@ Ohne Range-Support kann im Player nicht gesprungen werden, und viele Browser
 starten die Wiedergabe gar nicht erst.
 
 ### `POST /admin/rescan?t=<ticket>`
-Nur für UIDs in `HB_ADMIN_UIDS`. Stösst einen inkrementellen Scan an.
+Nur für UIDs in `HB_ADMIN_UIDS` (leer = jede zugelassene UID). Antwortet
+sofort mit `202`; der Scan läuft im Hintergrund weiter und liefert so lange den
+bisherigen Katalog aus. Ein zweiter Aufruf während eines laufenden Scans
+bekommt `409`.
 
 ### Fehlerfälle
 
@@ -299,7 +308,8 @@ Nur für UIDs in `HB_ADMIN_UIDS`. Stösst einen inkrementellen Scan an.
 | 401 | Ticket fehlt/abgelaufen/ungültig | Neues Ticket holen, Request **einmal** wiederholen |
 | 403 | UID nicht freigeschaltet | „Dieses Konto hat keinen Zugriff" im Elternmodus |
 | 404 | Buch/Datei nicht (mehr) da | Aus lokalem Katalog entfernen, Neu-Scan vorschlagen |
-| 503 | Scan läuft | Freundlich warten, automatisch erneut versuchen |
+| 409 | Ein Scan läuft bereits | Warten; `/health` meldet `scanning` |
+| 416 | Angeforderter Bereich liegt ausserhalb der Datei | Sollte nicht vorkommen; Datei neu laden |
 | Netzwerkfehler | NAS offline | Umschalten auf „Nur heruntergeladene Bücher" |
 
 ### Konfiguration (Umgebungsvariablen des Containers)
@@ -312,7 +322,9 @@ Nur für UIDs in `HB_ADMIN_UIDS`. Stösst einen inkrementellen Scan an.
 | `HB_ALLOWED_ORIGINS` | `https://hb.netlify.app` | CORS |
 | `HB_ALLOWED_UIDS` | `abc…,def…` | Leer = jeder verifizierte Nutzer des Projekts |
 | `HB_ADMIN_UIDS` | `abc…` | Darf `/admin/rescan` |
-| `HB_SCAN_CRON` | `0 4 * * *` | Nächtlicher Scan |
+| `HB_RESCAN_INTERVAL_MINUTES` | `360` | Abstand automatischer Neu-Scans; `0` schaltet sie ab |
+| `HB_SCAN_ON_START` | `true` | Beim Start einmal einlesen |
+| `HB_PORT` | `8080` | Port im Container |
 
 Eingebunden wird der Hörbuch-Ordner in der `docker-compose.yml` read-only:
 
@@ -360,13 +372,17 @@ HB/
 │   │   └── sw.ts                # eigener Service Worker
 │   └── vite.config.ts
 ├── services/media/              # NAS-Dienst
-│   ├── src/                     # server, auth, scanner (ID3), range
+│   ├── src/
+│   │   ├── auth/                # Firebase-Token prüfen, Tickets ausstellen
+│   │   ├── catalog/             # Scanner, Namensauswertung, Katalogbau
+│   │   ├── media/               # Range-Header
+│   │   └── server.ts            # Routen
 │   ├── Dockerfile
 │   └── docker-compose.yml       # für Container Station
 ├── docs/
 │   ├── KONZEPT.md
 │   ├── DATENMODELL.md
-│   └── QNAP-SETUP.md            # folgt mit M3
+│   └── QNAP-SETUP.md
 ├── netlify.toml
 └── package.json                 # npm workspaces
 ```

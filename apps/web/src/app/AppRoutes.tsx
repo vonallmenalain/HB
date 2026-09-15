@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { ManageProfilesScreen } from '@/features/profiles/ManageProfilesScreen'
 import { ProfilePicker } from '@/features/profiles/ProfilePicker'
+import { BookScreen } from '@/routes/BookScreen'
 import { HomeScreen } from '@/routes/HomeScreen'
 import { LibraryScreen } from '@/routes/LibraryScreen'
 import { NotFoundScreen } from '@/routes/NotFoundScreen'
@@ -44,6 +45,14 @@ export function AppRoutes() {
         element={
           <RequireProfile>
             <LibraryScreen />
+          </RequireProfile>
+        }
+      />
+      <Route
+        path="/buch/:bookId"
+        element={
+          <RequireProfile>
+            <BookScreen />
           </RequireProfile>
         }
       />
