@@ -1,0 +1,90 @@
+# Firestore-Regeln deployen.
+#
+# Die Regeln sind der eigentliche Zugangsriegel der App. Sie von Hand zu
+# deployen hiess bisher: daran denken. Dieser Workflow macht daraus einen
+# Schritt, der beim Zusammenführen von selbst passiert – und nur dann, wenn
+# sich die Regeln tatsächlich geändert haben.
+#
+# Voraussetzungen (einmalig, siehe docs/FIREBASE-DEPLOY.md):
+#   secrets.FIREBASE_SERVICE_ACCOUNT  JSON-Schlüssel eines Dienstkontos mit den
+#                                     Rollen „Firebase Rules Admin" und
+#                                     „Firebase Viewer"
+#   secrets.HB_ADMIN_EMAIL            Adresse des Administratorkontos; sie wird
+#                                     in die Regeln eingesetzt und steht
+#                                     deshalb nicht im öffentlichen Repository
+name: Firestore-Regeln
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - firestore.rules.tmpl
+      - firebase.json
+      - .firebaserc
+      - tools/render-rules.mjs
+      - .github/workflows/firestore-rules.yml
+  # Von Hand auslösbar – etwa nach dem Wechsel der Administrator-Adresse.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Zwei gleichzeitige Deployments würden sich gegenseitig überschreiben.
+concurrency:
+  group: firestore-rules
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Regeln nach Firestore bringen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Geheimnisse prüfen
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          ADMIN: ${{ secrets.HB_ADMIN_EMAIL }}
+        run: |
+          fehlt=""
+          [ -z "$KEY" ] && fehlt="$fehlt FIREBASE_SERVICE_ACCOUNT"
+          [ -z "$ADMIN" ] && fehlt="$fehlt HB_ADMIN_EMAIL"
+          if [ -n "$fehlt" ]; then
+            echo "::error::Es fehlen Repository-Geheimnisse:$fehlt"
+            echo "Anleitung: docs/FIREBASE-DEPLOY.md"
+            exit 1
+          fi
+
+      - name: Regeln erzeugen
+        env:
+          HB_ADMIN_EMAIL: ${{ secrets.HB_ADMIN_EMAIL }}
+        run: npm run rules
+
+      - name: Platzhalter darf nicht übrig sein
+        run: |
+          if grep -q '__ADMIN_EMAIL__' firestore.rules; then
+            echo "::error::In firestore.rules steht noch der Platzhalter – niemand wäre Administrator."
+            exit 1
+          fi
+
+      # Bewusst kein fremder Login-Schritt: Der Schlüssel landet in einer Datei
+      # ausserhalb des Arbeitsverzeichnisses, und die Firebase-CLI liest ihn
+      # über GOOGLE_APPLICATION_CREDENTIALS.
+      - name: Dienstkonto bereitstellen
+        env:
+          KEY: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          printf '%s' "$KEY" > "$RUNNER_TEMP/firebase-key.json"
+          chmod 600 "$RUNNER_TEMP/firebase-key.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/firebase-key.json" >> "$GITHUB_ENV"
+
+      - name: Deployen
+        run: npx --yes 'firebase-tools@^14.0.0' deploy --only firestore:rules --non-interactive
+
+      - name: Schlüssel wegräumen
+        if: always()
+        run: rm -f "$RUNNER_TEMP/firebase-key.json"

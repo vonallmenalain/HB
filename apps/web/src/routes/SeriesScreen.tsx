@@ -68,7 +68,7 @@ export function SeriesScreen() {
           <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
             {group.books.map((book) => (
               <li key={book.id}>
-                <BookTile book={book} numbered />
+                <BookTile book={book} inSeries />
               </li>
             ))}
           </ul>

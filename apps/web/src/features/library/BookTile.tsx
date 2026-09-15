@@ -12,11 +12,11 @@ import { bookLabel } from './titles'
 /**
  * Eine Kachel im Bibliotheks-Raster: grosses Cover, Titel klein darunter.
  *
- * In einer Reihe (`numbered`) steht die Folgennummer vor dem Titel und der
- * Reihenname entfällt – untereinander gelesen wäre er in jeder Zeile dasselbe
- * Rauschen.
+ * Die Folgennummer gehört zum Titel und steht immer davor. Der Reihenname
+ * dagegen entfällt innerhalb einer Reihe (`inSeries`) – untereinander gelesen
+ * wäre er in jeder Zeile dasselbe Rauschen.
  */
-export function BookTile({ book, numbered = false }: { book: Book; numbered?: boolean }) {
+export function BookTile({ book, inSeries = false }: { book: Book; inSeries?: boolean }) {
   const { client } = useLibrary()
   const { get, offlineCoverUrl } = useDownloads()
   const { isFavorite } = useFavorites()
@@ -58,10 +58,8 @@ export function BookTile({ book, numbered = false }: { book: Book; numbered?: bo
       </div>
       {/* Zwei Zeilen fest: sonst rutscht die Reihenangabe je nach
           Titellänge auf eine andere Höhe und das Raster wirkt schief. */}
-      <span className="line-clamp-2 min-h-[2lh] px-1 font-semibold">
-        {numbered ? bookLabel(book) : book.title}
-      </span>
-      {!numbered && book.series !== null ? (
+      <span className="line-clamp-2 min-h-[2lh] px-1 font-semibold">{bookLabel(book)}</span>
+      {!inSeries && book.series !== null ? (
         <span className="line-clamp-1 px-1 text-sm text-ink-soft">{book.series}</span>
       ) : null}
     </Link>

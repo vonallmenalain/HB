@@ -11,12 +11,10 @@ import { BookTile } from './BookTile'
 export function BookShelf({
   title,
   books,
-  numbered = false,
   action,
 }: {
   title: string
   books: readonly Book[]
-  numbered?: boolean
   action?: ReactNode
 }) {
   if (books.length === 0) return null
@@ -27,7 +25,7 @@ export function BookShelf({
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {books.map((book) => (
           <li key={book.id}>
-            <BookTile book={book} numbered={numbered} />
+            <BookTile book={book} />
           </li>
         ))}
       </ul>

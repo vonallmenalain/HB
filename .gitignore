@@ -17,6 +17,10 @@ build/
 *-service-account*.json
 serviceAccountKey.json
 
+# Aus firestore.rules.tmpl erzeugt – enthält die Adresse des Administrators
+# und gehört deshalb nicht in ein öffentliches Repository.
+/firestore.rules
+
 # Netlify
 .netlify/
 

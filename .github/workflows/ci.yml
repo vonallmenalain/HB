@@ -39,3 +39,11 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Die Regel-Vorlage lässt sich nicht mit Vitest prüfen – sie ist kein
+      # JavaScript. Dass sie sich überhaupt erzeugen lässt, aber schon: Ohne
+      # diesen Schritt fiele ein kaputter Platzhalter erst beim Deployen auf.
+      - name: Firestore-Regeln probeweise erzeugen
+        env:
+          HB_ADMIN_EMAIL: probe@example.com
+        run: npm run rules

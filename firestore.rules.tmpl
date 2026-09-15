@@ -1,0 +1,156 @@
+rules_version = '2';
+
+// Sicherheitsregeln für die Hörbuch-App.
+//
+// ⚠️  Vorlage, nicht die fertige Datei. `__ADMIN_EMAIL__` wird beim Deployen
+//     aus dem Geheimnis `HB_ADMIN_EMAIL` eingesetzt:
+//
+//       HB_ADMIN_EMAIL=… npm run rules      # erzeugt firestore.rules
+//       firebase deploy --only firestore:rules
+//
+//     Die erzeugte Datei ist per .gitignore gesperrt. Grund: Das Repository
+//     ist öffentlich, und eine private Adresse gehört dort nicht hinein
+//     (KONZEPT §9.3). Der Workflow .github/workflows/firestore-rules.yml
+//     erledigt beides bei jeder Änderung an dieser Vorlage.
+//
+// Grundgedanke: Anmelden darf sich jeder – bei aktivierter Google-Anmeldung
+// lässt sich das gar nicht verhindern. Zugriff bekommt aber nur, wer in der
+// Freigabeliste steht. Wer noch nicht darin steht, legt beim Anmelden eine
+// Anfrage ab; freigeben kann sie ausschliesslich das Administratorkonto.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /** Die Adresse aus dem Deployment. Steht sie nicht drin, ist niemand Administrator. */
+    function adminEmail() {
+      return '__ADMIN_EMAIL__';
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    /**
+     * Der Administrator, erkannt an der Adresse im Anmelde-Token.
+     *
+     * `email_verified` ist kein Zierrat: Ohne die Prüfung könnte jemand ein
+     * Konto mit derselben Adresse per Passwort anlegen und wäre damit
+     * Administrator.
+     */
+    function isAdminByEmail() {
+      return isSignedIn()
+          && request.auth.token.get('email_verified', false) == true
+          && request.auth.token.get('email', '').lower() == adminEmail();
+    }
+
+    function allowlistEntry() {
+      return get(/databases/$(database)/documents/allowlist/$(request.auth.uid)).data;
+    }
+
+    function hasAllowlistEntry() {
+      return isSignedIn()
+          && exists(/databases/$(database)/documents/allowlist/$(request.auth.uid));
+    }
+
+    /**
+     * Zweiter Weg zum Administrator: die Rolle im eigenen Freigabe-Eintrag.
+     *
+     * Der Eintrag entsteht beim ersten Anmelden des Administratorkontos. Er ist
+     * die Rückversicherung für den Fall, dass beim Deployen einmal die falsche
+     * Adresse eingesetzt wird – sonst stünde niemand mehr zur Verfügung, der
+     * das wieder geraderücken könnte.
+     */
+    function isAdminByList() {
+      return hasAllowlistEntry() && allowlistEntry().get('role', '') == 'admin';
+    }
+
+    function isAdmin() {
+      return isAdminByEmail() || isAdminByList();
+    }
+
+    function isAllowed() {
+      return hasAllowlistEntry() || isAdminByEmail();
+    }
+
+    match /allowlist/{uid} {
+      // Jedes Konto darf nachsehen, ob es selbst freigeschaltet ist.
+      allow get: if isOwner(uid) || isAdmin();
+      // Die Liste als Ganzes sieht nur der Administrator …
+      allow list: if isAdmin();
+      // … und nur er gibt frei oder nimmt eine Freigabe wieder weg.
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /accessRequests/{uid} {
+      allow get: if isOwner(uid) || isAdmin();
+      allow list: if isAdmin();
+
+      /**
+       * Anfragen legt jeder für sich selbst an – mehr als Name und Adresse
+       * steht nicht drin, und der Status ist immer „offen". Über „freigegeben"
+       * entscheidet allein der Administrator, und zwar in `allowlist`.
+       */
+      function ownRequest() {
+        return isOwner(uid)
+            && request.resource.data.keys().hasOnly([
+                 'uid', 'email', 'name', 'requestedAt', 'status'
+               ])
+            && request.resource.data.uid == request.auth.uid
+            && request.resource.data.status == 'pending'
+            && request.resource.data.requestedAt is string
+            && request.resource.data.get('email', '').size() < 320
+            && request.resource.data.get('name', '').size() < 200;
+      }
+
+      allow create: if ownRequest();
+      // Eine abgelehnte Anfrage lässt sich nicht einfach neu stellen – sonst
+      // legt dasselbe Gerät sie bei jedem Start wieder an.
+      allow update: if ownRequest() && resource.data.get('status', 'pending') != 'denied';
+      allow delete: if isOwner(uid) || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid) && isAllowed();
+
+      // Profile, Favoriten, Fortschritt und Einstellungen liegen darunter und
+      // folgen derselben Regel.
+      match /{document=**} {
+        allow read, write: if isOwner(uid) && isAllowed();
+      }
+    }
+
+    /**
+     * Von Hand gesetzte Titel.
+     *
+     * Sie gehören der Bibliothek, nicht einem Konto: Benennt der Administrator
+     * eine Folge um, liest jedes Kind auf jedem Gerät denselben Titel.
+     */
+    match /bookTitles/{bookId} {
+      allow read: if isAllowed();
+      allow write: if isAdmin();
+    }
+
+    /**
+     * Hörhistorie: wer hat was wie oft gehört.
+     *
+     * Jedes Gerät schreibt nur in die eigenen Einträge – die Kennung beginnt
+     * mit der eigenen UID. Lesen darf sie ausschliesslich der Administrator;
+     * für die Kinder selbst gibt es hier nichts zu holen.
+     */
+    match /listening/{entryId} {
+      allow read: if isAdmin();
+      allow create, update: if isAllowed()
+          && request.resource.data.uid == request.auth.uid
+          && entryId.matches(request.auth.uid + '_.*');
+      allow delete: if isAdmin();
+    }
+
+    // Alles, was hier nicht ausdrücklich erlaubt ist, bleibt gesperrt –
+    // das ist der Firestore-Standard und braucht keine eigene Regel.
+  }
+}
