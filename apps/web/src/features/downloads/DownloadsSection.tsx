@@ -3,6 +3,7 @@ import { BigButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
 
 import { formatBytes, isDownloaded } from './downloads'
+import { transferHinweis } from './transferHinweis'
 import { useDownloads } from './downloadsContext'
 
 /**
@@ -13,7 +14,7 @@ import { useDownloads } from './downloadsContext'
  * warum das Tablet voll ist.
  */
 export function DownloadsSection() {
-  const { records, supported, storage, remove } = useDownloads()
+  const { records, supported, background, transfer, storage, remove } = useDownloads()
   const { bookById } = useLibrary()
 
   if (!supported) return null
@@ -24,6 +25,8 @@ export function DownloadsSection() {
   return (
     <section className="flex flex-col gap-4 pt-8">
       <h2 className="text-2xl font-bold">Heruntergeladen</h2>
+
+      <Notice>{transferHinweis(transfer, background)}</Notice>
 
       {geladen.length === 0 ? (
         <Notice>

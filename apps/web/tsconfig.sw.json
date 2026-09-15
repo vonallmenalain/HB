@@ -1,17 +1,27 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2023", "WebWorker"],
+    "lib": [
+      "ES2023",
+      "WebWorker"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "types": [],
-
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
     "noEmit": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./src/*"
+      ]
+    }
   },
-  "include": ["src/sw.ts"]
+  "include": [
+    "src/sw.ts"
+  ]
 }

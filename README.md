@@ -8,8 +8,8 @@ Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört h
 > ohne Internet hören. Dazu Wiedergabe mit Hintergrundbetrieb, Kapitelwechsel,
 > Sperrbildschirm-Steuerung, punktgenaues Weiterhören und der Abgleich des
 > Fortschritts über Firestore. Was noch fehlt: den Medien-Dienst aufs NAS
-> deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)), die Übergabe
-> des Downloads an Android (Background Fetch) und der Feinschliff (M8).
+> deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)) und der
+> Feinschliff (M8: Sleep-Timer, Elternmodus mit PIN, Barrierefreiheit).
 
 ## Was die App können soll
 
@@ -58,7 +58,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M4 | Bibliothek im Kinderdesign | ✅ |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
 | M6 | Geräte-Sync über Firestore | ✅ |
-| M7 | Offline-Downloads, Verwaltung im Elternmodus | ✅ (Background Fetch offen) |
+| M7 | Offline-Downloads, Background Fetch, Verwaltung im Elternmodus | ✅ |
 | M8 | Sleep-Timer, Elternmodus, Feinschliff | offen |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).

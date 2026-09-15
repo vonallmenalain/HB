@@ -143,6 +143,8 @@ export function makeDownloadsValue(
     records,
     allowed: false,
     supported: true,
+    background: false,
+    transfer: null,
     storage: null,
     get: (bookId: string) => records.get(bookId) ?? null,
     start: vi.fn(),

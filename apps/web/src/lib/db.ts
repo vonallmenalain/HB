@@ -126,6 +126,14 @@ export async function readAllDownloads(): Promise<DownloadRecord[]> {
   }
 }
 
+export async function readDownload(bookId: string): Promise<DownloadRecord | null> {
+  try {
+    return (await (await db()).get('downloads', bookId)) ?? null
+  } catch {
+    return null
+  }
+}
+
 export async function writeDownload(record: DownloadRecord): Promise<void> {
   try {
     await (await db()).put('downloads', record, record.bookId)
