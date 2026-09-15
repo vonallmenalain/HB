@@ -1,0 +1,112 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-01-01T00:00:00.000Z",
+  "books": [
+    {
+      "id": "b_d38c8b005a24",
+      "title": "Bibi Blocksberg - Hexerei",
+      "series": null,
+      "seriesIndex": null,
+      "author": null,
+      "narrator": null,
+      "durationSec": 2,
+      "cover": null,
+      "coverColor": "#0369a1",
+      "tags": [],
+      "addedAt": "2026-01-01T00:00:00.000Z",
+      "filesHash": "ae8bf12a56c081ac",
+      "files": [
+        {
+          "idx": 0,
+          "durationSec": 2,
+          "bytes": 32044,
+          "mime": "audio/wav"
+        }
+      ],
+      "chapters": [
+        {
+          "idx": 0,
+          "title": "hexerei",
+          "fileIdx": 0,
+          "startSec": 0,
+          "endSec": 2
+        }
+      ]
+    },
+    {
+      "id": "b_d2a345997cb8",
+      "title": "Der Super-Papagei",
+      "series": "Die drei ???",
+      "seriesIndex": 1,
+      "author": null,
+      "narrator": null,
+      "durationSec": 5,
+      "cover": "/cover/b_d2a345997cb8.jpg",
+      "coverColor": "#6d28d9",
+      "tags": [],
+      "addedAt": "2026-01-01T00:00:00.000Z",
+      "filesHash": "16cab0922bffdadd",
+      "files": [
+        {
+          "idx": 0,
+          "durationSec": 3,
+          "bytes": 48044,
+          "mime": "audio/wav"
+        },
+        {
+          "idx": 1,
+          "durationSec": 2,
+          "bytes": 32044,
+          "mime": "audio/wav"
+        }
+      ],
+      "chapters": [
+        {
+          "idx": 0,
+          "title": "Der Anruf",
+          "fileIdx": 0,
+          "startSec": 0,
+          "endSec": 3
+        },
+        {
+          "idx": 1,
+          "title": "Die Spur",
+          "fileIdx": 1,
+          "startSec": 3,
+          "endSec": 5
+        }
+      ]
+    },
+    {
+      "id": "b_106cf6dcebdc",
+      "title": "Der Phantomsee",
+      "series": "Die drei ???",
+      "seriesIndex": 2,
+      "author": null,
+      "narrator": null,
+      "durationSec": 1,
+      "cover": null,
+      "coverColor": "#4338ca",
+      "tags": [],
+      "addedAt": "2026-01-01T00:00:00.000Z",
+      "filesHash": "21ed33e4e3a4c3e8",
+      "files": [
+        {
+          "idx": 0,
+          "durationSec": 1,
+          "bytes": 16044,
+          "mime": "audio/wav"
+        }
+      ],
+      "chapters": [
+        {
+          "idx": 0,
+          "title": "Am See",
+          "fileIdx": 0,
+          "startSec": 0,
+          "endSec": 1
+        }
+      ]
+    }
+  ]
+}

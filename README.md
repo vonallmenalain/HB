@@ -4,10 +4,9 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M3 steht – der Medien-Dienst für das QNAP ist fertig und
-> getestet. Was noch fehlt: ihn aufs NAS deployen (siehe
-> [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)) und die Bibliothek in der App
-> anzeigen (M4).
+> **Status:** M4 steht – Medien-Dienst, Katalog-Anbindung und Bibliothek sind
+> fertig. Was noch fehlt: den Dienst aufs NAS deployen (siehe
+> [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)) und der Player (M5).
 
 ## Was die App können soll
 
@@ -53,7 +52,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M1 | Projektgerüst, PWA-Hülle, CI, Netlify | ✅ |
 | M2 | Firebase Auth + Kinderprofile | ✅ |
 | M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | ✅ |
-| M4 | Bibliothek im Kinderdesign | offen |
+| M4 | Bibliothek im Kinderdesign | ✅ |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | offen |
 | M6 | Geräte-Sync über Firestore | offen |
 | M7 | Offline-Downloads | offen |
@@ -73,6 +72,7 @@ npm run dev          # Entwicklungsserver auf http://localhost:5173
 | `npm run dev` | Entwicklungsserver (ohne Service Worker) |
 | `npm run build` | Typprüfung und Produktionsbuild nach `apps/web/dist` |
 | `npm run preview` | Gebautes Ergebnis lokal servieren – nur so lässt sich der Service Worker testen |
+| `npm run sample -w @hb/media` | Beispielkatalog in `docs/examples/` neu erzeugen (nur nach absichtlicher Schema-Änderung) |
 | `npm run lint` | ESLint |
 | `npm run typecheck` | TypeScript über App, Werkzeuge und Service Worker |
 | `npm test` | Vitest |
@@ -108,6 +108,7 @@ aber fremde Konten aus dem Projekt heraus.
 apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/app/           Router, Anmelde-Weiche, App-Hülle
   src/features/auth/ Anmeldung, Freigabeliste
+  src/features/library/   Katalog, Medien-Client, Bibliothek
   src/features/profiles/  Kinderprofile
   src/routes/        Bildschirme
   src/ui/            Design-System-Bausteine
@@ -121,6 +122,12 @@ tools/               Build-Werkzeuge ausserhalb der App
 docs/                Konzept, Datenmodell, NAS-Anleitung
 firestore.rules      Sicherheitsregeln der Datenbank
 ```
+
+### Bildschirme ansehen, ohne sich anzumelden
+
+`npm run dev`, dann `http://localhost:5173/harness.html?route=/bibliothek`.
+Die Vorschau rendert jeden Bildschirm mit Beispieldaten – ohne Firebase-Konto
+und ohne laufendes NAS. Sie ist nicht Teil des Produktionsbuilds.
 
 Der Service Worker läuft im Entwicklungsmodus bewusst **nicht** mit – sonst
 bekommt man beim Entwickeln veraltete Dateien ausgeliefert. Zum Testen der

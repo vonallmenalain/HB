@@ -3,6 +3,11 @@ import { render } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { vi } from 'vitest'
 
+import type { Book } from '@/features/library/catalog'
+import {
+  LibraryContext,
+  type LibraryContextValue,
+} from '@/features/library/libraryContext'
 import type { Profile } from '@/features/profiles/profile'
 import {
   ProfilesContext,
@@ -17,6 +22,26 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
     color: '#6d28d9',
     allowDownload: false,
     createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+export function makeBook(overrides: Partial<Book> = {}): Book {
+  return {
+    id: 'b_1',
+    title: 'Der Super-Papagei',
+    series: 'Die drei ???',
+    seriesIndex: 1,
+    author: 'Robert Arthur',
+    narrator: null,
+    durationSec: 600,
+    cover: null,
+    coverColor: '#6d28d9',
+    tags: [],
+    addedAt: '2026-01-01T00:00:00.000Z',
+    filesHash: 'abc',
+    files: [{ idx: 0, durationSec: 600, bytes: 100, mime: 'audio/mpeg' }],
+    chapters: [{ idx: 0, title: 'Kapitel 1', fileIdx: 0, startSec: 0, endSec: 600 }],
     ...overrides,
   }
 }
@@ -37,15 +62,37 @@ export function makeProfilesValue(
   }
 }
 
+export function makeLibraryValue(
+  overrides: Partial<LibraryContextValue> = {},
+): LibraryContextValue {
+  const books = overrides.books ?? []
+  return {
+    status: 'ready',
+    books,
+    fromCache: false,
+    error: null,
+    skipped: 0,
+    refresh: vi.fn(),
+    bookById: (id: string) => books.find((book) => book.id === id),
+    client: null,
+    ...overrides,
+  }
+}
+
 export function renderWithProfiles(
   ui: ReactElement,
   value: ProfilesContextValue,
-  { route = '/' }: { route?: string } = {},
+  {
+    route = '/',
+    library = makeLibraryValue(),
+  }: { route?: string; library?: LibraryContextValue } = {},
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <MemoryRouter initialEntries={[route]}>
-        <ProfilesContext value={value}>{children}</ProfilesContext>
+        <ProfilesContext value={value}>
+          <LibraryContext value={library}>{children}</LibraryContext>
+        </ProfilesContext>
       </MemoryRouter>
     )
   }

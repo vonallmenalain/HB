@@ -12,7 +12,8 @@
     "lint": "eslint .",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.test.json --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sample": "tsx test/writeSample.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

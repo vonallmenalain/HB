@@ -5,7 +5,8 @@ import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
-import { makeProfile } from '@/test/renderWithProfiles'
+import { LibraryContext } from '@/features/library/libraryContext'
+import { makeLibraryValue, makeProfile } from '@/test/renderWithProfiles'
 
 import { ProfilesContext, type ProfilesContextValue } from './profilesContext'
 
@@ -33,7 +34,11 @@ function StatefulProfiles({ children }: { children: React.ReactNode }) {
     remove: () => Promise.resolve(),
   }
 
-  return <ProfilesContext value={value}>{children}</ProfilesContext>
+  return (
+    <ProfilesContext value={value}>
+      <LibraryContext value={makeLibraryValue()}>{children}</LibraryContext>
+    </ProfilesContext>
+  )
 }
 
 describe('Profilauswahl bis zum Startbildschirm', () => {

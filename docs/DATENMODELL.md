@@ -69,6 +69,12 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 
 Vom Scanner erzeugt, von der App in IndexedDB gespiegelt.
 
+> Ein echter Ausgabestand liegt in
+> [`examples/catalog.sample.json`](./examples/catalog.sample.json). Beide Seiten
+> prüfen dagegen: Der Dienst, dass er ihn so erzeugt, die App, dass sie ihn
+> vollständig versteht. Weicht eine Seite ab, schlägt der Test fehl, statt dass
+> es im Betrieb auffällt.
+
 ```jsonc
 {
   "schemaVersion": 1,

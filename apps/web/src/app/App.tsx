@@ -5,6 +5,7 @@ import { AuthProvider } from '@/features/auth/AuthProvider'
 import { ConfigMissingScreen } from '@/features/auth/ConfigMissingScreen'
 import { LoginScreen } from '@/features/auth/LoginScreen'
 import { useAuth } from '@/features/auth/authContext'
+import { LibraryProvider } from '@/features/library/LibraryProvider'
 import { ProfileProvider } from '@/features/profiles/ProfileProvider'
 import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
@@ -39,7 +40,9 @@ function AuthGate() {
     case 'ready':
       return (
         <ProfileProvider>
-          <AppRoutes />
+          <LibraryProvider>
+            <AppRoutes />
+          </LibraryProvider>
         </ProfileProvider>
       )
   }
