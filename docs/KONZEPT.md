@@ -417,10 +417,17 @@ Familienlösung, kein Verteildienst. Entsprechend:
 
 ### 9.1 Zugangskontrolle
 
+> **Wichtig:** Sobald die Google-Anmeldung aktiv ist, kann sich grundsätzlich
+> jeder mit einem Google-Konto *anmelden*. Das lässt sich nicht verhindern und
+> ist auch nicht nötig – entscheidend ist, dass ein angemeldetes Konto ohne
+> Freigabe **nichts** sieht und **nichts** ablegen kann. Der eigentliche Riegel
+> ist deshalb die Freigabeliste, nicht die abgeschaltete Registrierung.
+
 | Ebene | Massnahme |
 |---|---|
-| Registrierung | In der Firebase-Konsole **abgeschaltet** (`Authentication → Settings → User actions → Enable create` deaktivieren). Konten werden von Hand angelegt. |
-| App | Ohne gültigen Login kein Katalog, kein Cover, kein Ton |
+| **Freigabeliste** | Firestore-Kollektion `allowlist`, ein Dokument je erlaubter UID. Nur von Hand in der Firebase-Konsole pflegbar (`allow write: if false`). Ohne Eintrag verweigern die Firestore-Regeln jeden Zugriff. |
+| Registrierung | Zusätzlich in der Firebase-Konsole abschalten (`Authentication → Settings → User actions → Enable create`). Das reduziert den Lärm, ersetzt die Freigabeliste aber nicht. |
+| App | Ohne gültigen Login und ohne Freigabe kein Katalog, kein Cover, kein Ton. Ein nicht freigeschaltetes Konto sieht seine UID zum Übertragen in die Konsole. |
 | NAS-Dienst | Prüft jeden Request gegen ein Media-Ticket; ohne gültiges Ticket **401** |
 | Ticket | Kurzlebiges JWT (HS256, 8 h), enthält nur die Firebase-UID; signiert mit einem Secret, das nur Netlify-Build und NAS kennen |
 | Firestore | Regeln: `users/{uid}/**` nur für genau diese `uid` lesbar/schreibbar |

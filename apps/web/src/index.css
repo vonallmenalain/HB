@@ -25,7 +25,11 @@
     system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 }
 
-/* Dunkles Thema fürs Zubettgehen – dieselben Token, andere Werte. */
+/*
+ * Dunkles Thema fürs Zubettgehen – dieselben Token, andere Werte.
+ * Bewusst ausserhalb von `@layer`: hier werden nur Custom Properties neu
+ * gesetzt, mit denen keine Utility-Klasse konkurriert.
+ */
 @media (prefers-color-scheme: dark) {
   :root {
     --color-bg: #17140f;
@@ -40,33 +44,43 @@
   }
 }
 
-:root {
-  color-scheme: light dark;
-}
+/*
+ * Grundstile für Elemente gehören in `@layer base`.
+ *
+ * Ohne die Ebene landen sie in der ungeschichteten Voreinstellung – und die
+ * schlägt jede Regel aus `@layer utilities`. Ein ungeschichtetes
+ * `button { color: inherit }` macht damit stillschweigend jede Tailwind-
+ * Textfarbe auf jedem Knopf wirkungslos.
+ */
+@layer base {
+  :root {
+    color-scheme: light dark;
+  }
 
-html {
-  /* Verhindert, dass iOS/Android beim Drehen die Schrift skaliert. */
-  -webkit-text-size-adjust: 100%;
-}
+  html {
+    /* Verhindert, dass Android beim Drehen die Schrift skaliert. */
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  margin: 0;
-  background-color: var(--color-bg);
-  color: var(--color-ink);
-  font-family: var(--font-sans);
-  /* Mindestgrösse Fliesstext laut Konzept: 18px */
-  font-size: 1.125rem;
-  line-height: 1.5;
-  /* Kein Gummiband-Scrollen über den Rand hinaus. */
-  overscroll-behavior-y: none;
-}
+  body {
+    margin: 0;
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    /* Mindestgrösse Fliesstext laut Konzept: 18px */
+    font-size: 1.125rem;
+    line-height: 1.5;
+    /* Kein Gummiband-Scrollen über den Rand hinaus. */
+    overscroll-behavior-y: none;
+  }
 
-/* Kinder tippen doppelt und halten gedrückt – beides soll nichts auslösen. */
-button {
-  -webkit-tap-highlight-color: transparent;
-  touch-action: manipulation;
-  font: inherit;
-  color: inherit;
+  /* Kinder tippen doppelt und halten gedrückt – beides soll nichts auslösen. */
+  button {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    font: inherit;
+    color: inherit;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

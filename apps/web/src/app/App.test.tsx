@@ -1,30 +1,30 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { App } from './App'
 
-describe('App', () => {
-  it('zeigt den Startbildschirm', () => {
-    render(<App />)
-
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Hörbücher')
-    expect(screen.getByText('Noch keine Hörbücher')).toBeInTheDocument()
+describe('App ohne Firebase-Konfiguration', () => {
+  beforeEach(() => {
+    // Ausdrücklich leeren statt sich darauf zu verlassen, dass gerade keine
+    // .env.local herumliegt – sonst hängt der Test an der Umgebung des
+    // Entwicklungsrechners.
+    vi.stubEnv('VITE_FIREBASE_API_KEY', '')
+    vi.stubEnv('VITE_FIREBASE_AUTH_DOMAIN', '')
+    vi.stubEnv('VITE_FIREBASE_PROJECT_ID', '')
+    vi.stubEnv('VITE_FIREBASE_APP_ID', '')
   })
 
-  it('verlinkt von der Startseite in die Bibliothek', () => {
-    render(<App />)
-
-    const link = screen.getByRole('link', { name: 'Alle Hörbücher' })
-    expect(link).toHaveAttribute('href', '/bibliothek')
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
-  it('zeigt für unbekannte Adressen einen Weg zurück statt eines Fehlers', () => {
-    window.history.pushState({}, '', '/gibtesnicht')
+  it('nennt die fehlenden Variablen, statt mit einem Firebase-Fehler abzustürzen', () => {
     render(<App />)
 
-    expect(screen.getByText('Hier ist nichts')).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Zum Anfang' })).toHaveAttribute('href', '/')
-
-    window.history.pushState({}, '', '/')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Konfiguration fehlt')
+    expect(screen.getByText('VITE_FIREBASE_API_KEY')).toBeInTheDocument()
+    expect(screen.getByText('VITE_FIREBASE_AUTH_DOMAIN')).toBeInTheDocument()
+    expect(screen.getByText('VITE_FIREBASE_PROJECT_ID')).toBeInTheDocument()
+    expect(screen.getByText('VITE_FIREBASE_APP_ID')).toBeInTheDocument()
   })
 })

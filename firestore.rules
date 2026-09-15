@@ -1,0 +1,50 @@
+rules_version = '2';
+
+// Sicherheitsregeln für die Hörbuch-App.
+//
+// Grundgedanke: Anmelden darf sich jeder – bei aktivierter Google-Anmeldung
+// lässt sich das gar nicht verhindern. Zugriff bekommt aber nur, wer in der
+// Freigabeliste steht. Ein fremdes Konto sieht deshalb nichts und kann auch
+// nichts ablegen.
+//
+// Freischalten: In Firestore eine Kollektion `allowlist` anlegen und darin ein
+// Dokument mit der UID des Kontos als Dokument-ID erstellen. Der Inhalt ist
+// egal; die App zeigt die UID an, wenn ein Konto noch nicht freigeschaltet ist.
+//
+// Deployen mit:  firebase deploy --only firestore:rules
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isAllowed() {
+      return request.auth != null
+          && exists(/databases/$(database)/documents/allowlist/$(request.auth.uid));
+    }
+
+    match /allowlist/{uid} {
+      // Jedes Konto darf nachsehen, ob es selbst freigeschaltet ist – mehr
+      // nicht. Die Liste als Ganzes ist nicht lesbar, und geschrieben wird
+      // ausschliesslich von Hand in der Firebase-Konsole.
+      allow get: if isOwner(uid);
+      allow list: if false;
+      allow write: if false;
+    }
+
+    match /users/{uid} {
+      allow read, write: if isOwner(uid) && isAllowed();
+
+      // Profile, Fortschritt und Einstellungen liegen darunter und folgen
+      // derselben Regel.
+      match /{document=**} {
+        allow read, write: if isOwner(uid) && isAllowed();
+      }
+    }
+
+    // Alles, was hier nicht ausdrücklich erlaubt ist, bleibt gesperrt –
+    // das ist der Firestore-Standard und braucht keine eigene Regel.
+  }
+}

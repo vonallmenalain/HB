@@ -13,6 +13,14 @@
   to = "/index.html"
   status = 200
 
+# Die Content-Security-Policy nennt zwei Firebase-Hosts namentlich, weil die
+# Anmeldung sie tatsächlich braucht:
+#   apis.google.com                    – Firebase Auth lädt von dort api.js für
+#                                        den Popup-Resolver
+#   <projekt>.firebaseapp.com          – der unsichtbare Auth-iframe unter
+#                                        /__/auth/iframe
+# Wird die Firebase-Konfiguration auf ein anderes Projekt umgestellt, muss der
+# Host hier mitziehen (und ebenso VITE_MEDIA_BASE_URL beim NAS-Dienst).
 [[headers]]
   for = "/*"
   [headers.values]
@@ -27,12 +35,13 @@
       object-src 'none'; \
       frame-ancestors 'none'; \
       form-action 'self'; \
-      script-src 'self'; \
+      script-src 'self' https://apis.google.com; \
       style-src 'self' 'unsafe-inline'; \
       img-src 'self' data: blob: https://hb-media.alae.app; \
       media-src 'self' blob: https://hb-media.alae.app; \
       font-src 'self'; \
       worker-src 'self'; \
+      frame-src 'self' https://hoerbuchkinder.firebaseapp.com; \
       manifest-src 'self'; \
       connect-src 'self' https://hb-media.alae.app \
         https://identitytoolkit.googleapis.com https://securetoken.googleapis.com \

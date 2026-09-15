@@ -4,8 +4,8 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** Meilenstein M1 steht – die PWA-Hülle ist gebaut, installierbar und
-> deployt. Inhalte folgen ab M2.
+> **Status:** M2 steht – Anmeldung, Freigabeliste und Kinderprofile
+> funktionieren. Katalog und Player folgen ab M3.
 
 ## Was die App können soll
 
@@ -48,7 +48,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 |---|---|---|
 | M0 | Konzept | ✅ |
 | M1 | Projektgerüst, PWA-Hülle, CI, Netlify | ✅ |
-| M2 | Firebase Auth + Kinderprofile | offen |
+| M2 | Firebase Auth + Kinderprofile | ✅ |
 | M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | offen |
 | M4 | Bibliothek im Kinderdesign | offen |
 | M5 | Player, Hintergrundwiedergabe, Fortschritt | offen |
@@ -75,20 +75,44 @@ npm run dev          # Entwicklungsserver auf http://localhost:5173
 | `npm test` | Vitest |
 | `npm run icons` | App-Icons aus `tools/generate-icons.mjs` neu erzeugen |
 
-Umgebungsvariablen: `.env.example` nach `.env.local` kopieren. In Netlify liegen
-dieselben Werte unter *Site settings → Environment variables*.
+### Einrichtung
+
+1. `.env.example` nach `apps/web/.env.local` kopieren und die
+   Firebase-Web-Konfiguration eintragen. In Netlify liegen dieselben Werte unter
+   *Site settings → Environment variables*. Fehlen sie, zeigt die App den
+   Bildschirm „Konfiguration fehlt" und nennt die fehlenden Variablen.
+2. Firestore-Regeln deployen: `firebase deploy --only firestore:rules`
+3. Das eigene Konto freischalten – siehe unten.
+
+### Ein Konto freischalten
+
+Mit aktivierter Google-Anmeldung kann sich grundsätzlich jeder *anmelden*.
+Zugriff bekommt nur, wer in der Freigabeliste steht:
+
+1. In der App anmelden. Es erscheint „Noch kein Zugriff" mit der Kennung (UID).
+2. In der Firebase-Konsole unter *Firestore → Daten* eine Kollektion
+   `allowlist` anlegen und darin ein Dokument mit genau dieser UID als
+   Dokument-ID erstellen. Der Inhalt spielt keine Rolle.
+3. In der App auf „Nochmal prüfen" tippen.
+
+Zusätzlich empfiehlt sich, unter *Authentication → Settings → User actions* die
+Selbst-Registrierung abzuschalten. Das ersetzt die Freigabeliste nicht, hält
+aber fremde Konten aus dem Projekt heraus.
 
 ### Aufbau
 
 ```
-apps/web/          PWA (Vite, React, TypeScript, Tailwind)
-  src/app/         Router und App-Hülle
-  src/routes/      Bildschirme
-  src/ui/          Design-System-Bausteine
-  src/lib/         Hilfsfunktionen
-  src/sw.ts        Service Worker (eigener Code, kein generierter)
-tools/             Build-Werkzeuge ausserhalb der App
-docs/              Konzept und Datenmodell
+apps/web/            PWA (Vite, React, TypeScript, Tailwind)
+  src/app/           Router, Anmelde-Weiche, App-Hülle
+  src/features/auth/ Anmeldung, Freigabeliste
+  src/features/profiles/  Kinderprofile
+  src/routes/        Bildschirme
+  src/ui/            Design-System-Bausteine
+  src/lib/           Firebase, Konfiguration, Hilfsfunktionen
+  src/sw.ts          Service Worker (eigener Code, kein generierter)
+tools/               Build-Werkzeuge ausserhalb der App
+docs/                Konzept und Datenmodell
+firestore.rules      Sicherheitsregeln der Datenbank
 ```
 
 Der Service Worker läuft im Entwicklungsmodus bewusst **nicht** mit – sonst
