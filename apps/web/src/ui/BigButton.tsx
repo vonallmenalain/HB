@@ -20,7 +20,7 @@ export type BigButtonPadding = keyof typeof paddings
 
 const variants = {
   primary: 'bg-primary text-on-primary',
-  secondary: 'bg-surface text-ink border-2 border-line',
+  secondary: 'bg-surface text-ink border-2 border-control',
 } as const
 
 export type BigButtonVariant = keyof typeof variants

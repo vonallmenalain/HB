@@ -242,7 +242,31 @@ Zeile und zeigt dort nebenbei, in welchem Kapitel man gerade ist.
 | Animationen | ruhig, ≤ 250 ms, respektieren `prefers-reduced-motion` |
 | Destruktives | nie im Kinderbereich (kein Löschen, kein Logout, keine Einstellungen) |
 | Fehler | nie als Text-Dialog, sondern als Bild + ein Knopf („Nochmal probieren") |
-| Zustand merken | Scrollposition, letztes Profil, letzte Ansicht überleben den App-Neustart |
+| Zustand merken | Letztes Profil und letzte Ansicht überleben den App-Neustart |
+
+Zwei dieser Regeln haben beim Nachmessen nicht gehalten, und beide sahen beim
+Ansehen richtig aus:
+
+**Der Fehlertext verfehlte den Kontrast.** `#ea580c` auf Weiss ergibt 3,6:1 –
+verlangt sind 4,5:1, ausgerechnet dort, wo etwas schiefgegangen ist. Die Farbe
+ist jetzt dunkler (6,0:1).
+
+**Der Rand sekundärer Knöpfe war fast unsichtbar.** Ein solcher Knopf hebt sich
+farblich kaum vom Hintergrund ab; erkannt wird er an seinem Rand, und der kam
+auf 1,4:1 statt der von WCAG 1.4.11 geforderten 3:1. Dafür gibt es jetzt ein
+eigenes Token (`--color-control`, 3,3:1) – Trennlinien dürfen weiterhin zart
+sein, Bedienelemente nicht.
+
+Gerechnet wird das seither im Test, aus derselben Datei, aus der die App ihre
+Farben nimmt. Kontrast ist die einzige dieser Regeln, die man beim Ansehen
+nicht prüfen kann.
+
+**Die letzte Ansicht wird gemerkt, der Player aber nie.** Ihn beim Öffnen
+wiederherzustellen hiesse, dass die App von selbst zu spielen anfängt, sobald
+jemand sie antippt. Gemerkt wird stattdessen die Buchseite: dieselbe Stelle,
+ohne Ton im Wohnzimmer. Die Scrollposition bleibt offen – sie über einen
+Neustart zu erhalten lohnt den Aufwand erst, wenn die Bibliothek so gross ist,
+dass Scrollen wehtut.
 
 ### 5.6 Sleep-Timer
 
@@ -637,7 +661,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
-| **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
+| **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff ✅, Barrierefreiheit ✅ | Fertig für den Alltag ✅ |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied

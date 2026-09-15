@@ -11,6 +11,8 @@ import { LibraryScreen } from '@/routes/LibraryScreen'
 import { NotFoundScreen } from '@/routes/NotFoundScreen'
 import { PlayerScreen } from '@/routes/PlayerScreen'
 import { Screen } from '@/ui/Screen'
+
+import { useRememberView } from './useRememberView'
 import { Spinner } from '@/ui/Spinner'
 
 /**
@@ -32,6 +34,8 @@ function RequireProfile({ children }: { children: ReactNode }) {
 }
 
 export function AppRoutes() {
+  useRememberView()
+
   return (
     <Routes>
       <Route

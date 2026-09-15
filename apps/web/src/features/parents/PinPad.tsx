@@ -47,7 +47,7 @@ export function PinPad({
           <span
             key={index}
             aria-hidden="true"
-            className={`size-5 rounded-full border-2 border-line ${
+            className={`size-5 rounded-full border-2 border-control ${
               index < pin.length ? 'bg-primary' : 'bg-surface-sunken'
             }`}
           />
