@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useLibrary } from '@/features/library/libraryContext'
 import { SKIP_SECONDS } from '@/features/player/mediaSession'
+import { SleepTimerButton } from '@/features/player/SleepTimerButton'
 import { usePlayer } from '@/features/player/playerContext'
 import { formatCountdown, formatTime } from '@/lib/format'
 import { BigLinkButton } from '@/ui/BigButton'
@@ -52,7 +53,7 @@ export function PlayerScreen() {
 
   return (
     <Screen>
-      <div className="flex items-center py-4">
+      <div className="flex items-center justify-between py-4">
         <Link
           to={`/buch/${book.id}`}
           aria-label="Zurück zum Buch"
@@ -63,6 +64,8 @@ export function PlayerScreen() {
           </span>
           Zurück
         </Link>
+
+        <SleepTimerButton />
       </div>
 
       <div className="mx-auto w-full max-w-xs">

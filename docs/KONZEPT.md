@@ -250,6 +250,26 @@ Wichtigstes Elternfeature. Auswahl: 5 / 10 / 15 / 30 / 45 / 60 Minuten oder
 „bis Kapitelende". Restzeit gross sichtbar, letzte 20 Sekunden sanftes Ausblenden
 der Lautstärke, dann Pause (kein harter Stopp mitten im Satz).
 
+Drei Dinge daran sind beim Bauen dazugekommen:
+
+**Gerechnet wird gegen die Uhr, nicht mit einem Zähler.** Ein `setInterval`
+drosselt Android, sobald der Bildschirm ausgeht – und genau dann läuft dieser
+Timer. Der Zeitpunkt, an dem Schluss ist, steht deshalb fest, und nachgesehen
+wird bei jedem `timeupdate` des Audioelements. Das ist die eine Uhr, die im
+Hintergrund zuverlässig weitergeht, solange etwas läuft.
+
+**Die Uhr hält mit der Wiedergabe an.** „Noch 15 Minuten hören" meint
+Hörzeit. Läuft der Timer in einer Pause weiter, ist die Zeit vorbei, während
+das Tablet unangetastet auf dem Nachttisch lag.
+
+**Ausgeblendet wird nur bis zu einem Rest, nie bis auf null.** Eine Lautstärke
+von 0 stufen Browser als „spielt nicht" ein und beenden die
+Hintergrundwiedergabe (§6.1) – aus dem sanften Auslaufen würde ein hartes
+Ende. Nach dem Ausblenden folgt deshalb eine echte Pause.
+
+Bei „bis Kapitelende" endet die Wiedergabe am Kapitelende, statt wie sonst
+selbsttätig weiterzuwechseln.
+
 ### 5.7 Elternmodus
 
 Erreichbar über langen Druck (2 s) auf das Logo, gesichert mit 4-stelliger PIN.
@@ -599,7 +619,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
-| **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
+| **M8** | Sleep-Timer ✅, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied

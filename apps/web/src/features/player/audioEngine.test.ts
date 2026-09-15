@@ -260,3 +260,126 @@ describe('Abonnenten', () => {
     expect(calls).toBe(before)
   })
 })
+
+describe('Einschlaf-Timer', () => {
+  /** Eine Uhr, die der Test weiterstellt – nicht die echte. */
+  let jetzt = 1_000_000
+  const vor = (ms: number): void => {
+    jetzt += ms
+  }
+
+  function bauenMitUhr(): void {
+    jetzt = 1_000_000
+    element = createFakeMediaElement()
+    engine = createAudioEngine({
+      element,
+      audioUrl: (bookId, fileIdx) => `https://media.test/audio/${bookId}/${String(fileIdx)}`,
+      now: () => jetzt,
+    })
+  }
+
+  beforeEach(() => {
+    bauenMitUhr()
+    engine.open(BOOK, 0)
+    element.emitLoadedMetadata(600)
+  })
+
+  it('zeigt die Restzeit ab dem Einstellen', () => {
+    engine.setSleep({ kind: 'minutes', minutes: 15 })
+
+    expect(engine.snapshot().sleepMode).toEqual({ kind: 'minutes', minutes: 15 })
+    expect(engine.snapshot().sleepRemainingSec).toBe(900)
+  })
+
+  it('zählt mit der laufenden Wiedergabe herunter', async () => {
+    await engine.play()
+    engine.setSleep({ kind: 'minutes', minutes: 10 })
+
+    vor(4 * 60_000)
+    element.advanceTo(240)
+
+    expect(engine.snapshot().sleepRemainingSec).toBe(360)
+  })
+
+  it('hält an, wenn das Kind pausiert', async () => {
+    // „Noch 15 Minuten hören" meint Hörzeit. Sonst wäre die Zeit vorbei,
+    // während das Tablet unangetastet auf dem Nachttisch lag.
+    await engine.play()
+    engine.setSleep({ kind: 'minutes', minutes: 10 })
+
+    engine.pause()
+    vor(9 * 60_000)
+    await engine.play()
+    element.advanceTo(10)
+
+    expect(engine.snapshot().sleepRemainingSec).toBe(600)
+  })
+
+  it('blendet über die letzten Sekunden aus, ohne je stumm zu werden', async () => {
+    // Stumm heisst für den Browser „spielt nicht" – und dann endet die
+    // Hintergrundwiedergabe, statt sanft auszulaufen.
+    await engine.play()
+    engine.setSleep({ kind: 'minutes', minutes: 1 })
+
+    const lautstaerken: number[] = []
+    for (const sekunde of [30, 45, 50, 55, 59]) {
+      vor(sekunde * 1000 - (jetzt - 1_000_000))
+      element.advanceTo(sekunde)
+      lautstaerken.push(element.volume)
+    }
+
+    expect(lautstaerken[0]).toBe(1)
+    expect(lautstaerken.at(-1)).toBeLessThan(1)
+    for (const lautstaerke of lautstaerken) expect(lautstaerke).toBeGreaterThan(0)
+  })
+
+  it('hält am Ende an, statt mitten im Satz abzubrechen', async () => {
+    await engine.play()
+    engine.setSleep({ kind: 'minutes', minutes: 1 })
+
+    vor(61_000)
+    element.advanceTo(61)
+
+    expect(engine.snapshot().playing).toBe(false)
+    expect(element.paused).toBe(true)
+    // Und ohne Nachwirkung: Beim nächsten Mal ist wieder volle Lautstärke da.
+    expect(element.volume).toBe(1)
+    expect(engine.snapshot().sleepMode).toBeNull()
+  })
+
+  it('bleibt beim Ausschalten in voller Lautstärke stehen', async () => {
+    await engine.play()
+    engine.setSleep({ kind: 'minutes', minutes: 1 })
+    vor(55_000)
+    element.advanceTo(55)
+
+    engine.setSleep(null)
+
+    expect(element.volume).toBe(1)
+    expect(engine.snapshot().sleepMode).toBeNull()
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('endet bei „bis Kapitelende" am Kapitelende', async () => {
+    await engine.play()
+    engine.setSleep({ kind: 'chapter' })
+
+    // Erstes Kapitel geht bis Sekunde 600.
+    element.advanceTo(400)
+    expect(engine.snapshot().sleepRemainingSec).toBe(200)
+
+    element.emitEnded()
+
+    expect(engine.snapshot().playing).toBe(false)
+    // Und ausdrücklich **nicht** weiter zum nächsten Kapitel.
+    expect(element.src).toContain('/audio/b_1/0')
+    expect(engine.snapshot().positionSec).toBe(600)
+  })
+
+  it('lässt ohne Timer den Kapitelwechsel unverändert laufen', async () => {
+    await engine.play()
+    element.emitEnded()
+
+    expect(element.src).toContain('/audio/b_1/1')
+  })
+})

@@ -168,6 +168,8 @@ export function makePlayerValue(
     finished: false,
     error: false,
     chapter: null,
+    sleepMode: null,
+    sleepRemainingSec: 0,
     playBook: vi.fn(),
     playFrom: vi.fn(),
     toggle: vi.fn(),
@@ -175,6 +177,7 @@ export function makePlayerValue(
     nextChapter: vi.fn(),
     previousChapter: vi.fn(),
     seekTo: vi.fn(),
+    setSleep: vi.fn(),
     stop: vi.fn(),
     ...overrides,
   }
