@@ -38,8 +38,11 @@ export function formatRemaining(seconds: number): string {
   const total = toSafeSeconds(seconds)
   if (total < 60) return 'gleich fertig'
 
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.round((total % 3600) / 60)
+  // Erst auf ganze Minuten runden, dann aufteilen. Andersherum entsteht in den
+  // letzten 30 Sekunden einer Stunde „1 Std 60 Min“.
+  const totalMinutes = Math.round(total / 60)
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
 
   if (hours === 0) return `noch ${minutes} Min`
   if (minutes === 0) return `noch ${hours} Std`

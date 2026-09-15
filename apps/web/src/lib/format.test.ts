@@ -58,6 +58,14 @@ describe('formatRemaining', () => {
     expect(formatRemaining(3900)).toBe('noch 1 Std 5 Min')
     expect(formatRemaining(7800)).toBe('noch 2 Std 10 Min')
   })
+
+  it('trägt gerundete Minuten in die Stunde weiter', () => {
+    // 7170 s = 1 Std 59,5 Min. Wird nur der Minutenrest gerundet, steht hier
+    // „noch 1 Std 60 Min“.
+    expect(formatRemaining(7170)).toBe('noch 2 Std')
+    expect(formatRemaining(3599)).toBe('noch 1 Std')
+    expect(formatRemaining(3570)).toBe('noch 1 Std')
+  })
 })
 
 describe('progressRatio', () => {
