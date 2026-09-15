@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Von Hand auslösbar. Gelegentlich legt GitHub für einen Pull Request keinen
+  # Lauf an – dann lässt er sich hier nachholen, statt einen leeren Commit zu
+  # schieben.
+  workflow_dispatch:
 
 # Ein laufender Check pro Branch reicht.
 concurrency:
