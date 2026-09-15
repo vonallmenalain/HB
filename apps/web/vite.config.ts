@@ -33,5 +33,25 @@ export default defineConfig({
   build: {
     target: 'es2022',
     sourcemap: true,
+    rollupOptions: {
+      output: {
+        // Firebase und React getrennt halten. Der Service Worker legt jede
+        // Datei einzeln in den Precache – ändert sich nur App-Code, muss das
+        // Gerät nicht das gesamte Firebase-Paket erneut laden.
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return undefined
+          if (id.includes('/@firebase/') || id.includes('/firebase/')) return 'firebase'
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/react-router') ||
+            id.includes('/scheduler/')
+          ) {
+            return 'react'
+          }
+          return undefined
+        },
+      },
+    },
   },
 })

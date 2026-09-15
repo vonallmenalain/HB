@@ -140,7 +140,7 @@ users/{uid}/profiles/{profileId}
   ├─ name               : string        // "Emma"
   ├─ color              : string        // "#7c3aed"
   ├─ avatar             : string        // Emoji oder Icon-Key, z.B. "fox"
-  ├─ allowDownload      : boolean
+  ├─ allowDownload      : boolean       // Vorgabe false, nur im Elternmodus setzbar
   └─ createdAt          : timestamp
 
 users/{uid}/profiles/{profileId}/progress/{bookId}
@@ -162,25 +162,57 @@ komplett vorhanden.
 die 50 zuletzt geänderten) ≈ wenige Dutzend Reads. Bei 50 000 Reads/Tag im
 Gratis-Kontingent unkritisch.
 
+### Freigabeliste
+
+```
+allowlist/{uid}          // Inhalt beliebig, die Dokument-ID ist die Aussage
+```
+
+Der eigentliche Zugangsriegel. Mit aktivierter Google-Anmeldung kann sich jeder
+*anmelden* – Zugriff bekommt aber nur, wessen UID hier als Dokument steht. Die
+Kollektion ist ausschliesslich über die Firebase-Konsole pflegbar; die Regeln
+verbieten jedes Schreiben aus der App.
+
+Ein neues Konto freischalten:
+
+1. In der App anmelden. Es erscheint „Noch kein Zugriff" mit der UID.
+2. UID kopieren, in der Firebase-Konsole unter *Firestore → Daten* in der
+   Kollektion `allowlist` ein Dokument mit dieser ID anlegen (Inhalt egal,
+   z. B. `{ note: "Papa" }`).
+3. In der App auf „Nochmal prüfen" tippen.
+
 ### Sicherheitsregeln
 
+Die vollständigen Regeln liegen in [`firestore.rules`](../firestore.rules) im
+Projektstamm. Kurzfassung:
+
 ```js
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{uid} {
-      allow read, write: if request.auth != null && request.auth.uid == uid;
-      match /{document=**} {
-        allow read, write: if request.auth != null && request.auth.uid == uid;
-      }
-    }
-    // alles andere: verboten
+function isOwner(uid) {
+  return request.auth != null && request.auth.uid == uid;
+}
+function isAllowed() {
+  return request.auth != null
+      && exists(/databases/$(database)/documents/allowlist/$(request.auth.uid));
+}
+
+match /allowlist/{uid} {
+  allow get: if isOwner(uid);       // nur den eigenen Eintrag nachsehen
+  allow list, write: if false;      // Liste unlesbar, Pflege nur in der Konsole
+}
+
+match /users/{uid} {
+  allow read, write: if isOwner(uid) && isAllowed();
+  match /{document=**} {
+    allow read, write: if isOwner(uid) && isAllowed();
   }
 }
 ```
 
-> Diese Regeln liegen später in `firestore.rules`. Änderungen daran gehen laut
-> deiner Standardvorgabe **immer** als PR ohne Auto-Merge zu dir.
+Deployen mit `firebase deploy --only firestore:rules` (Konfiguration in
+`firebase.json` und `.firebaserc`).
+
+> Änderungen an diesen Regeln gehen laut deiner Standardvorgabe **immer** als PR
+> ohne Auto-Merge zu dir.
 
 ---
 
