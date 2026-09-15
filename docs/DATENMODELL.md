@@ -156,17 +156,41 @@ users/{uid}/profiles/{profileId}/progress/{bookId}
   ├─ filesHash          : string        // gültig nur, wenn Katalog übereinstimmt
   ├─ durationSec        : number        // Snapshot, für Prozentanzeige offline
   ├─ finished           : boolean
-  ├─ updatedAt          : timestamp     // serverTimestamp() – entscheidet Konflikte
+  ├─ updatedAt          : string        // ISO-8601 (UTC) – entscheidet Konflikte
   └─ deviceId           : string        // nur zur Diagnose
 ```
+
+Die Buch-Kennung steht **nur** im Dokumentnamen, nicht noch einmal im Dokument.
+
+**`updatedAt` ist die Gerätezeit, nicht `serverTimestamp()`.** Der Grund steht in
+KONZEPT §7.3: Ein Gerät, das eine Woche offline war, schiebt seine gepufferten
+Schreibvorgänge später hinaus – nach Server-Ankunft wären das die „neuesten",
+obwohl dort niemand zugehört hat. Praktisch kommt dazu, dass `serverTimestamp()`
+beim Schreiben noch gar nicht bekannt ist: Offline stünde dort `null`, und genau
+offline muss der Fortschritt zuverlässig sein.
+
+Gelesen wird der Zeitstempel misstrauisch und auf eine einheitliche Schreibweise
+normalisiert (`parseRemoteProgress`) – verglichen wird als Zeichenkette, und das
+geht nur auf, wenn alle Zeitstempel gleich geschrieben sind. Ein Dokument ohne
+lesbaren Zeitstempel wird übersprungen; der lokale Stand bleibt dann stehen.
 
 **Datenmenge:** Ein Progress-Dokument ist ~200 Byte. Bei 200 Büchern × 3 Profilen
 sind das unter 150 KB – weit unter jeder Firestore-Grenze, und im Offline-Cache
 komplett vorhanden.
 
-**Lesevorgänge pro App-Start:** 1 Profil-Query + 1 Progress-Query (limitiert auf
-die 50 zuletzt geänderten) ≈ wenige Dutzend Reads. Bei 50 000 Reads/Tag im
-Gratis-Kontingent unkritisch.
+**Lesevorgänge pro App-Start:** 1 Profil-Query + 1 Progress-Query über die
+Bücher des aktiven Profils ≈ wenige Dutzend Reads. Bewusst **ohne** `limit()`:
+Wer nur die letzten 50 Einträge liest, weiss bei den übrigen nicht, ob sie in
+der Cloud fehlen oder nur nicht abgefragt wurden – und würde sie bei jedem Start
+erneut hochschieben. Dank `persistentLocalCache` liefern Folgestarts ohnehin nur
+noch die geänderten Dokumente nach. Bei 50 000 Reads/Tag im Gratis-Kontingent
+unkritisch.
+
+**Sicherheitsregeln:** Der Fortschritt liegt unter `users/{uid}/…` und ist damit
+von der bestehenden Regel abgedeckt – gelesen und geschrieben wird er nur vom
+eigenen, freigeschalteten Konto. Eine Feldprüfung (etwa „`updatedAt` darf nicht
+zurücklaufen") gibt es bewusst nicht: Sie würde die Selbstreparatur oben
+verhindern, und schützen müsste sie ein Konto vor sich selbst.
 
 ### Freigabeliste
 
@@ -227,11 +251,18 @@ Deployen mit `firebase deploy --only firestore:rules` (Konfiguration in
 | Speicher | Inhalt | Warum dort |
 |---|---|---|
 | **IndexedDB** `catalog` | Gespiegelter Katalog + `generatedAt` | Bibliothek offline browsebar |
-| **IndexedDB** `progress` | Fortschritt pro (Profil, Buch), inkl. `dirty`-Flag | Überlebt alles, auch abgestürzte Tabs |
+| **IndexedDB** `progress` | Fortschritt pro (Profil, Buch) | Überlebt alles, auch abgestürzte Tabs |
 | **IndexedDB** `downloads` | Pro Buch: Status, pro Datei: `pending`/`done`/`failed`, Bytes | Fortsetzbare Downloads |
 | **Cache Storage** `hb-media-v1` | Die Audiodateien, Schlüssel = kanonische URL **ohne** `?t=` | Für grosse Responses gebaut |
 | **Cache Storage** `hb-app-v1` | App-Shell (Workbox-Precache) | Sofortstart, offline |
-| **localStorage** | Zuletzt gewähltes Profil, UI-Kleinkram | Synchron lesbar beim Start, spart einen Frame |
+| **localStorage** | Zuletzt gewähltes Profil, Gerätekennung (`hb.device`), UI-Kleinkram | Synchron lesbar beim Start, spart einen Frame |
+
+Ein `dirty`-Flag war dafür einmal vorgesehen und ist entfallen: Firestore puffert
+noch nicht gesendete Schreibvorgänge selbst und schickt sie nach, sobald wieder
+Netz da ist. Ein zweites Verzeichnis derselben Information hätte nur eine weitere
+Stelle geschaffen, an der etwas auseinanderlaufen kann. Was die Cloud verpasst
+hat, fällt beim nächsten Abgleich ohnehin auf – dort wird verglichen, nicht
+geglaubt.
 
 **Cache-Schlüssel ohne Ticket** – das ist der entscheidende Kniff:
 

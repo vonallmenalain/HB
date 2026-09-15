@@ -14,6 +14,7 @@ import {
 import { useUser } from '@/features/auth/authContext'
 import { readFirebaseConfig } from '@/lib/env'
 import { getFirebase } from '@/lib/firebase'
+import { deleteProgressFor } from '@/lib/db'
 import { readLocal, removeLocal, writeLocal } from '@/lib/localStore'
 
 import { type Profile, parseProfile, sortProfiles } from './profile'
@@ -119,6 +120,11 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       }
 
       await deleteDoc(doc(db, 'users', user.uid, 'profiles', id))
+
+      // Der lokale Spiegel gehört genauso weg. Sonst stünde der Fortschritt
+      // eines gelöschten Profils auf diesem Gerät weiter in IndexedDB – und
+      // käme beim nächsten Profil mit derselben Kennung wieder hervor.
+      await deleteProgressFor(id)
       if (selectedId === id) clearSelection()
     },
     [db, user.uid, selectedId, clearSelection],

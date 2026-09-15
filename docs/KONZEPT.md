@@ -312,14 +312,21 @@ Das ist das Herzstück. Entsprechend redundant ausgelegt.
 | Wann | Wohin |
 |---|---|
 | alle 5 Sekunden während der Wiedergabe | IndexedDB (lokal) |
-| bei Pause, Kapitelwechsel, Buchwechsel | IndexedDB **und** Firestore |
-| bei `visibilitychange` (App in den Hintergrund) | IndexedDB **und** Firestore |
-| bei `pagehide` / `freeze` | IndexedDB (synchron, letzte Rettung) |
-| alle 30 Sekunden, wenn online | Firestore |
+| bei Pause, Kapitelwechsel, Buchwechsel | IndexedDB, Firestore gedrosselt |
+| bei `visibilitychange` (App in den Hintergrund) | IndexedDB **und** Firestore sofort |
+| bei `pagehide` / `freeze` | IndexedDB **und** Firestore sofort |
+| höchstens alle 30 Sekunden pro Buch | Firestore |
 
 Lokal wird **immer zuerst** geschrieben. Firestore hat Offline-Persistenz
 aktiviert (`persistentLocalCache`), gepufferte Schreibvorgänge gehen automatisch
-raus, sobald wieder Netz da ist. Kein eigener Sync-Code nötig.
+raus, sobald wieder Netz da ist.
+
+Die Drosselung sitzt vor Firestore, nicht vor IndexedDB: Lokal zu schreiben
+kostet nichts, ein Cloud-Schreibvorgang wird gezählt – und für „weiterhören auf
+dem anderen Gerät" reicht eine Stelle, die dreissig Sekunden alt ist, vollkommen
+aus. Jedes Buch hat dabei seinen eigenen Takt, damit ein Buchwechsel nicht
+warten muss. Wartet beim Wegwischen der App noch ein Stand, geht er sofort
+hinaus statt am Ende der Drosselung.
 
 ### 7.2 Position robust ablegen
 
@@ -338,10 +345,32 @@ Wiedereinsteigen und ist der Standard, den alle guten Hörbuch-Apps haben.
 
 ### 7.3 Konflikte zwischen Geräten
 
-Letzter Schreibvorgang gewinnt (`updatedAt`, Server-Zeitstempel). Bewusst
-einfach und vorhersehbar. Falls sich das im Alltag als störend erweist
-(Geschwister hören dasselbe Buch auf zwei Geräten), ist die Lösung nicht
-kompliziertere Logik, sondern **getrennte Kinderprofile** – dafür sind sie da.
+**Der jüngere Stand gewinnt** – nicht der zuletzt beim Server eingetroffene.
+Entschieden wird über `updatedAt`, den Zeitstempel des Geräts, das zugehört hat.
+
+Das ist die eine Stelle, an der die ursprüngliche Skizze („Server-Zeitstempel")
+nicht trägt, und der Grund liegt in der Offline-Fähigkeit: Ein Tablet, das eine
+Woche im Flugmodus lag, schiebt beim nächsten Einschalten seine gepufferten
+Schreibvorgänge hinaus. Nach Server-Ankunft wären das die „neuesten", obwohl
+dort seit einer Woche niemand zugehört hat – die Stelle auf dem Handy würde
+zurückgesetzt. Der Preis dafür ist eine Abhängigkeit von der Gerätezeit; bei
+Android-Geräten mit Netzzeit ist das unkritisch.
+
+Weil Firestore selbst nicht zusammenführt, sondern überschreibt, kann ein solcher
+Nachzügler das Dokument trotzdem kurzzeitig auf den alten Stand setzen. Dagegen
+hilft ein zweiter Schritt: Sieht ein Gerät beim Abgleich, dass die Cloud hinter
+seinem eigenen Stand zurückliegt, legt es ihn wieder hin. **Der Abgleich
+repariert sich damit von selbst**, sobald ein Gerät mit dem jüngeren Stand
+online ist.
+
+Bleibt der eigentliche Fall: Geschwister hören dasselbe Buch auf zwei Geräten.
+Die Lösung ist dort nicht kompliziertere Logik, sondern **getrennte
+Kinderprofile** – dafür sind sie da.
+
+Wichtig bleibt in allen Fällen die Reihenfolge: **lokal ist die Wahrheit, die
+Cloud ist die Ergänzung.** Ohne Netz, ohne Freigabe oder ohne Firebase läuft die
+App unverändert weiter; der Abgleich ist das Einzige, was dann fehlt. Im
+Elternbereich steht, was er gerade tut – für das Kind bleibt er unsichtbar.
 
 ### 7.4 „Fertig gehört"
 
@@ -546,7 +575,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M3** | NAS-Dienst `hb-media` (Docker) + ID3-Scanner + Tunnel, `/library`, `/cover`, `/audio` | Katalog und Audio sind authentifiziert abrufbar ✅ (Code fertig; Deployen aufs NAS steht aus) |
 | **M4** | Bibliothek und Buchseite im Kinderdesign | Bücher sind sichtbar und auswählbar ✅ |
 | **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
-| **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät |
+| **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät ✅ |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich |
 | **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |
 

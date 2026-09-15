@@ -15,20 +15,32 @@
  * Mit `?media=http://localhost:8099&ticket=…` läuft sie stattdessen gegen einen
  * echten Medien-Dienst: Katalog, Cover und Ton kommen dann von dort. Nur die
  * Anmeldung bleibt überbrückt – so lässt sich der Player mit echtem Audio
- * prüfen. Nicht Teil des Produktionsbuilds.
+ * prüfen.
+ *
+ * Mit `?sync=1` tritt an die Stelle von Firestore eine Cloud aus localStorage.
+ * Zwei offene Tabs sind dann zwei Geräte: Was im einen läuft, erscheint im
+ * anderen.
+ *
+ * Die Anmeldung wird durch einen festen Kontext ersetzt – sonst liesse sich der
+ * Elternbereich hier gar nicht öffnen. Nicht Teil des Produktionsbuilds.
  */
 import { StrictMode, useEffect, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import type { User } from 'firebase/auth'
 import { MemoryRouter } from 'react-router-dom'
 
 import { AppRoutes } from './app/AppRoutes'
+import { AuthContext, type AuthContextValue } from './features/auth/authContext'
 import type { Book } from './features/library/catalog'
 import { parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
 import { createMediaClient } from './features/library/mediaClient'
 import { NowPlayingBar } from './features/player/NowPlayingBar'
 import { PlayerProvider } from './features/player/PlayerProvider'
-import { ProgressProvider } from './features/progress/ProgressProvider'
+import type { ProgressCloud } from './features/progress/cloud'
+import type { Progress } from './features/progress/progress'
+import { ProgressStore } from './features/progress/ProgressProvider'
+import { parseRemoteProgress, toRemoteDoc } from './features/progress/sync'
 import { ProfilesContext, type ProfilesContextValue } from './features/profiles/profilesContext'
 import './index.css'
 
@@ -36,6 +48,83 @@ const params = new URLSearchParams(window.location.search)
 const route = params.get('route') ?? '/'
 const mediaBase = params.get('media')
 const ticket = params.get('ticket')
+const syncDemo = params.get('sync') === '1'
+
+/**
+ * Ein angemeldetes Konto, das es nicht gibt.
+ *
+ * Der Elternbereich fragt nach der Anmeldung – ohne diesen Zustand liesse er
+ * sich in der Vorschau gar nicht öffnen. Gestellt wird nur der Kontext, nicht
+ * der `AuthProvider`: Es wird nichts an Firebase geschickt.
+ */
+const auth: AuthContextValue = {
+  state: {
+    status: 'ready',
+    user: { uid: 'uid-vorschau', email: 'vorschau@example.com' } as User,
+  },
+  actions: {
+    signInWithPassword: () => Promise.resolve(),
+    signInWithGoogle: () => Promise.resolve(),
+    sendLoginLink: () => Promise.resolve(),
+    signOut: () => Promise.resolve(),
+    recheckAccess: () => Promise.resolve(),
+  },
+  linkError: null,
+  clearLinkError: () => undefined,
+}
+
+/**
+ * Firestore-Ersatz aus localStorage – nur für die Vorschau.
+ *
+ * Reicht, weil `ProgressStore` von Firestore ohnehin nur zwei Dinge braucht:
+ * einen Strom von Ständen und eine Stelle zum Hinschreiben. Zwei Tabs teilen
+ * sich denselben Speicher und benachrichtigen sich über das `storage`-Ereignis
+ * – damit läuft der Abgleich im echten Browser, samt Zusammenführen und
+ * Reparatur, ohne dass ein Firebase-Konto nötig wäre.
+ */
+function localStorageCloud(profileId: string): ProgressCloud {
+  const key = `hb.harness.cloud.${profileId}`
+
+  const read = (): ReadonlyMap<string, Progress> => {
+    const entries = new Map<string, Progress>()
+    try {
+      const raw: unknown = JSON.parse(window.localStorage.getItem(key) ?? '{}')
+      if (typeof raw !== 'object' || raw === null) return entries
+      for (const [bookId, data] of Object.entries(raw)) {
+        const entry = parseRemoteProgress(bookId, data)
+        if (entry !== null) entries.set(bookId, entry)
+      }
+    } catch {
+      // Kaputter Speicher: wie eine leere Cloud behandeln.
+    }
+    return entries
+  }
+
+  return {
+    subscribe(onEntries) {
+      const push = (): void => {
+        onEntries(read(), true)
+      }
+      // Erst der eigene Stand, dann Änderungen aus dem anderen Tab.
+      const timer = setTimeout(push, 0)
+      window.addEventListener('storage', push)
+      return () => {
+        clearTimeout(timer)
+        window.removeEventListener('storage', push)
+      }
+    },
+    write(progress) {
+      const raw: unknown = JSON.parse(window.localStorage.getItem(key) ?? '{}')
+      const all = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {}
+      all[progress.bookId] = toRemoteDoc(progress, 'vorschau')
+      window.localStorage.setItem(key, JSON.stringify(all))
+      // `storage` feuert nur in *anderen* Tabs; im eigenen muss der Stand
+      // selbst zurückkommen, damit sich das Zusammenführen so verhält wie bei
+      // Firestore.
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+    },
+  }
+}
 
 const cover = (hue: number) =>
   `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -165,16 +254,20 @@ function Harness() {
 
   return (
     <MemoryRouter initialEntries={[route]}>
-      <ProfilesContext value={profiles}>
-        <LibraryContext value={library}>
-          <ProgressProvider>
-            <PlayerProvider>
-              <AppRoutes />
-              <NowPlayingBar />
-            </PlayerProvider>
-          </ProgressProvider>
-        </LibraryContext>
-      </ProfilesContext>
+      <AuthContext value={auth}>
+        <ProfilesContext value={profiles}>
+          <LibraryContext value={library}>
+            {/* Ohne `?sync=1` gibt es keine Cloud-Seite – der Fortschritt läuft
+                dann rein lokal, genau wie in der App bei fehlendem Netz. */}
+            <ProgressStore cloudFor={syncDemo ? localStorageCloud : undefined}>
+              <PlayerProvider>
+                <AppRoutes />
+                <NowPlayingBar />
+              </PlayerProvider>
+            </ProgressStore>
+          </LibraryContext>
+        </ProfilesContext>
+      </AuthContext>
     </MemoryRouter>
   )
 }
