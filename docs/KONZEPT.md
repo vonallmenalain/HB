@@ -224,6 +224,12 @@ Anfangsbuchstaben – nie ein leeres graues Rechteck.
 versehentlichen Wischen ihre Stelle – genau das, was diese App verhindern soll.
 Springen geht über Kapitel und ±30 s. Freies Spulen schaltet der Elternmodus frei.
 
+**Warum zwei Bedienzeilen statt einer:** Fünf Knöpfe nebeneinander brauchen
+368 px, plus die oben geforderten 16 px Abstand zwischen tappbaren Elementen
+sind das 432 px – mehr, als ein Handy im Hochformat hergibt. Statt die
+Mindestgrössen zu unterschreiten, liegt die Kapitelnavigation in einer eigenen
+Zeile und zeigt dort nebenbei, in welchem Kapitel man gerade ist.
+
 ### 5.5 Design-Regeln (verbindlich)
 
 | Regel | Wert |
@@ -539,7 +545,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M2** | Firebase Auth, dauerhafte Session, Profilwahl, geschützte Routen | Login funktioniert, Kind wählt Avatar ✅ |
 | **M3** | NAS-Dienst `hb-media` (Docker) + ID3-Scanner + Tunnel, `/library`, `/cover`, `/audio` | Katalog und Audio sind authentifiziert abrufbar ✅ (Code fertig; Deployen aufs NAS steht aus) |
 | **M4** | Bibliothek und Buchseite im Kinderdesign | Bücher sind sichtbar und auswählbar ✅ |
-| **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** |
+| **M5** | Player, Media Session, Hintergrundwiedergabe, lokale Fortschrittsspeicherung | **Die App ist benutzbar** ✅ |
 | **M6** | Firestore-Sync des Fortschritts über Geräte | Weiterhören auf jedem Gerät |
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich |
 | **M8** | Sleep-Timer, Elternmodus mit PIN, Feinschliff, Barrierefreiheit | Fertig für den Alltag |

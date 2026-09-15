@@ -6,7 +6,14 @@ import { describe, expect, it } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
 import { LibraryContext } from '@/features/library/libraryContext'
-import { makeLibraryValue, makeProfile } from '@/test/renderWithProfiles'
+import { PlayerContext } from '@/features/player/playerContext'
+import { ProgressContext } from '@/features/progress/progressContext'
+import {
+  makeLibraryValue,
+  makePlayerValue,
+  makeProfile,
+  makeProgressValue,
+} from '@/test/renderWithProfiles'
 
 import { ProfilesContext, type ProfilesContextValue } from './profilesContext'
 
@@ -36,7 +43,11 @@ function StatefulProfiles({ children }: { children: React.ReactNode }) {
 
   return (
     <ProfilesContext value={value}>
-      <LibraryContext value={makeLibraryValue()}>{children}</LibraryContext>
+      <LibraryContext value={makeLibraryValue()}>
+        <ProgressContext value={makeProgressValue()}>
+          <PlayerContext value={makePlayerValue()}>{children}</PlayerContext>
+        </ProgressContext>
+      </LibraryContext>
     </ProfilesContext>
   )
 }

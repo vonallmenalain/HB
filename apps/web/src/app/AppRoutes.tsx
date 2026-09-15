@@ -8,6 +8,7 @@ import { BookScreen } from '@/routes/BookScreen'
 import { HomeScreen } from '@/routes/HomeScreen'
 import { LibraryScreen } from '@/routes/LibraryScreen'
 import { NotFoundScreen } from '@/routes/NotFoundScreen'
+import { PlayerScreen } from '@/routes/PlayerScreen'
 import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
 
@@ -53,6 +54,14 @@ export function AppRoutes() {
         element={
           <RequireProfile>
             <BookScreen />
+          </RequireProfile>
+        }
+      />
+      <Route
+        path="/player/:bookId"
+        element={
+          <RequireProfile>
+            <PlayerScreen />
           </RequireProfile>
         }
       />

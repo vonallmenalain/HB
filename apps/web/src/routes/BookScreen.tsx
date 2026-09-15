@@ -1,22 +1,24 @@
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useLibrary } from '@/features/library/libraryContext'
-import { formatTime } from '@/lib/format'
-import { BigLinkButton } from '@/ui/BigButton'
+import { usePlayer } from '@/features/player/playerContext'
+import { progressRatio, resolveResume } from '@/features/progress/progress'
+import { useProgress } from '@/features/progress/progressContext'
+import { formatRemaining, formatTime } from '@/lib/format'
+import { BigButton, BigLinkButton } from '@/ui/BigButton'
+import { ProgressBar } from '@/ui/ProgressBar'
 import { BookCover } from '@/ui/BookCover'
 import { EmptyState } from '@/ui/EmptyState'
 import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
 
-/**
- * Buchseite: Cover, Titel, Kapitelliste.
- *
- * Der Abspiel-Knopf kommt mit M5; bis dahin zeigt die Seite, was der Katalog
- * hergibt, damit sich die Daten vom NAS überhaupt prüfen lassen.
- */
+/** Buchseite: Cover, Titel, Abspiel-Knopf, Kapitelliste. */
 export function BookScreen() {
   const { bookId = '' } = useParams()
   const { status, bookById, client } = useLibrary()
+  const { get: getProgress } = useProgress()
+  const player = usePlayer()
+  const navigate = useNavigate()
 
   if (status === 'loading') {
     return (
@@ -75,20 +77,57 @@ export function BookScreen() {
         </p>
       </div>
 
+      {(() => {
+        const progress = getProgress(book.id)
+        const angefangen = progress !== null && !progress.finished && progress.positionSec > 0
+        return (
+          <div className="flex flex-col gap-3 pb-8">
+            <BigButton
+              onClick={() => {
+                player.playBook(book)
+                void navigate(`/player/${book.id}`)
+              }}
+            >
+              {angefangen ? 'Weiterhören' : 'Abspielen'}
+            </BigButton>
+
+            {angefangen ? (
+              <div className="flex flex-col gap-2">
+                <ProgressBar
+                  ratio={progressRatio(progress)}
+                  label={`Fortschritt in ${book.title}`}
+                />
+                <p className="text-center text-ink-soft">
+                  {formatRemaining(
+                    Math.max(0, book.durationSec - resolveResume(book, progress).positionSec),
+                  )}
+                </p>
+              </div>
+            ) : null}
+          </div>
+        )
+      })()}
+
       <h2 className="pb-3 text-xl font-bold">Kapitel</h2>
       <ol className="flex flex-col gap-2 pb-6">
         {book.chapters.map((chapter) => (
-          <li
-            key={chapter.idx}
-            className="flex min-h-touch items-center gap-4 rounded-tile bg-surface px-4"
-          >
-            <span className="w-8 shrink-0 text-center text-lg font-semibold text-ink-soft">
-              {chapter.idx + 1}
-            </span>
-            <span className="flex-1">{chapter.title}</span>
-            <span className="shrink-0 tabular-nums text-ink-soft">
-              {formatTime(chapter.endSec - chapter.startSec)}
-            </span>
+          <li key={chapter.idx}>
+            <button
+              type="button"
+              onClick={() => {
+                player.playFrom(book, chapter.startSec)
+                void navigate(`/player/${book.id}`)
+              }}
+              className="flex min-h-touch w-full items-center gap-4 rounded-tile bg-surface px-4 text-left transition-transform active:scale-[0.99] focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              <span className="w-8 shrink-0 text-center text-lg font-semibold text-ink-soft">
+                {chapter.idx + 1}
+              </span>
+              <span className="flex-1">{chapter.title}</span>
+              <span className="shrink-0 tabular-nums text-ink-soft">
+                {formatTime(chapter.endSec - chapter.startSec)}
+              </span>
+            </button>
           </li>
         ))}
       </ol>

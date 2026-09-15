@@ -4,9 +4,11 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** M4 steht – Medien-Dienst, Katalog-Anbindung und Bibliothek sind
-> fertig. Was noch fehlt: den Dienst aufs NAS deployen (siehe
-> [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)) und der Player (M5).
+> **Status:** M5 steht – die App ist benutzbar. Wiedergabe mit
+> Hintergrundbetrieb, Kapitelwechsel, Sperrbildschirm-Steuerung und
+> punktgenauem Weiterhören funktionieren. Was noch fehlt: den Medien-Dienst
+> aufs NAS deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)),
+> Geräte-Abgleich (M6), Offline-Downloads (M7) und der Feinschliff (M8).
 
 ## Was die App können soll
 
@@ -53,7 +55,7 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M2 | Firebase Auth + Kinderprofile | ✅ |
 | M3 | NAS-Dienst `hb-media` + Scanner + Tunnel | ✅ |
 | M4 | Bibliothek im Kinderdesign | ✅ |
-| M5 | Player, Hintergrundwiedergabe, Fortschritt | offen |
+| M5 | Player, Hintergrundwiedergabe, Fortschritt | ✅ |
 | M6 | Geräte-Sync über Firestore | offen |
 | M7 | Offline-Downloads | offen |
 | M8 | Sleep-Timer, Elternmodus, Feinschliff | offen |
@@ -109,6 +111,8 @@ apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/app/           Router, Anmelde-Weiche, App-Hülle
   src/features/auth/ Anmeldung, Freigabeliste
   src/features/library/   Katalog, Medien-Client, Bibliothek
+  src/features/player/    Audio-Engine, Media Session, Player-Zustand
+  src/features/progress/  Hörfortschritt
   src/features/profiles/  Kinderprofile
   src/routes/        Bildschirme
   src/ui/            Design-System-Bausteine
@@ -128,6 +132,21 @@ firestore.rules      Sicherheitsregeln der Datenbank
 `npm run dev`, dann `http://localhost:5173/harness.html?route=/bibliothek`.
 Die Vorschau rendert jeden Bildschirm mit Beispieldaten – ohne Firebase-Konto
 und ohne laufendes NAS. Sie ist nicht Teil des Produktionsbuilds.
+
+Mit einem laufenden Medien-Dienst geht auch echtes Audio, weiterhin ohne
+Anmeldung:
+
+```
+/harness.html?route=/bibliothek&media=http://localhost:8080&ticket=<ticket>
+```
+
+Ein Ticket dafür erzeugt man mit demselben `HB_TICKET_SECRET` wie der Dienst:
+
+```bash
+node --input-type=module -e "
+import { issueTicket } from './services/media/dist/auth/ticket.js'
+process.stdout.write((await issueTicket(process.env.HB_TICKET_SECRET, 'test', 3600)).ticket)"
+```
 
 Der Service Worker läuft im Entwicklungsmodus bewusst **nicht** mit – sonst
 bekommt man beim Entwickeln veraltete Dateien ausgeliefert. Zum Testen der

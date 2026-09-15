@@ -8,6 +8,12 @@ import {
   LibraryContext,
   type LibraryContextValue,
 } from '@/features/library/libraryContext'
+import { PlayerContext, type PlayerContextValue } from '@/features/player/playerContext'
+import type { Progress } from '@/features/progress/progress'
+import {
+  ProgressContext,
+  type ProgressContextValue,
+} from '@/features/progress/progressContext'
 import type { Profile } from '@/features/profiles/profile'
 import {
   ProfilesContext,
@@ -79,19 +85,82 @@ export function makeLibraryValue(
   }
 }
 
+export function makeProgressEntry(overrides: Partial<Progress> = {}): Progress {
+  return {
+    bookId: 'b_1',
+    positionSec: 300,
+    fileIdx: 0,
+    offsetSec: 300,
+    filesHash: 'abc',
+    durationSec: 600,
+    finished: false,
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  }
+}
+
+export function makeProgressValue(
+  overrides: Partial<ProgressContextValue> = {},
+): ProgressContextValue {
+  const entries = overrides.entries ?? new Map<string, Progress>()
+  return {
+    entries,
+    loading: false,
+    get: (bookId: string) => entries.get(bookId) ?? null,
+    save: vi.fn(),
+    reset: vi.fn(),
+    ...overrides,
+  }
+}
+
+export function makePlayerValue(
+  overrides: Partial<PlayerContextValue> = {},
+): PlayerContextValue {
+  return {
+    book: null,
+    positionSec: 0,
+    durationSec: 0,
+    playing: false,
+    loading: false,
+    finished: false,
+    error: false,
+    chapter: null,
+    playBook: vi.fn(),
+    playFrom: vi.fn(),
+    toggle: vi.fn(),
+    skip: vi.fn(),
+    nextChapter: vi.fn(),
+    previousChapter: vi.fn(),
+    seekTo: vi.fn(),
+    stop: vi.fn(),
+    ...overrides,
+  }
+}
+
 export function renderWithProfiles(
   ui: ReactElement,
   value: ProfilesContextValue,
   {
     route = '/',
     library = makeLibraryValue(),
-  }: { route?: string; library?: LibraryContextValue } = {},
+    progress = makeProgressValue(),
+    player = makePlayerValue(),
+  }: {
+    route?: string
+    library?: LibraryContextValue
+    progress?: ProgressContextValue
+    player?: PlayerContextValue
+  } = {},
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
       <MemoryRouter initialEntries={[route]}>
         <ProfilesContext value={value}>
-          <LibraryContext value={library}>{children}</LibraryContext>
+          <LibraryContext value={library}>
+            <ProgressContext value={progress}>
+              <PlayerContext value={player}>{children}</PlayerContext>
+            </ProgressContext>
+          </LibraryContext>
         </ProfilesContext>
       </MemoryRouter>
     )
