@@ -1,0 +1,26 @@
+{
+  "name": "hb",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Hörbuch-PWA für Kinder",
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "services/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "npm run dev -w @hb/web",
+    "build": "npm run build -w @hb/web",
+    "preview": "npm run preview -w @hb/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "icons": "node tools/generate-icons.mjs"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.4"
+  }
+}
