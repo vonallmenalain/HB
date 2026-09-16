@@ -1,4 +1,4 @@
-import { Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/features/auth/authContext'
 import { useParents } from '@/features/parents/parentsContext'
@@ -15,9 +15,15 @@ import { useProfiles } from './profilesContext'
  * Das eigene Bild ändern – und der sichtbare Weg zu allem anderen.
  *
  * Tier und Farbe gehören dem Kind: Es darf sie jederzeit wechseln. Darunter
- * liegen die Türen für die Erwachsenen. Der Elternbereich war bis M9 nur über
+ * liegt die Tür für die Erwachsenen. Der Elternbereich war bis M9 nur über
  * zwei Sekunden Druck auf den Titel zu erreichen – ein Eingang, den niemand
  * findet, der ihn nicht kennt. Jetzt steht er hier, hinter der PIN.
+ *
+ * Bewusst klein und grau: Für ein Kind ist das keine Wahl, die es hat, sondern
+ * eine Tür, die es nicht aufbekommt. Als grosser Knopf lud sie zum Antippen
+ * ein und verstellte den Weg zurück zu den Hörbüchern. Und „Anderes Kind"
+ * steht nur da, wenn dieses Profil wechseln darf – sonst wäre der Knopf ein
+ * Versprechen, das die Weiche gleich danach bricht.
  */
 export function EditProfileScreen() {
   const { loading, selected, update, clearSelection } = useProfiles()
@@ -89,20 +95,20 @@ export function EditProfileScreen() {
 
       <div className="flex flex-col gap-3">
         <BigLinkButton to="/">Fertig</BigLinkButton>
-        <BigButton
-          variant="secondary"
-          onClick={() => {
-            clearSelection()
-            void navigate('/profil')
-          }}
-        >
-          Anderes Kind
-        </BigButton>
+        {selected.maySwitchProfile ? (
+          <BigButton
+            variant="secondary"
+            onClick={() => {
+              clearSelection()
+              void navigate('/profil')
+            }}
+          >
+            Anderes Kind
+          </BigButton>
+        ) : null}
       </div>
 
       <section className="flex flex-col gap-3 pt-10">
-        <h2 className="text-xl font-bold text-ink-soft">Für Erwachsene</h2>
-
         {hasPin ? null : (
           <Notice>
             Noch keine PIN gesetzt – der Elternbereich steht damit jedem offen,
@@ -110,15 +116,23 @@ export function EditProfileScreen() {
           </Notice>
         )}
 
-        <BigLinkButton to="/eltern" variant="secondary">
-          {hasPin ? '🔒 Elternbereich' : 'Elternbereich'}
-        </BigLinkButton>
+        <div className="flex flex-wrap items-center justify-center gap-4">
+          <Link
+            to="/eltern"
+            className="min-h-touch rounded-tile px-2 py-3 text-ink-soft underline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            {hasPin ? '🔒 Für Erwachsene' : 'Für Erwachsene'}
+          </Link>
 
-        {isAdmin ? (
-          <BigLinkButton to="/admin" variant="secondary">
-            {hasPin ? '🔒 Adminbereich' : 'Adminbereich'}
-          </BigLinkButton>
-        ) : null}
+          {isAdmin ? (
+            <Link
+              to="/admin"
+              className="min-h-touch rounded-tile px-2 py-3 text-ink-soft underline focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+            >
+              {hasPin ? '🔒 Adminbereich' : 'Adminbereich'}
+            </Link>
+          ) : null}
+        </div>
       </section>
     </Screen>
   )

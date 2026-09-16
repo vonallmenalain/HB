@@ -49,7 +49,9 @@ function rescanMessage(state: RescanState): string | null {
  * nicht neu gelesen.
  */
 export function LibrarySection() {
-  const { status, books, error, fromCache, skipped, schemaVersion, refresh, client } =
+  // Der ganze Katalog: Die Zahl hier soll sagen, was auf dem NAS liegt – nicht,
+  // was das gerade gewählte Kind davon sehen darf.
+  const { status, allBooks: books, error, fromCache, skipped, schemaVersion, refresh, client } =
     useLibrary()
   const { state: rescan, start: rescanStarten } = useRescan(client, refresh)
 

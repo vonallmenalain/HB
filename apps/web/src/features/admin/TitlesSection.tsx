@@ -27,7 +27,8 @@ function passt(book: Book, suche: string): boolean {
  * steht, gilt – auf jedem Gerät und für jedes Kind.
  */
 export function TitlesSection() {
-  const { books } = useLibrary()
+  // Der ganze Katalog: Hier wird umbenannt, auch was ein Kind nicht sieht.
+  const { allBooks: books } = useLibrary()
   const { titles, setTitle } = useTitles()
 
   const [suche, setSuche] = useState('')

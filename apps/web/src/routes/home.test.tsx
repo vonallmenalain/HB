@@ -78,10 +78,12 @@ describe('Startseite', () => {
 
   it('führt vom Profil in den Elternbereich', () => {
     // Der versteckte Eingang (zwei Sekunden auf den Titel) findet niemand, der
-    // ihn nicht kennt. Hinter der PIN darf er sichtbar sein.
+    // ihn nicht kennt. Hinter der PIN darf er sichtbar sein – als kleiner
+    // grauer Link, nicht als Knopf: Für ein Kind ist das keine Wahl, die es
+    // hat, sondern eine Tür, die es nicht aufbekommt.
     renderWithProfiles(<AppRoutes />, profiles(), { route: '/profil/bearbeiten' })
 
-    expect(screen.getByRole('link', { name: /Elternbereich/ })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: /Für Erwachsene/ })).toHaveAttribute(
       'href',
       '/eltern',
     )

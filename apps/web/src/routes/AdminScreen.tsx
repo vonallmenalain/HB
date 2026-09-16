@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { AccessSection } from '@/features/admin/AccessSection'
+import { AgesSection } from '@/features/admin/AgesSection'
 import { useAdmin } from '@/features/admin/adminContext'
 import { CoverSearchSection } from '@/features/admin/CoverSearchSection'
 import { CoversSection } from '@/features/admin/CoversSection'
@@ -36,6 +37,13 @@ const BEREICHE: Bereich[] = [
     hinweis: 'Namen richtigstellen, wo der Ordner danebenliegt',
     zeichen: '✎',
     inhalt: () => <TitlesSection />,
+  },
+  {
+    slug: 'alter',
+    name: 'Altersfreigabe',
+    hinweis: 'Ab wie vielen Jahren ein Hörbuch erscheint',
+    zeichen: '🔢',
+    inhalt: () => <AgesSection />,
   },
   {
     slug: 'cover',
@@ -81,12 +89,12 @@ function bereichAus(pathname: string): string {
  * gemeint ist, bekommt hier nichts zu sehen – durchgesetzt wird das in den
  * Firestore-Regeln, nicht von diesem Bildschirm.
  *
- * Sechs Abschnitte standen bisher untereinander auf einer Seite. Jeder bringt
+ * Die Abschnitte standen bisher untereinander auf einer Seite. Jeder bringt
  * seinen Erklärtext, sein Suchfeld und seine Liste mit – zusammen war das ein
  * Bildschirm, an dem man vorbeiscrollte, um den einen zu finden, den man
- * suchte. Jetzt steht vorn eine Übersicht mit sechs Kacheln, und jeder
- * Abschnitt hat eine eigene Adresse: Der Zurück-Knopf des Geräts führt damit
- * dorthin zurück, wo man herkam.
+ * suchte. Jetzt steht vorn eine Übersicht mit Kacheln, und jeder Abschnitt hat
+ * eine eigene Adresse: Der Zurück-Knopf des Geräts führt damit dorthin zurück,
+ * wo man herkam.
  */
 export function AdminScreen() {
   const { isAdmin, state } = useAuth()

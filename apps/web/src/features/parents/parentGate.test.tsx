@@ -78,6 +78,7 @@ async function tippen(pin: string): Promise<void> {
 describe('Schloss vor dem Elternbereich', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    window.localStorage.clear()
   })
 
   it('lässt ohne gesetzte PIN durch', async () => {
@@ -168,6 +169,55 @@ describe('Schloss vor dem Elternbereich', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Elternbereich')).toBeInTheDocument()
+    })
+  })
+
+  it('merkt die PIN auf diesem Gerät, wenn jemand es verlangt', async () => {
+    // Für das eigene Telefon: Dort ist die PIN eine Hürde ohne Zweck, denn wer
+    // das Telefon entsperrt hat, ist ohnehin schon drin.
+    const stored = await makeStoredPin('2739')
+    getDoc.mockResolvedValue({
+      data: () => ({ pinSalt: stored.salt, pinHash: stored.hash }),
+    })
+    const erste = zeigen()
+    await waitFor(() => {
+      expect(screen.getByText('PIN eingeben')).toBeInTheDocument()
+    })
+
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Auf diesem Gerät merken' }))
+    await tippen('2739')
+    await waitFor(() => {
+      expect(screen.getByText('Elternbereich')).toBeInTheDocument()
+    })
+    erste.unmount()
+
+    // Neu gestartet: Ohne das Gemerkte stünde hier wieder die Tastatur.
+    zeigen()
+    await waitFor(() => {
+      expect(screen.getByText('Elternbereich')).toBeInTheDocument()
+    })
+  })
+
+  it('verlangt die PIN beim nächsten Start, wenn niemand sie merken wollte', async () => {
+    // Das ist der Fall auf dem Kindertablett – dort ist die PIN der ganze Zweck.
+    const stored = await makeStoredPin('2739')
+    getDoc.mockResolvedValue({
+      data: () => ({ pinSalt: stored.salt, pinHash: stored.hash }),
+    })
+    const erste = zeigen()
+    await waitFor(() => {
+      expect(screen.getByText('PIN eingeben')).toBeInTheDocument()
+    })
+
+    await tippen('2739')
+    await waitFor(() => {
+      expect(screen.getByText('Elternbereich')).toBeInTheDocument()
+    })
+    erste.unmount()
+
+    zeigen()
+    await waitFor(() => {
+      expect(screen.getByText('PIN eingeben')).toBeInTheDocument()
     })
   })
 

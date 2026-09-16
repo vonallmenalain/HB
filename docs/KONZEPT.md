@@ -421,6 +421,23 @@ deshalb sagt die App deutlich, solange keine gesetzt ist.
 Enthält: Profile verwalten, Downloads verwalten/löschen, neue Hörbücher suchen,
 Diagnose (ist das NAS erreichbar?), PIN setzen, alles zurücksetzen, Abmelden.
 
+**Was jedes Kind darf, steht bei seinem Profil.** Vier Dinge, alle an derselben
+Stelle – wer sie sucht, sucht sie beim Kind und nicht in einem eigenen
+Abschnitt weiter unten:
+
+| | |
+|---|---|
+| **Alter** | Gegen die Altersfreigabe am Hörbuch (§5.8). Ohne Alter bleibt alles mit Freigabe verborgen: Wer eine Folge auf „ab 12" setzt, will sie vor den Kleinen verbergen und nicht erst noch bei jedem Profil eine Zahl nachtragen müssen. Freigeben heisst hier also: das Alter eintragen. |
+| **Einzelne Hörbücher sperren** | Für die Ausnahme, für die kein Alter etwas hergibt – eine Folge, die ausgerechnet diesem Kind Angst macht. |
+| **Darf herunterladen** | Wie bisher, Vorgabe aus (R8). |
+| **Darf das Profil wechseln** | Vorgabe **aus**. Auf dem Familientablett wird einmal ausgewählt, wer zuhört, und danach bleibt es dabei. Ein Kind, das zwischen den Profilen hin- und herspringt, verliert seine Stellen und findet fremde Bücher unter „Weiterhören". Der Weg zurück zur Auswahl steht im Elternbereich und liegt damit hinter der PIN. |
+
+**Der Kinderbereich zeigt davon nichts.** Kein „gesperrt"-Schild, keine graue
+Kachel, keine Meldung: Was nicht erlaubt ist, ist einfach nicht da. Ein Schild
+wäre eine Auskunft über etwas, das das Kind ohnehin nicht bekommt – und in einer
+App, die zwei Taps bis zum Ton verspricht, ist es genau die Ablenkung, die dort
+nicht hingehört.
+
 „Neue Hörbücher suchen" lässt bewusst das NAS seine Ordner lesen und wartet auf
 das Ergebnis, statt nur den Katalog neu zu holen. Der Unterschied ist der
 einzige, der hier zählt: Ein Ordner, der gerade erst aufs NAS kopiert wurde,
@@ -430,13 +447,14 @@ nicht.
 
 **Ein Stockwerk darüber liegt der Adminbereich.** Der Elternmodus ist für alle,
 die das Tablet verwalten; der Adminbereich für das eine Konto, das über Zugänge
-entscheidet – und darüber, wie die Sammlung aussieht. Er enthält fünf Dinge,
+entscheidet – und darüber, wie die Sammlung aussieht. Er enthält die Dinge,
 die es sonst nirgends gibt:
 
 | | |
 |---|---|
 | **Zugriffsanfragen** | Wer sich mit einer fremden Adresse anmeldet, erscheint hier mit Namen und Adresse. Ein Tap gibt frei. Vorher stand auf dem Sperrbildschirm eine UID zum Abschreiben, die von Hand in die Firebase-Konsole gehörte – der einzige Schritt der ganzen App, der einen Rechner verlangte. |
 | **Titel** | Was die Automatik aus §5.3 falsch aufräumt, lässt sich hier hinschreiben. Der Eintrag gilt für alle Geräte und alle Kinder. |
+| **Altersfreigabe** | „Ab wie vielen Jahren" – je Hörbuch, und auf einen Schlag für alles, was die Suche zeigt (§5.8). Die Freigabe gehört zum Buch und gilt für die ganze Familie; wem sie ein Buch wegnimmt, entscheidet das Alter beim Profil. |
 | **Cover** | Wo auf dem NAS kein Bild liegt, lässt sich hier eines hochladen. Für ein Kind, das noch nicht liest, ist das Cover der Name des Hörbuchs – eine farbige Buchstabenkachel ist der Notbehelf, nicht das Ziel. |
 | **Ordner** | Ein Ordner mit vielen Dateien ist entweder ein Hörbuch mit Kapiteln oder eine Sammlung ganzer Folgen. Hier wird umgestellt, welches von beidem (§6.4). |
 | **Gehört** | Wer hat was wie oft gehört – je Profil, mit den meistgehörten Folgen. Beantwortet die Frage, die sich zu Hause tatsächlich stellt („läuft eigentlich immer nur dieselbe Folge?"), ohne ein Protokoll über den Tag eines Kindes anzulegen: gezählt werden Starts und abgespielte Sekunden, sonst nichts. |
@@ -459,6 +477,15 @@ Wer nicht das Administratorkonto ist, sieht den Eingang gar nicht erst – und
 bekäme dort auch nichts zu lesen: Die Firestore-Regeln geben die Listen nur einer
 einzigen, im Deployment hinterlegten Adresse heraus (§9.1).
 
+**Auf dem eigenen Telefon lässt sich die PIN merken.** Beim Eingeben steht
+„Auf diesem Gerät merken" – dann geht der Elternbereich hier ohne Eingabe auf,
+bis ihn jemand darin wieder sperrt. Das ist der Unterschied zwischen dem eigenen
+Telefon und dem Kindertablett: Auf dem eigenen Gerät ist die PIN ein Hindernis
+ohne Zweck, denn wer das Telefon entsperrt hat, ist ohnehin schon drin; auf dem
+Tablett ist sie der ganze Zweck. Deshalb entscheidet das nicht eine Einstellung
+im Voraus für beide Geräte, sondern jedes Gerät für sich – und der Vermerk liegt
+in `localStorage`, nicht in Firestore.
+
 **Was die PIN ist und was nicht.** Sie hält ein Kind vom Elternbereich fern.
 Sie ist keine Sicherheitsgrenze: Wer das Gerät in der Hand hat, ist ohnehin
 angemeldet, und vier Ziffern sind zehntausend Möglichkeiten. Gespeichert wird
@@ -474,6 +501,40 @@ Hürde: Anmelden kann sich, wer das Konto kennt – ein Kind nicht.
 naheliegende Weg und der falsche: Die Seite verlöre ihre Hauptüberschrift. Für
 Tastatur und Vorleseprogramm steht daneben ein eigener Knopf, den nur sie zu
 sehen bekommen – ein Eingang, den nur der Finger kennt, wäre für sie keiner.
+
+### 5.8 Wer darf welches Hörbuch hören?
+
+Zwei Schrauben, und sie greifen unabhängig voneinander:
+
+**Die Altersfreigabe hängt am Hörbuch** und gilt für die ganze Familie. Sie
+steht im Adminbereich, weil sie zur Bibliothek gehört und nicht zu einem Gerät:
+„Der Feuerkelch ist ab 12" ist eine Aussage über das Buch. Gesetzt wird sie auf
+einer kurzen Leiter – 3, 6, 8, 10, 12, 14, 16 – und für eine ganze Reihe auf
+einen Schlag: Bei neunzig Folgen wäre neunzigmal dasselbe anzutippen keine
+Einstellung, sondern eine Strafe.
+
+**Die Sperre hängt am Profil** und gilt nur für dieses Kind. Sie ist für die
+Ausnahme, für die kein Alter etwas hergibt.
+
+Ein Hörbuch erscheint also, wenn es nicht für dieses Kind gesperrt ist **und**
+entweder keine Freigabe hat oder das eingetragene Alter mindestens so hoch ist.
+Ohne Alter beim Profil bleibt alles mit Freigabe verborgen – siehe §5.7.
+
+**Gefiltert wird an einer Stelle**, im `LibraryProvider`. Er gibt zwei Listen
+heraus: `books`, was dieses Kind sehen darf, und `allBooks`, den ganzen Katalog
+für Eltern- und Adminbereich. Jeder Bildschirm liest `books` und muss von
+Altersfreigaben nichts wissen. Auch `bookById` hängt daran, und das ist der
+Grund für diesen Aufbau: Die App startet dort, wo man aufgehört hat, und ein
+gesperrtes Buch liefe über diese gemerkte Adresse sonst doch noch an.
+
+**Ein Schloss ist das nicht, und es gibt sich auch nicht als eines aus.** Wer
+das Gerät in der Hand hat, ist angemeldet und kommt mit dem Ticket des
+Medien-Dienstes an jede Datei – das gilt hier wie bei der PIN (§9.3). Was diese
+Einstellung leistet, ist, Unpassendes aus der Kachelübersicht eines
+Sechsjährigen herauszuhalten. Deshalb gilt bei einer Störung auch die
+unvorsichtige Richtung: Sind die Freigaben nicht zu lesen, zählt keine – sonst
+stünde das Kind bei abgeschaltetem NAS vor einer leeren Bibliothek, und der
+häufigste Grund dafür ist kein Umgehungsversuch.
 
 ---
 
@@ -842,6 +903,7 @@ bliebe nach einem Update nur Raten.
 | R4 | Versehentlich committete Zugangsdaten sind im öffentlichen Repo sofort öffentlich | Tunnel oder Firebase-Projekt kompromittiert | Secret Scanning + Push Protection aktivieren, alles Sensible nur in Umgebungsvariablen, Diff-Kontrolle vor dem Commit (Kapitel 9.3) |
 | R5 | Upload-Bandbreite zuhause zu klein | Ruckeln beim Streaming | Prüfen: Ein 128-kbit/s-MP3 braucht ~0,13 Mbit/s – selbst schwache Anschlüsse reichen für 2–3 gleichzeitige Streams. Notfalls Transcoding auf dem NAS (Ausbaustufe). |
 | R6 | Kind tippt sich aus dem Konto | Kann sich nicht neu anmelden | Kein Logout im Kinderbereich, nur im PIN-geschützten Elternmodus |
+| R6b | Kind wechselt das Profil und hört im Namen des Geschwisters weiter | Beide verlieren ihre Stellen, „Weiterhören" zeigt fremde Bücher | `maySwitchProfile` standardmässig **aus**; der Weg zurück zur Auswahl liegt im PIN-geschützten Elternbereich (§5.7) |
 | R7 | Katalog wächst, Scan wird langsam | Neue Bücher erscheinen spät | Inkrementeller Scan (nur geänderte Ordner); Metadaten-Ergebnisse werden pro Datei gecacht. Bei MP3s ohne VBR-Header muss die Dauer einmalig durch Lesen der ganzen Datei ermittelt werden – deshalb ist der Cache wichtig, nicht optional. |
 | R8 | Ein Kind lädt aus Versehen die halbe Bibliothek herunter | Tablet voll | Downloads pro Profil freischaltbar (`allowDownload`); Speicherwarnung vor dem Start; Übersicht mit Grössen im Elternmodus |
 
@@ -864,14 +926,14 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff ✅, Barrierefreiheit ✅ | Fertig für den Alltag ✅ |
 | **M9** | Bibliothek nach Reihen, aufgeräumte Titel, Startseite als Dashboard (Favoriten, Vorschläge), Adminbereich mit Freigaben, Titeln und Hörhistorie, Spulen im Player, Regel-Deployment über GitHub | Aus „läuft" wird „macht Freude" ✅ |
 | **M10** | Die Sammlung von der App aus in Form bringen: Reihen direkt auf der Startseite, CD-Ordner als ein Buch, Ordner mit ganzen Folgen aufteilen, Cover hochladen – beides auch im Adminbereich, ohne ans NAS zu müssen | Eine gewachsene Sammlung sieht aus wie eine gepflegte ✅ |
+| **M11** | Wer darf was: Altersfreigabe je Hörbuch, Alter und einzelne Sperren je Profil, gesperrter Profilwechsel, PIN auf dem eigenen Gerät merkbar (§5.7, §5.8) | Jedes Kind sieht seine Bibliothek – und nur die ✅ |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied
 zwischen „funktioniert" und „wird täglich benutzt" ausmacht.
 
-Ausbaustufen danach (nicht eingeplant, nur notiert): „Nur diese Bücher für
-dieses Kind", Cast/Sonos, Transcoding auf dem NAS, Katalogspiegel in Firestore,
-Wiedergabegeschwindigkeit.
+Ausbaustufen danach (nicht eingeplant, nur notiert): Cast/Sonos, Transcoding auf
+dem NAS, Katalogspiegel in Firestore, Wiedergabegeschwindigkeit.
 
 ---
 
@@ -896,7 +958,7 @@ Vorgaben weiter.
 | **F1** | Wie viele Bücher, wie viel GB insgesamt? | M3 | Scanner wird inkrementell gebaut und skaliert bis einige Tausend Dateien |
 | **F2** | Eigene Domain für den Tunnel, oder Cloudflare-Subdomain? | M3 | Ich plane mit einer Cloudflare-Subdomain; ein Wechsel ist eine Änderung an einer Umgebungsvariablen |
 | **F3** | Wie viele Kinderprofile, und dürfen Kinder selbst herunterladen? | M2 / M7 | Beliebig viele Profile möglich; `allowDownload` standardmässig **aus**, im Elternmodus pro Kind einschaltbar |
-| **F4** | Sollen die Kinder unterschiedliche Bücher sehen („nur diese für Emma")? | Ausbaustufe | Alle Profile sehen alles; Einschränkung wäre eine spätere Erweiterung |
+| **F4** | Sollen die Kinder unterschiedliche Bücher sehen („nur diese für Emma")? | ~~Ausbaustufe~~ M11 | **Beantwortet:** ja. Altersfreigabe je Hörbuch im Adminbereich, Alter und einzelne Sperren je Profil im Elternbereich (§5.8) |
 
 ---
 

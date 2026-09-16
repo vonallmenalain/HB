@@ -136,6 +136,23 @@ service cloud.firestore {
     }
 
     /**
+     * Altersfreigaben.
+     *
+     * Dieselbe Überlegung wie bei den Titeln: „Der Feuerkelch ist ab 12" ist
+     * eine Aussage über das Buch und gilt für die ganze Familie. Setzen darf sie
+     * nur der Administrator, lesen muss sie jedes Gerät – ohne sie wüsste die
+     * App nicht, was sie vor den Kleinen verbergen soll.
+     *
+     * Wem eine Freigabe ein Buch wegnimmt, steht nicht hier, sondern beim
+     * Profil unter `users/{uid}/profiles/{id}`: Das Alter des Kindes und die
+     * einzeln gesperrten Hörbücher gehören dem Konto und sonst niemandem.
+     */
+    match /bookAges/{bookId} {
+      allow read: if isAllowed();
+      allow write: if isAdmin();
+    }
+
+    /**
      * Hörhistorie: wer hat was wie oft gehört.
      *
      * Jedes Gerät schreibt nur in die eigenen Einträge – die Kennung beginnt

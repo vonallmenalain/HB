@@ -7,10 +7,20 @@ export interface ParentsContextValue {
   hasPin: boolean
   /** Ist der Elternbereich gerade gesperrt? */
   locked: boolean
-  /** Prüft die eingegebene PIN; `true`, wenn sie stimmt. */
-  unlock: (pin: string) => Promise<boolean>
+  /**
+   * Prüft die eingegebene PIN; `true`, wenn sie stimmt.
+   *
+   * Mit `remember` bleibt dieses Gerät offen, bis es jemand im Elternbereich
+   * wieder sperrt – für das eigene Telefon, auf dem die PIN sonst bei jedem
+   * Start wieder verlangt würde.
+   */
+  unlock: (pin: string, remember?: boolean) => Promise<boolean>
   /** Sperrt wieder zu – beim Verlassen des Elternbereichs. */
   lock: () => void
+  /** Ist dieses Gerät dauerhaft aufgesperrt? */
+  remembered: boolean
+  /** Nimmt das Gemerkte wieder weg: Auf diesem Gerät gilt wieder die PIN. */
+  forgetOnThisDevice: () => void
   /** Setzt eine neue PIN (oder ändert sie). */
   setPin: (pin: string) => Promise<void>
   /** Nimmt die PIN weg; der Elternbereich steht dann offen. */

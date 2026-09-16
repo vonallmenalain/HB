@@ -56,7 +56,7 @@ function fehlerText(error: unknown): string {
  * schlechter als gar keines – die Kachel sagt wenigstens nichts Falsches.
  */
 export function CoverSearchSection() {
-  const { books, client, refresh } = useLibrary()
+  const { allBooks: books, client, refresh } = useLibrary()
 
   const [suche, setSuche] = useState<CoverSuche>(LEER)
   const [fehler, setFehler] = useState<string | null>(null)

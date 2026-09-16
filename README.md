@@ -4,10 +4,11 @@ Private Hörbuch-PWA für die Familie. Die Hörbücher liegen auf dem eigenen
 QNAP-NAS, die App ist auf dem Startbildschirm installierbar, spielt im
 Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört hat.
 
-> **Status:** Alle Meilensteine M0–M9 stehen. Die App ist damit fertig für den
+> **Status:** Alle Meilensteine M0–M11 stehen. Die App ist damit fertig für den
 > Alltag: auswählen, hören, punktgenau weiterhören, über Geräte abgleichen,
 > herunterladen und offline hören, Einschlaf-Timer, Elternbereich mit PIN,
-> Bibliothek nach Reihen, Favoriten und Vorschläge, Adminbereich mit Freigaben.
+> Bibliothek nach Reihen, Favoriten und Vorschläge, Adminbereich mit Freigaben,
+> Altersfreigaben und ein Profil je Gerät.
 >
 > **Was noch aussteht, kann nur Alain tun:** den Medien-Dienst aufs QNAP
 > deployen (siehe [`docs/QNAP-SETUP.md`](docs/QNAP-SETUP.md)), die Netlify-
@@ -29,7 +30,11 @@ Hintergrund weiter und merkt sich für jedes Kind punktgenau, wo es aufgehört h
 - **Geschützt.** Login über Firebase Authentication, kein Medienzugriff ohne
   gültiges Token.
 - **Kinderprofile.** Ein Familien-Login, darin ein Avatar pro Kind – Kinder
-  müssen nie ein Passwort eintippen.
+  müssen nie ein Passwort eintippen. Ein Gerät bleibt bei dem Profil, das
+  einmal gewählt wurde; zurück zur Auswahl geht es nur über den Elternbereich.
+- **Nur, was passt.** Altersfreigabe je Hörbuch im Adminbereich, dazu Alter und
+  einzelne Sperren je Profil im Elternbereich. Was ein Kind nicht hören soll,
+  erscheint bei ihm gar nicht – ohne Schild und ohne graue Kachel.
 - **Aufgeräumt.** Die Bibliothek gliedert nach Reihen, Titel werden aus den
   Ordnernamen lesbar gemacht, und auf der Startseite stehen Weiterhören,
   Gemerktes und Vorschläge.
@@ -72,6 +77,8 @@ Range-Support) über einen Tunnel aus · Offline-Dateien liegen in Cache Storage
 | M7 | Offline-Downloads, Background Fetch, Verwaltung im Elternmodus | ✅ |
 | M8 | Sleep-Timer, Elternmodus mit PIN, Feinschliff | ✅ |
 | M9 | Reihen, aufgeräumte Titel, Dashboard, Adminbereich, Spulen | ✅ |
+| M10 | Die Sammlung von der App aus in Form bringen: CD-Ordner, Einzelfolgen, Cover | ✅ |
+| M11 | Wer darf was: Altersfreigabe, Sperren je Profil, gesperrter Profilwechsel | ✅ |
 
 Details und Begründungen in [`docs/KONZEPT.md`](docs/KONZEPT.md#12-roadmap).
 
@@ -135,13 +142,13 @@ aber fremde Konten aus dem Projekt heraus.
 apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/app/           Router, Anmelde-Weiche, App-Hülle
   src/features/auth/ Anmeldung, Freigabeliste, Zugriffsanfragen
-  src/features/admin/     Adminbereich: Freigaben, Titel, Hörhistorie
+  src/features/admin/     Adminbereich: Freigaben, Titel, Altersfreigaben, Hörhistorie
   src/features/library/   Katalog, Medien-Client, Reihen, Titel-Aufbereitung
   src/features/favorites/ Gemerkte Hörbücher je Profil
   src/features/history/   Hörhistorie aufzeichnen und auswerten
   src/features/player/    Audio-Engine, Media Session, Player-Zustand
   src/features/progress/  Hörfortschritt
-  src/features/profiles/  Kinderprofile
+  src/features/profiles/  Kinderprofile, Alter und Sperren (`access.ts`)
   src/routes/        Bildschirme
   src/ui/            Design-System-Bausteine
   src/lib/           Firebase, Konfiguration, Hilfsfunktionen

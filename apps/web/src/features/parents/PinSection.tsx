@@ -17,7 +17,7 @@ type Schritt = 'aus' | 'neu' | 'wiederholen'
  * niemanden sonst.
  */
 export function PinSection() {
-  const { hasPin, setPin, removePin } = useParents()
+  const { hasPin, remembered, forgetOnThisDevice, setPin, removePin } = useParents()
   const [schritt, setSchritt] = useState<Schritt>('aus')
   const [erste, setErste] = useState('')
   const [fehler, setFehler] = useState<string | null>(null)
@@ -70,6 +70,14 @@ export function PinSection() {
         Anmelden geht es einmal ohne.
       </Notice>
 
+      {remembered ? (
+        <Notice>
+          Auf diesem Gerät ist die PIN gemerkt – der Elternbereich geht hier ohne Eingabe
+          auf. Auf einem Gerät, das die Kinder in der Hand haben, gehört das
+          zurückgenommen.
+        </Notice>
+      ) : null}
+
       {erledigt !== null ? <Notice>{erledigt}</Notice> : null}
 
       {schritt === 'aus' ? (
@@ -84,6 +92,18 @@ export function PinSection() {
           >
             {hasPin ? 'PIN ändern' : 'PIN einrichten'}
           </BigButton>
+
+          {remembered ? (
+            <BigButton
+              variant="secondary"
+              onClick={() => {
+                setErledigt('Gemerkt aufgehoben. Hier gilt wieder die PIN.')
+                forgetOnThisDevice()
+              }}
+            >
+              Auf diesem Gerät wieder sperren
+            </BigButton>
+          ) : null}
 
           {hasPin ? (
             <BigButton

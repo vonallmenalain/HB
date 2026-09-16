@@ -50,7 +50,7 @@ function fehlerText(error: unknown): string {
  * lesend eingebunden. Ein Scan überschreibt es nicht.
  */
 export function CoversSection() {
-  const { books, client, refresh } = useLibrary()
+  const { allBooks: books, client, refresh } = useLibrary()
 
   const [suche, setSuche] = useState('')
   const [vorgang, setVorgang] = useState<Vorgang>(null)

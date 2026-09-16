@@ -8,7 +8,15 @@ export interface ProfileInput {
   color: string
 }
 
-export type ProfilePatch = Partial<ProfileInput & { allowDownload: boolean }>
+export type ProfilePatch = Partial<
+  ProfileInput & {
+    allowDownload: boolean
+    maySwitchProfile: boolean
+    /** `null` nimmt das Alter wieder weg. */
+    ageYears: number | null
+    blockedBooks: readonly string[]
+  }
+>
 
 export interface ProfilesContextValue {
   loading: boolean
