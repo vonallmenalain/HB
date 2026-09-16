@@ -557,6 +557,7 @@ wiederzufinden. Der Adminbereich kann deshalb nach Bildern suchen lassen.
 |---|---|
 | `POST /admin/cover-suche` | Startet den Lauf über alle Bücher ohne Bild. Antwortet sofort mit 202; ein zweiter Aufruf während des Laufs bekommt 409 |
 | `GET /admin/cover-suche` | Stand (`laeuft`, `erledigt`, `gesamt`, `gesetzt`, `offen`, `hinweis`) und die Vorschläge je Buch |
+| `POST /admin/cover-suche/:bookId` | Sucht für ein einzelnes Hörbuch und antwortet mit den Treffern. Setzt nie von selbst: Wer den Knopf drückt, sieht sich das Buch gerade an und will wählen |
 | `GET /admin/cover-vorschlag/:bookId?bild=…` | Reicht ein vorgeschlagenes Bild zum Ansehen durch |
 | `POST /admin/cover/:bookId/vorschlag` | Übernimmt einen Vorschlag: `{ "bild": "<Adresse aus der Vorschlagsliste>" }` |
 

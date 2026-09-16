@@ -138,6 +138,8 @@ export interface MediaClient {
   startCoverSearch: () => Promise<'started' | 'already-running'>
   /** Stand und Vorschläge des Laufs. */
   fetchCoverSearch: () => Promise<CoverSuche>
+  /** Sucht für ein einzelnes Hörbuch und liefert die Treffer sofort. */
+  searchCoversFor: (bookId: string) => Promise<CoverVorschlag[]>
   /** Übernimmt einen Vorschlag. Liefert die neue Adresse des Covers. */
   applyCoverSuggestion: (bookId: string, imageUrl: string) => Promise<string>
   /**
@@ -515,6 +517,20 @@ export function createMediaClient(options: {
         }
       }
       return { stand, vorschlaege }
+    },
+    searchCoversFor: async (bookId) => {
+      const response = await adminCall(`/admin/cover-suche/${bookId}`, { method: 'POST' })
+
+      let body: unknown
+      try {
+        body = await response.json()
+      } catch {
+        throw new MediaRequestError('malformed')
+      }
+
+      const vorschlaege = (body as { vorschlaege?: unknown }).vorschlaege
+      if (!Array.isArray(vorschlaege)) throw new MediaRequestError('malformed')
+      return vorschlaege as CoverVorschlag[]
     },
     applyCoverSuggestion: async (bookId, imageUrl) => {
       const response = await adminCall(`/admin/cover/${bookId}/vorschlag`, {

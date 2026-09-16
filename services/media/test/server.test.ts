@@ -407,6 +407,14 @@ describe('Cover von Hand setzen', () => {
     expect(response.statusCode).toBe(422)
   })
 
+  it('antwortet 404, wenn für ein unbekanntes Buch gesucht wird', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover-suche/b_gibtsnicht?t=${ticket}`,
+    })
+    expect(response.statusCode).toBe(404)
+  })
+
   it('reicht keine Adresse durch, die niemand vorgeschlagen hat', async () => {
     // Dieselbe Sperre wie beim Übernehmen: Ohne sie wäre die Vorschau ein
     // Fenster in jedes Gerät im Heimnetz.

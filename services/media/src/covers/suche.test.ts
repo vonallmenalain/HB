@@ -105,6 +105,36 @@ describe('createCoverSuche', () => {
     expect(suche.vorschlaege().size).toBe(0)
   })
 
+  it('sucht für ein einzelnes Buch, ohne etwas zu setzen', async () => {
+    // Wer den Knopf am Buch drückt, sieht es sich gerade an und will wählen –
+    // oft steht schon ein Bild da, das nur nicht gefällt.
+    const { suche, setzen } = bauen([
+      { collectionName: 'Die drei ??? - Folge 3: Der Karpatenhund', artistName: 'Die drei ???' },
+    ])
+
+    const gefunden = await suche.fuerEinBuch(KARPATENHUND)
+
+    expect(gefunden).toHaveLength(1)
+    expect(setzen).not.toHaveBeenCalled()
+    // Gemerkt wird es trotzdem: Ohne das würde das Übernehmen die Adresse
+    // nicht wiedererkennen und ablehnen.
+    expect(suche.vorschlaege().get('b_1')).toHaveLength(1)
+  })
+
+  it('räumt einen alten Vorschlag weg, wenn die zweite Suche nichts findet', async () => {
+    const { suche } = bauen([
+      { collectionName: 'Der Karpatenhund', artistName: 'Die drei Fragezeichen' },
+    ])
+    await suche.fuerEinBuch(KARPATENHUND)
+    expect(suche.vorschlaege().size).toBe(1)
+
+    const { suche: leer } = bauen([{ collectionName: 'Etwas ganz anderes' }])
+    leer.uebernehmen(suche.vorschlaege())
+    await leer.fuerEinBuch(KARPATENHUND)
+
+    expect(leer.vorschlaege().size).toBe(0)
+  })
+
   it('startet nicht zweimal nebeneinander', () => {
     const { suche } = bauen([{ collectionName: 'egal' }])
     expect(suche.starten()).toBe('gestartet')
@@ -112,7 +142,9 @@ describe('createCoverSuche', () => {
   })
 
   it('schreibt die Vorschläge am Ende weg', async () => {
-    const { suche, gemerkt } = bauen([{ collectionName: 'Der Karpatenhund' }])
+    const { suche, gemerkt } = bauen([
+      { collectionName: 'Der Karpatenhund', artistName: 'Die drei Fragezeichen' },
+    ])
     suche.starten()
     await fertig(suche.stand)
     expect(gemerkt.length).toBeGreaterThan(0)

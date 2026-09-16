@@ -9,6 +9,8 @@ import {
   MediaRequestError,
 } from '@/features/library/mediaClient'
 import { bookLabel } from '@/features/library/titles'
+
+import { CoverSuggestions } from './CoverSuggestions'
 import { BigButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
 
@@ -38,10 +40,6 @@ function fehlerText(error: unknown): string {
       : libraryErrorMessage(error.reason)
   }
   return 'Die Suche liess sich nicht starten.'
-}
-
-function quelleName(quelle: CoverVorschlag['quelle']): string {
-  return quelle === 'apple' ? 'Apple' : 'MusicBrainz'
 }
 
 /**
@@ -190,39 +188,14 @@ export function CoverSearchSection() {
                 <p className="font-semibold">{bookLabel(book)}</p>
                 <p className="truncate text-sm text-ink-soft">{book.folderName}</p>
 
-                {/* 16px zwischen tappbaren Elementen, KONZEPT §5.5. */}
-                <ul className="flex flex-wrap gap-4">
-                  {vorschlaege.map((vorschlag) => (
-                    <li key={vorschlag.imageUrl}>
-                      <button
-                        type="button"
-                        disabled={laeuft === book.id}
-                        onClick={() => {
-                          uebernehmen(book, vorschlag)
-                        }}
-                        className="flex w-32 flex-col gap-2 rounded-tile p-1 text-left transition-transform active:scale-95 disabled:opacity-40 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
-                      >
-                        {/* Über den Dienst, nicht von der Quelle: Sonst müsste
-                            die Content-Security-Policy fremde Bildquellen
-                            zulassen, und jeder Aufruf verriete dem Anbieter,
-                            wer gerade im Adminbereich sitzt. */}
-                        <img
-                          src={client?.suggestionUrl(book.id, vorschlag.imageUrl) ?? ''}
-                          alt=""
-                          loading="lazy"
-                          className="aspect-square w-full rounded-tile bg-surface-sunken object-cover"
-                        />
-                        <span className="line-clamp-2 text-sm font-semibold">
-                          {vorschlag.title}
-                        </span>
-                        <span className="text-xs text-ink-soft">
-                          {quelleName(vorschlag.quelle)}
-                          {vorschlag.artist === null ? '' : ` · ${vorschlag.artist}`}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
+                <CoverSuggestions
+                  book={book}
+                  vorschlaege={vorschlaege}
+                  disabled={laeuft === book.id}
+                  onApply={(vorschlag) => {
+                    uebernehmen(book, vorschlag)
+                  }}
+                />
               </li>
             ))}
           </ul>

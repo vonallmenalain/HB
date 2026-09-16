@@ -240,6 +240,7 @@ const demoClient: LibraryContextValue['client'] = {
       },
       vorschlaege: {},
     }),
+  searchCoversFor: () => Promise.resolve([]),
   applyCoverSuggestion: () => Promise.resolve('/cover/x.jpg'),
   suggestionUrl: () => null,
   uploadCover: (bookId: string) => Promise.resolve(`/cover/${bookId}.jpg?v=neu`),

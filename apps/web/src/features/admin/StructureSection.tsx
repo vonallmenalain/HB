@@ -16,6 +16,9 @@ import { TextField } from '@/ui/TextField'
 /** So viele Ordner auf einmal – die langen stehen oben, der Rest ist Suche. */
 const MAX_TREFFER = 15
 
+/** So viele stehen ohne Suchbegriff da – die mit den meisten Dateien. */
+const MAX_OHNE_SUCHE = 5
+
 function fehlerText(error: unknown): string {
   if (error instanceof MediaRequestError) {
     return error.reason === 'forbidden'
@@ -92,9 +95,18 @@ export function StructureSection() {
     run((bereit) => bereit.setFolderMode(folder.path, mode))
   }
 
-  const treffer = (folders ?? []).filter((folder) =>
-    suche === '' ? true : folder.path.toLowerCase().includes(suche.toLowerCase()),
-  )
+  const alle = folders ?? []
+  /**
+   * Ohne Suchbegriff nur die grössten.
+   *
+   * Eine Liste mit allen Ordnern ist keine Übersicht. Die mit den meisten
+   * Dateien wegzulassen wäre aber auch falsch: Genau dort steckt der Fall, um
+   * den es hier geht – neunzig Folgen in einem Ordner.
+   */
+  const treffer =
+    suche === ''
+      ? alle.slice(0, MAX_OHNE_SUCHE)
+      : alle.filter((folder) => folder.path.toLowerCase().includes(suche.toLowerCase()))
   const meldung = scanMeldung(scan)
 
   return (
@@ -129,8 +141,11 @@ export function StructureSection() {
           />
 
           <p className="text-ink-soft">
-            {treffer.length} Ordner mit mehreren Dateien
-            {treffer.length > MAX_TREFFER ? ` – die ersten ${String(MAX_TREFFER)}` : ''}
+            {suche === ''
+              ? `${String(alle.length)} Ordner mit mehreren Dateien – hier die mit den meisten`
+              : `${String(treffer.length)} Treffer${
+                  treffer.length > MAX_TREFFER ? ` – die ersten ${String(MAX_TREFFER)}` : ''
+                }`}
           </p>
 
           <ul className="flex flex-col gap-3">
