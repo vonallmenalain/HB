@@ -12,7 +12,9 @@ import { TextField } from '@/ui/TextField'
 const MAX_TREFFER = 25
 
 function passt(book: Book, suche: string): boolean {
-  if (suche === '') return true
+  // Ohne Suchbegriff nichts: Eine Liste mit neunhundert Hörbüchern ist keine
+  // Übersicht, sondern ein Bildschirm, an dem man vorbeiscrollt.
+  if (suche === '') return false
   const text = `${book.title} ${book.folderName} ${book.series ?? ''} ${book.group ?? ''}`
   return text.toLowerCase().includes(suche.toLowerCase())
 }
@@ -65,10 +67,16 @@ export function TitlesSection() {
         }}
       />
 
-      <p className="text-ink-soft">
-        {treffer.length} von {books.length} Hörbüchern
-        {treffer.length > MAX_TREFFER ? ` – die ersten ${String(MAX_TREFFER)}` : ''}
-      </p>
+      {suche === '' ? (
+        <p className="text-ink-soft">
+          Erst suchen: {books.length} Hörbücher sind zu viele für eine Liste.
+        </p>
+      ) : (
+        <p className="text-ink-soft">
+          {treffer.length} von {books.length} Hörbüchern
+          {treffer.length > MAX_TREFFER ? ` – die ersten ${String(MAX_TREFFER)}` : ''}
+        </p>
+      )}
 
       <ul className="flex flex-col gap-3">
         {treffer.slice(0, MAX_TREFFER).map((book) => {

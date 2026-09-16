@@ -317,6 +317,29 @@ export function buildServer(options: ServerOptions): FastifyInstance {
   })
 
   /**
+   * Für ein einzelnes Hörbuch suchen.
+   *
+   * Antwortet mit den Treffern statt mit 202: Es sind höchstens zwei Anfragen,
+   * und davor wartet jemand. Gesetzt wird dabei nichts – wer hier landet, will
+   * wählen, oft weil schon ein Bild da ist, das nicht gefällt.
+   */
+  app.post<{ Params: { bookId: string }; Querystring: TicketQuery }>(
+    '/admin/cover-suche/:bookId',
+    async (request, reply) => {
+      if ((await adminUid(request, reply)) === null) return reply
+
+      const vorschlaege = await store.searchCoversFor(request.params.bookId)
+      if (vorschlaege === null) return reply.code(404).send({ error: 'book_not_found' })
+
+      request.log.info(
+        { bookId: request.params.bookId, treffer: vorschlaege.length },
+        'Cover für ein Buch gesucht',
+      )
+      return reply.send({ vorschlaege })
+    },
+  )
+
+  /**
    * Ein vorgeschlagenes Bild zum Ansehen.
    *
    * Der Dienst holt es und reicht es durch, statt die App direkt zur fremden

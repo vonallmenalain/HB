@@ -65,6 +65,13 @@ export interface CatalogStore {
   clearOwnCover: (bookId: string) => Promise<boolean>
   /** Startet den Lauf, der fehlende Cover online sucht. */
   startCoverSearch: () => 'gestartet' | 'laeuft'
+  /**
+   * Sucht für ein einzelnes Buch, auf Zuruf.
+   *
+   * Liefert die Vorschläge sofort zurück und setzt nie von selbst: Wer den
+   * Knopf drückt, sieht sich das Buch gerade an und will wählen.
+   */
+  searchCoversFor: (bookId: string) => Promise<CoverVorschlag[] | null>
   coverSearchState: () => CoverSucheStand
   /** Die Treffer, die auf eine Bestätigung warten. */
   coverSuggestions: () => Record<string, CoverVorschlag[]>
@@ -353,6 +360,18 @@ export function createCatalogStore(options: {
     },
 
     startCoverSearch: () => suche.starten(),
+
+    searchCoversFor: async (bookId) => {
+      const book = current.catalog.books.find((entry) => entry.id === bookId)
+      if (book === undefined) return null
+
+      return suche.fuerEinBuch({
+        id: book.id,
+        series: book.series,
+        seriesIndex: book.seriesIndex,
+        title: book.title,
+      })
+    },
     coverSearchState: () => suche.stand(),
     coverSuggestions: () => Object.fromEntries(suche.vorschlaege()),
 

@@ -93,8 +93,11 @@ export function AppRoutes() {
       />
       {/* Der Adminbereich liegt hinter derselben PIN – und zusätzlich hinter
           der Adresse, die in den Firestore-Regeln steht. */}
+      {/* `/*`, damit auch die einzelnen Abschnitte (`/admin/titel`) hier
+          landen: Jeder bekommt eine eigene Adresse, damit der Zurück-Knopf des
+          Geräts zur Übersicht führt und nicht aus dem Adminbereich hinaus. */}
       <Route
-        path="/admin"
+        path="/admin/*"
         element={
           <PinGate>
             <AdminScreen />

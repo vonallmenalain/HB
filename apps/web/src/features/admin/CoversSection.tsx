@@ -3,15 +3,24 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type Book } from '@/features/library/catalog'
 import { libraryErrorMessage } from '@/features/library/errors'
 import { useLibrary } from '@/features/library/libraryContext'
-import { type CoverHerkunft, MediaRequestError } from '@/features/library/mediaClient'
+import {
+  type CoverHerkunft,
+  type CoverVorschlag,
+  MediaRequestError,
+} from '@/features/library/mediaClient'
 import { bookLabel } from '@/features/library/titles'
 import { BookCover } from '@/ui/BookCover'
 import { BigButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
 import { TextField } from '@/ui/TextField'
 
+import { CoverSuggestions } from './CoverSuggestions'
+
 /** So viele Treffer auf einmal – darunter sucht man weiter, statt zu scrollen. */
 const MAX_TREFFER = 12
+
+/** Was die Einzelsuche gerade tut – an genau einem Buch. */
+type Vorgang = { bookId: string; was: 'hochladen' | 'suchen' | 'setzen' } | null
 
 function passt(book: Book, suche: string): boolean {
   if (suche === '') return false
@@ -44,7 +53,9 @@ export function CoversSection() {
   const { books, client, refresh } = useLibrary()
 
   const [suche, setSuche] = useState('')
-  const [laeuft, setLaeuft] = useState<string | null>(null)
+  const [vorgang, setVorgang] = useState<Vorgang>(null)
+  /** Was die Einzelsuche gefunden hat, je Buch. */
+  const [gefunden, setGefunden] = useState<Readonly<Record<string, CoverVorschlag[]>>>({})
   const [fehler, setFehler] = useState<string | null>(null)
   const [erledigt, setErledigt] = useState<string | null>(null)
   /**
@@ -79,7 +90,7 @@ export function CoversSection() {
     if (!client) return
     setFehler(null)
     setErledigt(null)
-    setLaeuft(book.id)
+    setVorgang({ bookId: book.id, was: 'hochladen' })
 
     void client
       .uploadCover(book.id, datei)
@@ -94,7 +105,7 @@ export function CoversSection() {
         setFehler(fehlerText(error))
       })
       .finally(() => {
-        setLaeuft(null)
+        setVorgang(null)
       })
   }
 
@@ -102,7 +113,7 @@ export function CoversSection() {
     if (!client) return
     setFehler(null)
     setErledigt(null)
-    setLaeuft(book.id)
+    setVorgang({ bookId: book.id, was: 'hochladen' })
 
     void client
       .removeCover(book.id)
@@ -117,7 +128,57 @@ export function CoversSection() {
         setFehler(fehlerText(error))
       })
       .finally(() => {
-        setLaeuft(null)
+        setVorgang(null)
+      })
+  }
+
+  /**
+   * Für dieses eine Buch online suchen.
+   *
+   * Auch dann, wenn schon ein Bild da ist: Oft ist genau das der Grund, hier zu
+   * landen – das Bild aus den ID3-Tags ist eine graue Notenzeile, und das
+   * richtige Cover liegt bei Apple.
+   */
+  const suchen = (book: Book): void => {
+    if (!client) return
+    setFehler(null)
+    setErledigt(null)
+    setVorgang({ bookId: book.id, was: 'suchen' })
+
+    void client
+      .searchCoversFor(book.id)
+      .then((treffer) => {
+        setGefunden((bisher) => ({ ...bisher, [book.id]: treffer }))
+      })
+      .catch((error: unknown) => {
+        setFehler(fehlerText(error))
+      })
+      .finally(() => {
+        setVorgang(null)
+      })
+  }
+
+  const uebernehmen = (book: Book, vorschlag: CoverVorschlag): void => {
+    if (!client) return
+    setFehler(null)
+    setVorgang({ bookId: book.id, was: 'setzen' })
+
+    void client
+      .applyCoverSuggestion(book.id, vorschlag.imageUrl)
+      .then(() => {
+        refresh()
+        setEigene((bisher) => ({ ...bisher, [book.id]: 'online' }))
+        setGefunden((bisher) => {
+          const { [book.id]: _weg, ...rest } = bisher
+          return rest
+        })
+        setErledigt(book.id)
+      })
+      .catch((error: unknown) => {
+        setFehler(fehlerText(error))
+      })
+      .finally(() => {
+        setVorgang(null)
       })
   }
 
@@ -126,10 +187,11 @@ export function CoversSection() {
       <h2 className="text-2xl font-bold">Cover</h2>
 
       <Notice>
-        Die Bilder kommen aus dem Ordner auf dem NAS oder aus der Datei selbst. Wo keins
-        liegt, steht eine farbige Kachel – hier lässt sich stattdessen ein Bild hochladen.
-        Es gilt für alle Geräte, überlebt das nächste Einlesen und lässt sich jederzeit
-        wieder zurücknehmen; dann gilt erneut, was auf dem NAS liegt.
+        Die Bilder kommen aus dem Ordner auf dem NAS oder aus der Datei selbst. Hier lässt
+        sich für ein einzelnes Hörbuch ein eigenes Bild hochladen oder online eines suchen –
+        auch dann, wenn schon eines da ist, das nicht gefällt. Was hier gesetzt wird, gilt
+        für alle Geräte, überlebt das nächste Einlesen und lässt sich jederzeit wieder
+        zurücknehmen; dann gilt erneut, was auf dem NAS liegt.
       </Notice>
 
       {client === null ? (
@@ -161,6 +223,8 @@ export function CoversSection() {
         {treffer.slice(0, MAX_TREFFER).map((book) => {
           const bild = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
           const herkunft = eigene[book.id]
+          const treffer = gefunden[book.id]
+          const beschaeftigt = vorgang?.bookId === book.id
 
           return (
             <li key={book.id} className="flex items-center gap-4 rounded-tile bg-surface p-4">
@@ -205,18 +269,49 @@ export function CoversSection() {
                   />
                   <BigButton
                     variant="secondary"
-                    disabled={client === null || laeuft === book.id}
+                    disabled={client === null || beschaeftigt}
                     onClick={() => {
                       felder.current.get(book.id)?.click()
                     }}
                   >
-                    {laeuft === book.id ? 'Einen Moment …' : 'Bild wählen'}
+                    {vorgang?.bookId === book.id && vorgang.was === 'hochladen'
+                      ? 'Einen Moment …'
+                      : 'Bild wählen'}
                   </BigButton>
+
+                  <BigButton
+                    variant="secondary"
+                    disabled={client === null || beschaeftigt}
+                    onClick={() => {
+                      suchen(book)
+                    }}
+                  >
+                    {vorgang?.bookId === book.id && vorgang.was === 'suchen'
+                      ? 'Sucht …'
+                      : 'Cover online suchen'}
+                  </BigButton>
+
+                  {treffer !== undefined ? (
+                    treffer.length === 0 ? (
+                      <p className="text-sm text-ink-soft">
+                        Nichts gefunden, das sicher zu diesem Hörbuch gehört.
+                      </p>
+                    ) : (
+                      <CoverSuggestions
+                        book={book}
+                        vorschlaege={treffer}
+                        disabled={beschaeftigt}
+                        onApply={(vorschlag) => {
+                          uebernehmen(book, vorschlag)
+                        }}
+                      />
+                    )
+                  ) : null}
 
                   {herkunft !== undefined ? (
                     <BigButton
                       variant="secondary"
-                      disabled={client === null || laeuft === book.id}
+                      disabled={client === null || beschaeftigt}
                       onClick={() => {
                         wegnehmen(book)
                       }}

@@ -89,6 +89,7 @@ const client: MediaClient = {
       },
       vorschlaege: {},
     }),
+  searchCoversFor: () => Promise.resolve([]),
   applyCoverSuggestion: () => Promise.resolve('/cover/x.jpg'),
   suggestionUrl: () => null,
   setFolderMode: () => Promise.resolve(),

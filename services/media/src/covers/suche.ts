@@ -60,6 +60,14 @@ export interface CoverSucheOptions {
 
 export interface CoverSuche {
   starten: () => 'gestartet' | 'laeuft'
+  /**
+   * Sucht für ein einzelnes Buch, auf Zuruf.
+   *
+   * Setzt nie von selbst, auch bei einem eindeutigen Treffer nicht: Wer hier
+   * landet, sieht sich das Buch gerade an und will wählen. Genau dafür ist der
+   * Knopf da – oft steht ja schon ein Bild da, das nur nicht gefällt.
+   */
+  fuerEinBuch: (buch: CoverBuch) => Promise<CoverVorschlag[]>
   stand: () => CoverSucheStand
   vorschlaege: () => ReadonlyMap<string, CoverVorschlag[]>
   /** Setzt die gemerkten Vorschläge beim Start des Dienstes wieder ein. */
@@ -115,9 +123,16 @@ export function createCoverSuche(options: CoverSucheOptions): CoverSuche {
       .slice(0, HOECHSTENS_VORSCHLAEGE)
   }
 
-  async function einBuch(buch: CoverBuch): Promise<void> {
+  /**
+   * Fragt die Quellen nach einem Buch und bewertet, was zurückkommt.
+   *
+   * Die zweite Quelle nur, wenn die erste nichts hergab: Jede Anfrage kostet
+   * Wartezeit, und bei neunhundert Büchern ist das der Unterschied zwischen
+   * einer und zwei Stunden.
+   */
+  async function fragen(buch: CoverBuch, pause: number): Promise<CoverVorschlag[]> {
     const begriff = searchTerm(buch)
-    if (begriff === '') return
+    if (begriff === '') return []
 
     let gefunden: CoverVorschlag[] = []
     try {
@@ -126,18 +141,19 @@ export function createCoverSuche(options: CoverSucheOptions): CoverSuche {
       stand = { ...stand, hinweis: fehlerText(error) }
     }
 
-    // Die zweite Quelle nur, wenn die erste nichts hergab: Jede Anfrage kostet
-    // Wartezeit, und bei neunhundert Büchern ist das der Unterschied zwischen
-    // einer und zwei Stunden.
     if (gefunden.length === 0) {
-      await schlaf(pauseMs)
+      await schlaf(pause)
       try {
         gefunden = bewerten(buch, await sucheBeiMusicBrainz(begriff, options.holen))
       } catch (error) {
         stand = { ...stand, hinweis: fehlerText(error) }
       }
     }
+    return gefunden
+  }
 
+  async function einBuch(buch: CoverBuch): Promise<void> {
+    const gefunden = await fragen(buch, pauseMs)
     const bester = gefunden[0]
     if (bester === undefined) return
 
@@ -191,6 +207,24 @@ export function createCoverSuche(options: CoverSucheOptions): CoverSuche {
   }
 
   return {
+    fuerEinBuch: async (buch) => {
+      // Ein einzelner Aufruf braucht keine Bremse: Jemand wartet davor auf die
+      // Antwort, und zwei Anfragen bringen keine Quelle ins Schwitzen.
+      const gefunden = await fragen(buch, 0)
+      if (gefunden.length === 0) {
+        vorschlaege.delete(buch.id)
+      } else {
+        // Gemerkt wird es trotzdem: Ohne das würde das Übernehmen die Adresse
+        // nicht wiedererkennen und ablehnen.
+        vorschlaege.set(buch.id, gefunden)
+      }
+      stand = { ...stand, offen: vorschlaege.size }
+      await options.merken(vorschlaege).catch(() => {
+        // Ohne die Datei sind nur die Vorschläge nach einem Neustart weg.
+      })
+      return gefunden
+    },
+
     starten: () => {
       if (laeuft) return 'laeuft'
       laeuft = true

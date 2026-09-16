@@ -44,6 +44,7 @@ describe('Adminbereich', () => {
     const approve = vi.fn().mockResolvedValue(undefined)
 
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/zugaenge',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue({ requests: [ANFRAGE], approve }),
     })
@@ -59,6 +60,7 @@ describe('Adminbereich', () => {
     const deny = vi.fn().mockResolvedValue(undefined)
 
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/zugaenge',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue({ requests: [ANFRAGE], deny }),
     })
@@ -69,6 +71,7 @@ describe('Adminbereich', () => {
 
   it('lässt den eigenen Zugang nicht entziehen', () => {
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/zugaenge',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue({
         accounts: [
@@ -82,16 +85,81 @@ describe('Adminbereich', () => {
     expect(screen.getAllByRole('button', { name: 'Zugriff entziehen' })).toHaveLength(1)
   })
 
+  it('zeigt vorn eine Übersicht statt aller Abschnitte untereinander', () => {
+    // Sechs Abschnitte mit Erklärtext, Suchfeld und Liste waren zusammen ein
+    // Bildschirm, an dem man vorbeiscrollte.
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [] }),
+    })
+
+    const ziele = screen.getAllByRole('link').map((link) => link.getAttribute('href'))
+    expect(ziele).toEqual(
+      expect.arrayContaining([
+        '/admin/zugaenge',
+        '/admin/titel',
+        '/admin/cover',
+        '/admin/cover-suche',
+        '/admin/ordner',
+        '/admin/gehoert',
+      ]),
+    )
+    // Die Abschnitte selbst stehen erst hinter ihrer Kachel.
+    expect(screen.queryByLabelText('Hörbuch suchen')).not.toBeInTheDocument()
+  })
+
+  it('nennt offene Zugriffsanfragen schon auf der Kachel', () => {
+    // Sie sind das Einzige hier, was von selbst auftaucht und wartet.
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue({ requests: [ANFRAGE] }),
+      library: makeLibraryValue({ books: [] }),
+    })
+
+    expect(screen.getByRole('link', { name: /Zugänge · 1 offen/ })).toBeInTheDocument()
+  })
+
+  it('führt von einer unbekannten Adresse zurück zur Übersicht', () => {
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/gibtsnicht',
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [] }),
+    })
+
+    expect(
+      screen.getAllByRole('link').map((link) => link.getAttribute('href')),
+    ).toContain('/admin/ordner')
+  })
+
+  it('zeigt Hörbücher in „Titel" erst nach einer Suche', () => {
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/titel',
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [makeBook({ id: 'b_1', title: 'Chaos im Dunkeln' })] }),
+    })
+
+    expect(screen.queryByRole('button', { name: 'Umbenennen' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Erst suchen/)).toBeInTheDocument()
+  })
+
   it('speichert einen von Hand geänderten Titel', async () => {
     const setTitle = vi.fn().mockResolvedValue(undefined)
     const book = makeBook({ id: 'b_1', title: 'Chaos im Dunkeln', seriesIndex: 68 })
 
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/titel',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({ books: [book] }),
       titles: makeTitlesValue({ setTitle }),
     })
+
+    // Erst suchen: Bei neunhundert Hörbüchern ist die Liste sonst der
+    // Bildschirm.
+    await userEvent.type(screen.getByLabelText('Suchen'), 'Chaos')
 
     await userEvent.click(screen.getByRole('button', { name: 'Umbenennen' }))
 
@@ -138,6 +206,7 @@ function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
         },
         vorschlaege: {},
       }),
+    searchCoversFor: () => Promise.resolve([]),
     applyCoverSuggestion: () => Promise.resolve('/cover/x.jpg'),
     suggestionUrl: () => null,
     setFolderMode: () => Promise.resolve(),
@@ -184,6 +253,7 @@ describe('Cover online suchen', () => {
   it('startet den Lauf', async () => {
     const startCoverSearch = vi.fn().mockResolvedValue('started')
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover-suche',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({ books: [OHNE_BILD], client: makeClient({ startCoverSearch }) }),
@@ -199,6 +269,7 @@ describe('Cover online suchen', () => {
     const applyCoverSuggestion = vi.fn().mockResolvedValue('/cover/b_1.jpg?v=9')
     const refresh = vi.fn()
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover-suche',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({
@@ -227,6 +298,7 @@ describe('Cover online suchen', () => {
     // und jeder Aufruf verriete dem Anbieter, wer im Adminbereich sitzt.
     const suggestionUrl = vi.fn(() => 'https://hb-media.example.com/admin/cover-vorschlag/b_1?bild=x')
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover-suche',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({
@@ -249,6 +321,7 @@ describe('Cover im Adminbereich', () => {
 
   function zeigen(client: MediaClient, refresh = vi.fn()) {
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({ books: [BUCH], client, refresh }),
@@ -279,6 +352,7 @@ describe('Cover im Adminbereich', () => {
     const mitBild = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: '/cover/b_1.jpg' })
 
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({
@@ -295,6 +369,43 @@ describe('Cover im Adminbereich', () => {
     expect(removeCover).toHaveBeenCalledWith('b_1')
   })
 
+  it('sucht auf Zuruf für ein einzelnes Hörbuch', async () => {
+    // Auch wo schon ein Bild steht: Oft ist genau das der Grund – das Bild aus
+    // den ID3-Tags ist eine graue Notenzeile.
+    const VORSCHLAG = {
+      quelle: 'apple' as const,
+      title: 'Die drei ??? - Der Super-Papagei',
+      artist: 'Die drei ???',
+      imageUrl: 'https://bild.example.com/a/600x600bb.jpg',
+      score: 0.7,
+    }
+    const searchCoversFor = vi.fn().mockResolvedValue([VORSCHLAG])
+    const applyCoverSuggestion = vi.fn().mockResolvedValue('/cover/b_1.jpg?v=3')
+    const refresh = zeigen(makeClient({ searchCoversFor, applyCoverSuggestion }))
+
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+    await userEvent.click(screen.getByRole('button', { name: 'Cover online suchen' }))
+
+    expect(searchCoversFor).toHaveBeenCalledWith('b_1')
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Die drei \?\?\? - Der Super-Papagei/ }),
+    )
+    expect(applyCoverSuggestion).toHaveBeenCalledWith('b_1', VORSCHLAG.imageUrl)
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled()
+    })
+  })
+
+  it('sagt es, wenn die Einzelsuche nichts Sicheres findet', async () => {
+    zeigen(makeClient({ searchCoversFor: () => Promise.resolve([]) }))
+
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+    await userEvent.click(screen.getByRole('button', { name: 'Cover online suchen' }))
+
+    expect(await screen.findByText(/Nichts gefunden/)).toBeInTheDocument()
+  })
+
   it('bietet das Zurücknehmen nicht an, wo das Bild vom NAS kommt', async () => {
     // Der Knopf löscht nur ein hochgeladenes Bild. An einem Cover aus dem
     // Ordner täte er nichts – und ein Knopf, der nichts tut, sieht aus wie ein
@@ -302,6 +413,7 @@ describe('Cover im Adminbereich', () => {
     const mitBild = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: '/cover/b_1.jpg' })
 
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/cover',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({ books: [mitBild], client: makeClient() }),
@@ -328,6 +440,7 @@ describe('Cover im Adminbereich', () => {
 describe('Ordner umstellen', () => {
   function zeigen(client: MediaClient) {
     renderWithProfiles(<AdminScreen />, profiles(), {
+      route: '/admin/ordner',
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
       library: makeLibraryValue({ books: [makeBook()], client }),
