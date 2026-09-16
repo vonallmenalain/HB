@@ -158,6 +158,23 @@ function stripOnePrefix(name: string, prefix: string): string | null {
     .trim()
   if (rest === '') return null
 
+  // Der Reihenname geht oft in den Titel über: „Die drei ??? und der
+  // Karpatenhund". Das Bindewort gehört zur Reihe, nicht zur Folge – bliebe es
+  // stehen, hiesse in der Reihe jede zweite Kachel „und der …", und bei
+  // abgeschnittenem Text sähen alle gleich aus.
+  //
+  // Nur das Bindewort, keine Präposition: „5 Freunde auf der Felseninsel" ist
+  // ein ganzer Satz, „Die drei ??? und der Karpatenhund" eine Aufzählung aus
+  // Reihe und Titel.
+  const bindewort = /^(?:und|u\.|&|\+)\s+(\S.*)$/i.exec(rest)
+  if (bindewort) {
+    // „der Karpatenhund" steht jetzt am Anfang und wird deshalb gross
+    // geschrieben. Angefasst wird nur dieser eine Buchstabe – was dahinter
+    // steht, ist der Name, den jemand vergeben hat.
+    const titel = bindewort[1]!.trim()
+    return titel === '' ? null : titel.charAt(0).toUpperCase() + titel.slice(1)
+  }
+
   // Geht es klein weiter, war der Reihenname Teil des Satzes und kein Präfix:
   // „5 Freunde auf der Felseninsel" darf nicht „auf der Felseninsel" heissen.
   if (/^\p{Ll}/u.test(rest)) return null
@@ -176,6 +193,9 @@ function stripOnePrefix(name: string, prefix: string): string | null {
  * mit Bibi Blocksberg - Hexerei" ist kein „Bibi Blocksberg"-Präfix und bleibt
  * deshalb stehen. Passt kein Kandidat, bleibt der Name, wie er ist – lieber
  * einmal zu viel stehen lassen als einen Titel anschneiden.
+ *
+ * Ein Bindewort hinter dem Reihennamen gehört noch zu ihm: Aus „Die drei ???
+ * und der Karpatenhund" wird „Der Karpatenhund".
  *
  * Eine führende Folgennummer gehört vorher abgetrennt (siehe
  * {@link parseBookFolder}); sonst zählt sie hier als überspringbare Zahl.

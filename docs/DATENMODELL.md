@@ -79,7 +79,8 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 | Ordnername `79 Achtung, Abenteuer!`, `Folge 103 SOS` | Auch ohne Trennzeichen eine Folgennummer – ab zwei Ziffern, mit führender Null oder mit Wort davor. `5 Freunde` und `1984` behalten ihre Zahl |
 | Ordnername `50A - Titel` | Der angehängte Buchstabe zählt zur Nummer: `seriesIndex: 50`. `50A`, `50B`, `50C` stehen damit zwischen 49 und 51 statt am Ende der Reihe |
 | Ordnername beginnt mit dem Reihennamen | Der fliegt heraus: `Die Drei Fragezeichen Kids-68-Chaos` → `seriesIndex: 68`, `title: "Chaos"`. Verglichen wird unempfindlich gegen Artikel, Gross-/Kleinschreibung und Zahlwörter, `Die drei ???` gilt als `Die 3 Fragezeichen`. Übersprungen werden dabei nur Füllwörter und eine führende Zahl – `Abenteuer mit Bibi Blocksberg` ist kein Präfix |
-| Reihenname steckt im Satz | Bleibt stehen: `5 Freunde auf der Felseninsel` wird nicht zu `auf der Felseninsel` |
+| Reihenname geht mit einem Bindewort in den Titel über | Das Bindewort gehört zur Reihe: `Die drei ??? und der Karpatenhund` → `Der Karpatenhund`. Der Artikel steht jetzt am Anfang und wird gross geschrieben |
+| Reihenname steckt im Satz | Bleibt stehen: `5 Freunde auf der Felseninsel` wird nicht zu `auf der Felseninsel` – eine Präposition macht daraus einen Satz, kein Titel |
 | Nummer steht vor dem Reihennamen | Sie wird zuerst abgetrennt: `068 - Bibi Blocksberg - Der Schulausflug` → `seriesIndex: 68`, `title: "Der Schulausflug"` |
 | Trennzeichen | `_` wird Leerzeichen; ein Strich gilt als Trenner, wenn Leerraum daneben steht oder auf einer Seite eine Ziffer – `Mini-Fall` behält seinen Bindestrich |
 | Ordnername ist danach leer | Dann bleibt der ursprüngliche Name stehen. Lieber einmal zu viel stehen lassen als einen Titel anschneiden |
