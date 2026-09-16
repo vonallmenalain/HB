@@ -11,6 +11,7 @@ function file(overrides: Partial<ProbedFile> = {}): ProbedFile {
     tagTitle: null,
     tagArtist: null,
     tagAlbumArtist: null,
+    discName: null,
     ...overrides,
   }
 }
@@ -178,6 +179,31 @@ describe('buildBook', () => {
   })
 })
 
+describe('buildBook mit CD-Ordnern', () => {
+  it('stellt den Teil vor den Kapitelnamen', () => {
+    // In zwanzig CD-Ordnern heisst die erste Datei zwanzigmal gleich. Ohne den
+    // Teil davor wäre die Kapitelliste zum Suchen unbrauchbar.
+    const book = buildBook(
+      input({
+        files: [
+          file({ fileName: '01 - Anfang.mp3', discName: 'CD 1' }),
+          file({ fileName: '01 - Anfang.mp3', discName: 'CD 2' }),
+        ],
+      }),
+    )
+
+    expect(book.chapters.map((kapitel) => kapitel.title)).toEqual([
+      'CD 1 · Anfang',
+      'CD 2 · Anfang',
+    ])
+  })
+
+  it('lässt Kapitel ohne Teil unverändert', () => {
+    const book = buildBook(input({ files: [file({ fileName: '01 - Anfang.mp3' })] }))
+    expect(book.chapters[0]?.title).toBe('Anfang')
+  })
+})
+
 describe('parseOverride', () => {
   it('liest brauchbare Felder', () => {
     expect(parseOverride({ title: 'T', seriesIndex: 3, tags: ['a'] })).toEqual({
@@ -194,6 +220,14 @@ describe('parseOverride', () => {
 
   it('siebt Nicht-Zeichenketten aus den Tags', () => {
     expect(parseOverride({ tags: ['a', 3, null, 'b'] })).toEqual({ tags: ['a', 'b'] })
+  })
+
+  it('liest „einzelfolgen" in beide Richtungen', () => {
+    // Das `false` ist nicht dasselbe wie „nicht gesetzt": Es ist die Bremse
+    // für einen Ordner, bei dem jemand sonst nachhelfen möchte.
+    expect(parseOverride({ einzelfolgen: true })).toEqual({ einzelfolgen: true })
+    expect(parseOverride({ einzelfolgen: false })).toEqual({ einzelfolgen: false })
+    expect(parseOverride({ einzelfolgen: 'ja' })).toEqual({})
   })
 
   it('kommt mit Unsinn klar', () => {
