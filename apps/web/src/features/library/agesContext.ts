@@ -20,6 +20,15 @@ export interface AgesContextValue {
    * liegt, verschwindet bei ihm aus der Bibliothek.
    */
   setMinAge: (bookId: string, minAge: number) => Promise<void>
+  /**
+   * Dasselbe für eine ganze Reihe – zweihundert Folgen in einem Rutsch.
+   *
+   * Eigener Weg und nicht zweihundertmal `setMinAge`: Das wären zweihundert
+   * einzelne Schreibvorgänge, die gleichzeitig losrennen. Firestore fasst bis
+   * zu 500 in einem Stapel zusammen; das ist ein Netzgang statt zweihundert
+   * und geht entweder ganz oder gar nicht durch.
+   */
+  setMinAges: (bookIds: readonly string[], minAge: number) => Promise<void>
 }
 
 /**
@@ -31,6 +40,7 @@ export interface AgesContextValue {
 const OHNE_FREIGABEN: AgesContextValue = {
   ages: new Map(),
   setMinAge: () => Promise.resolve(),
+  setMinAges: () => Promise.resolve(),
 }
 
 export const AgesContext = createContext<AgesContextValue>(OHNE_FREIGABEN)

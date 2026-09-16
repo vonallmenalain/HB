@@ -454,7 +454,7 @@ die es sonst nirgends gibt:
 |---|---|
 | **Zugriffsanfragen** | Wer sich mit einer fremden Adresse anmeldet, erscheint hier mit Namen und Adresse. Ein Tap gibt frei. Vorher stand auf dem Sperrbildschirm eine UID zum Abschreiben, die von Hand in die Firebase-Konsole gehörte – der einzige Schritt der ganzen App, der einen Rechner verlangte. |
 | **Titel** | Was die Automatik aus §5.3 falsch aufräumt, lässt sich hier hinschreiben. Der Eintrag gilt für alle Geräte und alle Kinder. |
-| **Altersfreigabe** | „Ab wie vielen Jahren" – je Hörbuch, und auf einen Schlag für alles, was die Suche zeigt (§5.8). Die Freigabe gehört zum Buch und gilt für die ganze Familie; wem sie ein Buch wegnimmt, entscheidet das Alter beim Profil. |
+| **Altersfreigabe** | „Ab wie vielen Jahren" – je Reihe in zwei Taps, je Hörbuch einzeln (§5.8). Die Freigabe gehört zum Buch und gilt für die ganze Familie; wem sie ein Buch wegnimmt, entscheidet das Alter beim Profil. |
 | **Cover** | Wo auf dem NAS kein Bild liegt, lässt sich hier eines hochladen. Für ein Kind, das noch nicht liest, ist das Cover der Name des Hörbuchs – eine farbige Buchstabenkachel ist der Notbehelf, nicht das Ziel. |
 | **Ordner** | Ein Ordner mit vielen Dateien ist entweder ein Hörbuch mit Kapiteln oder eine Sammlung ganzer Folgen. Hier wird umgestellt, welches von beidem (§6.4). |
 | **Gehört** | Wer hat was wie oft gehört – je Profil, mit den meistgehörten Folgen. Beantwortet die Frage, die sich zu Hause tatsächlich stellt („läuft eigentlich immer nur dieselbe Folge?"), ohne ein Protokoll über den Tag eines Kindes anzulegen: gezählt werden Starts und abgespielte Sekunden, sonst nichts. |
@@ -509,9 +509,28 @@ Zwei Schrauben, und sie greifen unabhängig voneinander:
 **Die Altersfreigabe hängt am Hörbuch** und gilt für die ganze Familie. Sie
 steht im Adminbereich, weil sie zur Bibliothek gehört und nicht zu einem Gerät:
 „Der Feuerkelch ist ab 12" ist eine Aussage über das Buch. Gesetzt wird sie auf
-einer kurzen Leiter – 3, 6, 8, 10, 12, 14, 16 – und für eine ganze Reihe auf
-einen Schlag: Bei neunzig Folgen wäre neunzigmal dasselbe anzutippen keine
-Einstellung, sondern eine Strafe.
+einer kurzen Leiter – 3, 6, 8, 10, 12, 14, 16.
+
+**Die Einheit dort ist die Reihe, nicht der Bildschirm.** Der Abschnitt zeigt
+zuerst die Reihen mit ihrer Länge und mit dem, was in ihnen gerade gilt; zwei
+Taps setzen „Die drei ??? ab 10", alle zweihundert Folgen. Zuerst stand dort
+ein Knopf „alle hier gezeigten auf einmal", und der griff nur auf die
+fünfundzwanzig, die die Liste zeigte – für eine Reihe mit zweihundert Folgen
+hiess das achtmal suchen und achtmal tippen, ohne Anzeige, was noch fehlt. Die
+Liste der Reihen ist ausserdem kurz genug, um darin zu suchen; die der
+neunhundert Hörbücher ist es nicht, und deshalb erscheint sie erst nach einer
+Suche.
+
+Bei einer Suche setzt der Knopf einer Reihe nur ihre Treffer, und die Karte
+sagt das („3 von 209 Folgen"): Wer „Weihnachten" sucht, meint die drei
+Weihnachtsfolgen und nicht zweihundert. Gilt in einer Reihe mehr als eine
+Stufe, steht das da – „Gemischt: ohne, ab 8" –, denn „gemischt" allein liesse
+offen, was zu tun ist.
+
+Geschrieben wird das als **ein** Stapel je 400 Folgen (`writeBatch`), nicht als
+zweihundert einzelne Schreibvorgänge: Ein Stapel ist ein Netzgang statt
+zweihundert und geht ganz oder gar nicht durch – es bleiben also keine halb
+gesetzten zweihundert Folgen zurück, an denen sich niemand mehr auskennt.
 
 **Die Sperre hängt am Profil** und gilt nur für dieses Kind. Sie ist für die
 Ausnahme, für die kein Alter etwas hergibt.

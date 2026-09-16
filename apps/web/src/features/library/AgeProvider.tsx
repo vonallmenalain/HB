@@ -1,5 +1,5 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react'
-import { collection, deleteDoc, doc, onSnapshot, setDoc } from 'firebase/firestore'
+import { collection, doc, onSnapshot, writeBatch } from 'firebase/firestore'
 
 import { useUser } from '@/features/auth/authContext'
 import { parseMinAge } from '@/features/profiles/access'
@@ -48,24 +48,47 @@ export function AgeProvider({ children }: { children: ReactNode }) {
     )
   }, [db])
 
-  const setMinAge = useCallback(
-    async (bookId: string, minAge: number) => {
-      if (!db) return
+  /**
+   * Schreibt eine Freigabe für beliebig viele Bücher.
+   *
+   * In Stapeln von 400, weil Firestore bei 500 Schreibvorgängen je Stapel
+   * aufhört. Ein Stapel geht ganz oder gar nicht durch – bei „Die drei ??? ab
+   * 10" bleiben also keine halb gesetzten zweihundert Folgen zurück, an denen
+   * sich niemand mehr auskennt.
+   *
+   * Derselbe Zeitstempel für alle: Sie sind mit einer Handlung entstanden.
+   */
+  const setMinAges = useCallback(
+    async (bookIds: readonly string[], minAge: number) => {
+      if (!db || bookIds.length === 0) return
       const sauber = parseMinAge(minAge)
-      if (sauber <= 0) {
-        await deleteDoc(doc(db, AGES_COLLECTION, bookId))
-        return
+      const zeit = new Date().toISOString()
+
+      for (let start = 0; start < bookIds.length; start += 400) {
+        const batch = writeBatch(db)
+        for (const bookId of bookIds.slice(start, start + 400)) {
+          const ziel = doc(db, AGES_COLLECTION, bookId)
+          // Kein Dokument heisst „frei" – statt einer Null, die jedes Gerät
+          // mitliest.
+          if (sauber <= 0) batch.delete(ziel)
+          else batch.set(ziel, { minAge: sauber, updatedAt: zeit, updatedBy: user.uid })
+        }
+        await batch.commit()
       }
-      await setDoc(doc(db, AGES_COLLECTION, bookId), {
-        minAge: sauber,
-        updatedAt: new Date().toISOString(),
-        updatedBy: user.uid,
-      })
     },
     [db, user.uid],
   )
 
-  const value = useMemo(() => ({ ages, setMinAge }), [ages, setMinAge])
+  // Ein einzelnes Buch ist eine Reihe mit einem Eintrag: Zwei Wege, die
+  // dasselbe tun, liefen früher oder später auseinander.
+  const setMinAge = useCallback(
+    async (bookId: string, minAge: number) => {
+      await setMinAges([bookId], minAge)
+    },
+    [setMinAges],
+  )
+
+  const value = useMemo(() => ({ ages, setMinAge, setMinAges }), [ages, setMinAge, setMinAges])
 
   return <AgesContext value={value}>{children}</AgesContext>
 }

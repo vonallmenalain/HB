@@ -229,6 +229,13 @@ users/{uid}/profiles/{profileId}/favorites/{bookId}
   └─ addedAt            : string        // die Dokument-ID ist die Aussage
 ```
 
+**Eine ganze Reihe wird in Stapeln geschrieben.** „Die drei ??? ab 10" sind
+zweihundert Dokumente; sie gehen als `writeBatch` in Gruppen von 400 hinaus
+(Firestore hört bei 500 je Stapel auf). Ein Stapel geht ganz oder gar nicht
+durch – es bleiben keine halb gesetzten zweihundert Folgen zurück. Eine Freigabe
+wegzunehmen heisst, das Dokument zu löschen: Kein Dokument ist „frei", statt
+einer Null, die jedes Gerät mitliest.
+
 **Favoriten hängen am Profil, nicht am Konto.** Zwei Geschwister auf demselben
 Tablet haben verschiedene Lieblingsfolgen; ein gemeinsamer Stern wäre für beide
 der falsche.
@@ -327,7 +334,7 @@ bookTitles/{bookId}
 
 bookAges/{bookId}
   ├─ minAge             : number        // Altersfreigabe in Jahren; kein Dokument heisst „frei"
-  ├─ updatedAt          : string
+  ├─ updatedAt          : string        // gleich für alle Folgen einer Reihe – eine Handlung
   └─ updatedBy          : string
 
 listening/{uid}_{profileId}_{bookId}
