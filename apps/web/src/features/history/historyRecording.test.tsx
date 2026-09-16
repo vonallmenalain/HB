@@ -76,7 +76,10 @@ function fakeHistory() {
     gehoert,
     context: {
       started: vi.fn(),
-      listened: (_book: Book, seconds: number) => gehoert.push(seconds),
+      listened: (_book: Book, seconds: number) => {
+        gehoert.push(seconds)
+      },
+      forget: vi.fn(),
     },
   }
 }

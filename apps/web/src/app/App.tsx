@@ -14,6 +14,7 @@ import { LibraryProvider } from '@/features/library/LibraryProvider'
 import { TitleProvider } from '@/features/library/TitleProvider'
 import { NowPlayingBar } from '@/features/player/NowPlayingBar'
 import { PlayerProvider } from '@/features/player/PlayerProvider'
+import { ResetProvider } from '@/features/parents/ResetProvider'
 import { ProgressProvider } from '@/features/progress/ProgressProvider'
 import { ProfileProvider } from '@/features/profiles/ProfileProvider'
 import { Screen } from '@/ui/Screen'
@@ -67,8 +68,10 @@ function AuthGate() {
                       <HistoryProvider>
                         <DownloadProvider>
                           <PlayerProvider>
-                            <AppRoutes />
-                            <NowPlayingBar />
+                            <ResetProvider>
+                              <AppRoutes />
+                              <NowPlayingBar />
+                            </ResetProvider>
                           </PlayerProvider>
                         </DownloadProvider>
                       </HistoryProvider>

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
+import { blankProgress } from '@/features/progress/progress'
 import {
   makeAuthValue,
   makeBook,
@@ -119,5 +120,67 @@ describe('Startseite', () => {
       'href',
       '/bibliothek',
     )
+  })
+})
+
+describe('Hörbücher von der Startseite nehmen', () => {
+  const laufend = new Map([
+    ['kids_5', makeProgressEntry({ bookId: 'kids_5', updatedAt: '2026-01-02T00:00:00.000Z' })],
+    ['kids_6', makeProgressEntry({ bookId: 'kids_6', updatedAt: '2026-01-01T00:00:00.000Z' })],
+  ])
+
+  function zeigen(reset = vi.fn()) {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({ books: KIDS }),
+      progress: makeProgressValue({ entries: laufend, reset }),
+    })
+    return reset
+  }
+
+  it('fragt beim ersten Tipp nach und nimmt erst beim zweiten weg', async () => {
+    // Ein Kind tippt schnell. Ein einziger Fehlgriff würde hier drei Stunden
+    // Hörbuch auf Anfang setzen – deshalb zwei Tipps.
+    const reset = zeigen()
+
+    await userEvent.click(screen.getByRole('button', { name: '06 - Folge 6 entfernen' }))
+    expect(reset).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: '06 - Folge 6 wirklich entfernen' }))
+    expect(reset).toHaveBeenCalledWith('kids_6')
+  })
+
+  it('lässt auch das Buch aus „Weiterhören" wegnehmen', async () => {
+    const reset = zeigen()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Folge 5 entfernen' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Folge 5 wirklich entfernen' }))
+
+    expect(reset).toHaveBeenCalledWith('kids_5')
+  })
+
+  it('schlägt nach dem Zurücksetzen nichts mehr vor', () => {
+    // Zurückgesetzt heisst: Einträge auf 0, aber eben Einträge. Würde die
+    // Startseite nur zählen, wie viele es sind, stünden hier weiter Vorschläge
+    // – obwohl nichts gehört wurde.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({ books: KIDS }),
+      progress: makeProgressValue({
+        entries: new Map(KIDS.map((book) => [book.id, blankProgress(book.id)])),
+      }),
+    })
+
+    expect(
+      screen.queryByRole('heading', { name: 'Vielleicht auch etwas für dich' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('stellt kein Kreuz an Vorschläge und Gemerktes', () => {
+    // Dort wäre es eine Frage ohne Antwort: Vorschläge wechseln von allein,
+    // und Gemerktes nimmt der Stern zurück.
+    zeigen()
+
+    expect(screen.queryByRole('button', { name: '07 - Folge 7 entfernen' })).not.toBeInTheDocument()
   })
 })

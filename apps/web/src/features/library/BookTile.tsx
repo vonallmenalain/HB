@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { isDownloaded } from '@/features/downloads/downloads'
 import { useDownloads } from '@/features/downloads/downloadsContext'
 import { useFavorites } from '@/features/favorites/favoritesContext'
+import { RemoveFromShelf } from '@/features/progress/RemoveFromShelf'
 import { BookCover } from '@/ui/BookCover'
 
 import { type Book } from './catalog'
@@ -15,8 +16,20 @@ import { bookLabel } from './titles'
  * Die Folgennummer gehört zum Titel und steht immer davor. Der Reihenname
  * dagegen entfällt innerhalb einer Reihe (`inSeries`) – untereinander gelesen
  * wäre er in jeder Zeile dasselbe Rauschen.
+ *
+ * `onRemove` setzt oben rechts ein Kreuz zum Wegnehmen. Nur die Startseite
+ * gibt es mit: In der Bibliothek stehen alle Hörbücher, dort wäre „entfernen"
+ * eine Frage ohne Antwort.
  */
-export function BookTile({ book, inSeries = false }: { book: Book; inSeries?: boolean }) {
+export function BookTile({
+  book,
+  inSeries = false,
+  onRemove,
+}: {
+  book: Book
+  inSeries?: boolean
+  onRemove?: () => void
+}) {
   const { client } = useLibrary()
   const { get, offlineCoverUrl } = useDownloads()
   const { isFavorite } = useFavorites()
@@ -30,7 +43,7 @@ export function BookTile({ book, inSeries = false }: { book: Book; inSeries?: bo
   const aufDemGeraet = isDownloaded(get(book.id))
   const gemerkt = isFavorite(book.id)
 
-  return (
+  const kachel = (
     <Link
       to={`/buch/${book.id}`}
       className="flex flex-col gap-2 rounded-tile transition-transform active:scale-[0.97] focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
@@ -49,7 +62,10 @@ export function BookTile({ book, inSeries = false }: { book: Book; inSeries?: bo
         {aufDemGeraet ? (
           <span
             title="Auf dem Gerät"
-            className="absolute right-2 top-2 flex size-8 items-center justify-center rounded-full bg-surface text-lg shadow"
+            // Rückt zur Seite, wenn oben rechts das Kreuz zum Wegnehmen sitzt.
+            className={`absolute top-2 flex size-8 items-center justify-center rounded-full bg-surface text-lg shadow ${
+              onRemove ? 'right-14' : 'right-2'
+            }`}
           >
             <span aria-hidden="true">⬇</span>
             <span className="sr-only">Auf dem Gerät</span>
@@ -63,5 +79,20 @@ export function BookTile({ book, inSeries = false }: { book: Book; inSeries?: bo
         <span className="line-clamp-1 px-1 text-sm text-ink-soft">{book.series}</span>
       ) : null}
     </Link>
+  )
+
+  if (!onRemove) return kachel
+
+  // Der Knopf steht neben dem Link, nicht darin: Ein Knopf im Link wäre weder
+  // gültiges HTML noch für Vorlesehilfen eindeutig.
+  return (
+    <div className="relative">
+      {kachel}
+      <RemoveFromShelf
+        title={bookLabel(book)}
+        onRemove={onRemove}
+        className="absolute right-0 top-0"
+      />
+    </div>
   )
 }

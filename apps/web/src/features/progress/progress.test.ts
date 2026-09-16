@@ -6,6 +6,8 @@ import { makeBook } from '@/test/renderWithProfiles'
 import {
   type Progress,
   CONTINUE_MIN_SECONDS,
+  blankProgress,
+  hasListened,
   makeProgress,
   pickContinue,
   progressRatio,
@@ -167,5 +169,25 @@ describe('pickContinue', () => {
 
   it('liefert null, wenn nichts passt', () => {
     expect(pickContinue([], vorhanden)).toBeNull()
+  })
+})
+
+describe('Wurde schon etwas gehört?', () => {
+  it('zählt leere Einträge nicht mit', () => {
+    // Nach dem Zurücksetzen steht zu jedem Buch ein Eintrag – gehört wurde
+    // trotzdem nichts, und die Startseite soll wieder aussehen wie am ersten Tag.
+    expect(hasListened([blankProgress('b_1'), blankProgress('b_2')])).toBe(false)
+  })
+
+  it('erkennt ein angefangenes Buch', () => {
+    expect(hasListened([blankProgress('b_1'), progress({ positionSec: 300 })])).toBe(true)
+  })
+
+  it('zählt auch ein fertig gehörtes Buch', () => {
+    expect(hasListened([progress({ positionSec: 0, finished: true })])).toBe(true)
+  })
+
+  it('sagt bei gar keinen Einträgen nein', () => {
+    expect(hasListened([])).toBe(false)
   })
 })

@@ -7,7 +7,7 @@ import { getFirebase } from '@/lib/firebase'
 import { readAllProgress, writeProgress } from '@/lib/db'
 
 import { type ProgressCloud, createFirestoreCloud } from './cloud'
-import { type Progress } from './progress'
+import { type Progress, blankProgress } from './progress'
 import { ProgressContext, type SyncState } from './progressContext'
 import { mergeRemote, pick } from './sync'
 import { createSyncQueue } from './syncQueue'
@@ -180,16 +180,7 @@ export function ProgressStore({
 
   const reset = useCallback(
     (bookId: string) => {
-      save({
-        bookId,
-        positionSec: 0,
-        fileIdx: 0,
-        offsetSec: 0,
-        filesHash: '',
-        durationSec: 0,
-        finished: false,
-        updatedAt: new Date().toISOString(),
-      })
+      save(blankProgress(bookId))
     },
     [save],
   )

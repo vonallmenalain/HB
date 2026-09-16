@@ -113,6 +113,12 @@ export function HistoryProvider({ children }: { children: ReactNode }) {
           seconds: (eintrag?.seconds ?? 0) + seconds,
         })
       },
+      forget: () => {
+        offen.current.clear()
+        // Auch die Startsperre: Läuft gerade etwas, soll das als neuer Start
+        // zählen und nicht als Fortsetzung einer Zählung, die es nicht mehr gibt.
+        letzterStart.current.clear()
+      },
     }),
     [schreiben],
   )

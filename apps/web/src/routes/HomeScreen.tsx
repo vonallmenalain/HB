@@ -6,7 +6,7 @@ import { useLibrary } from '@/features/library/libraryContext'
 import { suggestBooks } from '@/features/library/suggestions'
 import { ParentEntry } from '@/features/parents/ParentEntry'
 import { ContinueTile } from '@/features/player/ContinueTile'
-import { pickRecent } from '@/features/progress/progress'
+import { hasListened, pickRecent } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { Avatar } from '@/ui/Avatar'
@@ -26,7 +26,7 @@ import { Spinner } from '@/ui/Spinner'
 export function HomeScreen() {
   const { selected } = useProfiles()
   const { status, books, bookById } = useLibrary()
-  const { entries } = useProgress()
+  const { entries, reset } = useProgress()
   const { ids: favoriten } = useFavorites()
 
   const zuletzt = pickRecent([...entries.values()], (id) => bookById(id) !== undefined, 5)
@@ -49,15 +49,17 @@ export function HomeScreen() {
   // Ohne einen einzigen gehörten Satz gibt es nichts vorzuschlagen. Dann
   // stünde dort einfach das Neueste – und darunter, im Ausschnitt der
   // Bibliothek, noch einmal dasselbe.
-  const vorschlaege =
-    entries.size === 0
-      ? []
-      : suggestBooks({
-          books,
-          entries: [...entries.values()],
-          exclude: schonZuSehen,
-          limit: 6,
-        })
+  //
+  // Gezählt werden angefangene Bücher, nicht Einträge: Nach dem Zurücksetzen
+  // steht zu jedem Buch ein Eintrag auf 0, gehört wurde aber nichts.
+  const vorschlaege = !hasListened(entries.values())
+    ? []
+    : suggestBooks({
+        books,
+        entries: [...entries.values()],
+        exclude: schonZuSehen,
+        limit: 6,
+      })
 
   for (const book of vorschlaege) schonZuSehen.add(book.id)
 
@@ -86,7 +88,13 @@ export function HomeScreen() {
 
       {weiter && weiterBuch ? (
         <div className="pb-8">
-          <ContinueTile book={weiterBuch} progress={weiter} />
+          <ContinueTile
+            book={weiterBuch}
+            progress={weiter}
+            onRemove={() => {
+              reset(weiterBuch.id)
+            }}
+          />
         </div>
       ) : null}
 
@@ -100,7 +108,16 @@ export function HomeScreen() {
         />
       ) : null}
 
-      <BookShelf title="Zuletzt gehört" books={weitereAngefangene} />
+      {/* Nur hier steht ein Kreuz an den Kacheln: „Zuletzt gehört" ist eine
+          Liste, die das Kind selbst gefüllt hat – Gemerktes nimmt der Stern
+          zurück, und Vorschläge kommen und gehen ohnehin von allein. */}
+      <BookShelf
+        title="Zuletzt gehört"
+        books={weitereAngefangene}
+        onRemove={(book) => {
+          reset(book.id)
+        }}
+      />
       <BookShelf title="Gemerkt" books={gemerkt} />
       <BookShelf title="Vielleicht auch etwas für dich" books={vorschlaege} />
 

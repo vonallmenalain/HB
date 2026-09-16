@@ -304,9 +304,18 @@ Zeile und zeigt dort nebenbei, in welchem Kapitel man gerade ist.
 | Kontrast | mindestens WCAG AA, Ziel AAA bei Text |
 | Abstand zwischen tappbaren Elementen | ≥ 16 px |
 | Animationen | ruhig, ≤ 250 ms, respektieren `prefers-reduced-motion` |
-| Destruktives | nie im Kinderbereich (kein Löschen, kein Logout, keine Einstellungen) |
+| Destruktives | nie im Kinderbereich – eine Ausnahme, siehe unten |
 | Fehler | nie als Text-Dialog, sondern als Bild + ein Knopf („Nochmal probieren") |
 | Zustand merken | Letztes Profil und letzte Ansicht überleben den App-Neustart |
+
+**Die eine Ausnahme beim Destruktiven** ist das Kreuz an den Kacheln unter
+„Weiterhören" und „Zuletzt gehört". Gemeint war mit der Regel, dass ein Kind
+nichts kaputt machen kann: kein gelöschtes Profil, keine Abmeldung, keine
+Einstellung, die niemand zurückdreht. Hier geht nichts verloren ausser der
+Stelle im Buch – das Hörbuch selbst liegt weiter auf dem NAS und steht zwei
+Tipps entfernt in der Bibliothek. Und es bleibt bei zwei Tipps: Der erste macht
+aus dem Kreuz einen Haken, der zweite nimmt weg. Alles andere aus der Zeile gilt
+unverändert.
 
 Zwei dieser Regeln haben beim Nachmessen nicht gehalten, und beide sahen beim
 Ansehen richtig aus:
@@ -371,7 +380,7 @@ Ansicht, sodass man den Titel unter Umständen gar nicht mehr zu Gesicht bekommt
 Geschützt wird der Bereich durch die PIN, nicht durch das Verstecken der Tür –
 deshalb sagt die App deutlich, solange keine gesetzt ist.
 Enthält: Profile verwalten, Downloads verwalten/löschen, neue Hörbücher suchen,
-Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden.
+Diagnose (ist das NAS erreichbar?), PIN setzen, alles zurücksetzen, Abmelden.
 
 „Neue Hörbücher suchen" lässt bewusst das NAS seine Ordner lesen und wartet auf
 das Ergebnis, statt nur den Katalog neu zu holen. Der Unterschied ist der

@@ -6,6 +6,7 @@ import type { User } from 'firebase/auth'
 
 import { AdminContext, type AdminContextValue } from '@/features/admin/adminContext'
 import { ParentsContext, type ParentsContextValue } from '@/features/parents/parentsContext'
+import { ResetContext, type ResetContextValue } from '@/features/parents/resetContext'
 import { AuthContext, type AuthContextValue } from '@/features/auth/authContext'
 import {
   FavoritesContext,
@@ -215,6 +216,13 @@ export function makeAuthValue(overrides: Partial<AuthContextValue> = {}): AuthCo
   }
 }
 
+export function makeResetValue(overrides: Partial<ResetContextValue> = {}): ResetContextValue {
+  return {
+    resetAll: vi.fn().mockResolvedValue({ progress: 0, favorites: 0, history: null }),
+    ...overrides,
+  }
+}
+
 export function makeAdminValue(overrides: Partial<AdminContextValue> = {}): AdminContextValue {
   return {
     loading: false,
@@ -279,6 +287,7 @@ export function renderWithProfiles(
     parents = makeParentsValue(),
     favorites = makeFavoritesValue(),
     titles = makeTitlesValue(),
+    reset = makeResetValue(),
   }: {
     route?: string
     library?: LibraryContextValue
@@ -290,6 +299,7 @@ export function renderWithProfiles(
     parents?: ParentsContextValue
     favorites?: FavoritesContextValue
     titles?: TitlesContextValue
+    reset?: ResetContextValue
   } = {},
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
@@ -297,6 +307,7 @@ export function renderWithProfiles(
       <MemoryRouter initialEntries={[route]}>
         <AuthContext value={auth}>
           <ParentsContext value={parents}>
+          <ResetContext value={reset}>
           <AdminContext value={admin}>
             <TitlesContext value={titles}>
               <ProfilesContext value={value}>
@@ -312,6 +323,7 @@ export function renderWithProfiles(
               </ProfilesContext>
             </TitlesContext>
           </AdminContext>
+          </ResetContext>
           </ParentsContext>
         </AuthContext>
       </MemoryRouter>
