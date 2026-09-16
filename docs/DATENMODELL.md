@@ -39,9 +39,12 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 │   ├── Drei Ausrufezeichen 001 - Die Handy-Falle.mp3
 │   ├── Drei Ausrufezeichen 001 - Die Handy-Falle.jpg   ← Cover dieser Folge
 │   └── Drei Ausrufezeichen 002 - Betrug beim Casting.mp3
-└── .hb-cache/                             ← vom Scanner angelegt
+└── .hb-cache/                             ← vom Dienst angelegt, beschreibbar
     ├── catalog.json
-    └── meta/                              ← gelesene ID3-Daten, hash-basiert
+    ├── meta/                              ← gelesene ID3-Daten, hash-basiert
+    ├── covers/                            ← aufbereitete Cover aus dem Scan
+    ├── manual/                            ← im Adminbereich hochgeladene Cover
+    └── struktur.json                      ← im Adminbereich umgestellte Ordner
 ```
 
 **Reihe und Gruppe.** Der oberste Ordner unter dem Medien-Stamm ist die Reihe;
@@ -62,6 +65,7 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 | Ordner enthält nur Unterordner | → ist Reihe oder Gruppe; der oberste wird `series`, die dazwischen `group` |
 | Einziger Unterordner heisst `CD1`, `Teil 2`, `01` … | Wird übersprungen: Das Buch erscheint unter dem Namen des Ordners darüber. Sonst hiesse die Folge in der Bibliothek „CD1". Vierstellige Zahlen zählen nicht – `2019` ist eine Jahresangabe |
 | **Alle** Unterordner heissen `CD 1`, `CD 2`, `Teil 3` … | → **ein** Buch über alle Teile, in natürlicher Reihenfolge (`CD 2` vor `CD 10`). Der Teil steht vor dem Kapitelnamen: „CD 3 · Anfang". Verlangt wird das Wort: `01`, `02` und `Folge 1`, `Folge 2` bleiben eigene Bücher – so legen manche Sammlungen ihre Folgen ab |
+| Im Adminbereich umgestellter Ordner | Schlägt die `buch.json`: Was dort eingestellt wurde, lässt sich dort auch zurücknehmen – an die Datei auf dem NAS kommt nicht jeder heran |
 | `buch.json` mit `{"einzelfolgen": true}` | → **jede Audiodatei im Ordner ist ein eigenes Hörbuch.** Titel und Folgennummer kommen aus dem Dateinamen (dieselben Regeln wie bei Ordnernamen), der Ordner selbst wird zur Reihe. Geraten wird das nie: Ein Roman mit langen, benannten Kapiteln sähe von aussen genauso aus |
 | Bild mit demselben Namen wie die Audiodatei | Wird ihr Cover: `001 - Die Handy-Falle.jpg` neben `001 - Die Handy-Falle.mp3`. So bekommt in einem `einzelfolgen`-Ordner jede Folge ihr eigenes Bild |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
@@ -509,6 +513,46 @@ sofort mit `202`; der Scan läuft im Hintergrund weiter und liefert so lange den
 bisherigen Katalog aus. Ein zweiter Aufruf während eines laufenden Scans
 bekommt `409`.
 
+### `GET /admin/struktur?t=<ticket>`
+Die Ordner, die sich umstellen lassen – alle mit mehr als einer Audiodatei, die
+längsten zuerst. Für den Adminbereich der App.
+
+```json
+{
+  "folders": [
+    {
+      "path": "Die Drei Ausrufezeichen",
+      "books": 1,
+      "files": 94,
+      "titles": ["Die Drei Ausrufezeichen"],
+      "mode": null
+    }
+  ]
+}
+```
+
+`mode` ist `"einzelfolgen"`, `"einBuch"` oder `null` („wie es auf dem NAS
+steht").
+
+### `POST /admin/struktur?t=<ticket>`
+`{ "ordner": "Die Drei Ausrufezeichen", "modus": "einzelfolgen" | "einBuch" | null }`
+
+Stellt einen Ordner um und stösst danach einen Scan an – Antwort `202`, der
+Scan läuft im Hintergrund. `modus: null` nimmt die Einstellung zurück; dann
+gilt wieder die `buch.json` auf dem NAS. Die Einstellungen liegen in
+`.hb-cache/struktur.json`, weil der Hörbuch-Ordner nur lesend eingebunden ist.
+
+### `POST /admin/cover/{bookId}?t=<ticket>`
+Rohe Bilddaten im Body (`image/jpeg`, `image/png`, `image/webp`), höchstens
+12 MB – kein Multipart. Das Bild wird wie jedes Cover auf 600 px verkleinert
+und landet in `.hb-cache/manual/{bookId}.jpg`. Es gewinnt über alles, was der
+Scanner findet, und überlebt jeden Scan. Antwort: `{ "cover": "/cover/b_…jpg?v=…" }`.
+`415`, wenn sich das Bild nicht lesen lässt.
+
+### `DELETE /admin/cover/{bookId}?t=<ticket>`
+Nimmt das hochgeladene Bild wieder weg; danach gilt wieder, was auf dem NAS
+liegt.
+
 ### Fehlerfälle
 
 | Code | Bedeutung | Reaktion der App |
@@ -529,7 +573,7 @@ bekommt `409`.
 | `HB_TICKET_SECRET` | *(zufällig, 32+ Byte)* | Signatur der Media-Tickets |
 | `HB_ALLOWED_ORIGINS` | `https://hb.netlify.app` | CORS |
 | `HB_ALLOWED_UIDS` | `abc…,def…` | Leer = jeder verifizierte Nutzer des Projekts |
-| `HB_ADMIN_UIDS` | `abc…` | Darf `/admin/rescan` |
+| `HB_ADMIN_UIDS` | `abc…` | Darf die `/admin/…`-Aufrufe: neu einlesen, Ordner umstellen, Cover setzen |
 | `HB_RESCAN_INTERVAL_MINUTES` | `360` | Abstand automatischer Neu-Scans; `0` schaltet sie ab |
 | `HB_SCAN_ON_START` | `true` | Beim Start einmal einlesen |
 | `HB_PORT` | `8080` | Port **im Container** |

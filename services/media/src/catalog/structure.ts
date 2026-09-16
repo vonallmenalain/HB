@@ -8,6 +8,7 @@
  * Bibliothek anzulegen.
  */
 import type { BookOverride } from './build.js'
+import type { FolderMode } from './settings.js'
 
 /**
  * Ordnernamen, die nichts über den Inhalt sagen: `CD1`, `Teil 2`, `01`.
@@ -60,7 +61,15 @@ export function isSplitAcrossParts(subdirectories: readonly string[]): boolean {
  * ins Leere. Eine Datei auf dem NAS ist dagegen in einer halben Minute
  * geschrieben.
  */
-export function splitsIntoEpisodes(override: BookOverride | null): boolean {
+export function splitsIntoEpisodes(
+  override: BookOverride | null,
+  fromAdmin?: FolderMode,
+): boolean {
+  // Der Adminbereich schlägt die `buch.json`: Was dort eingestellt wurde, lässt
+  // sich dort auch wieder zurücknehmen – an die Datei auf dem NAS kommt nicht
+  // jeder heran.
+  if (fromAdmin === 'einzelfolgen') return true
+  if (fromAdmin === 'einBuch') return false
   return override?.einzelfolgen === true
 }
 

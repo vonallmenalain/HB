@@ -62,6 +62,21 @@ export interface NasStatus {
   scannedAt: string | null
 }
 
+/** Wie ein Ordner gelesen wird, wenn der Adminbereich es vorgibt. */
+export type FolderMode = 'einzelfolgen' | 'einBuch'
+
+/** Ein Ordner auf dem NAS, wie ihn der Adminbereich zur Wahl stellt. */
+export interface MediaFolder {
+  /** Pfad relativ zum Hörbuch-Ordner. */
+  path: string
+  books: number
+  files: number
+  /** Ein paar Titel daraus, zum Wiedererkennen. */
+  titles: string[]
+  /** Was eingestellt ist; null heisst „wie es auf dem NAS steht". */
+  mode: FolderMode | null
+}
+
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
@@ -79,6 +94,19 @@ export interface MediaClient {
   startRescan: () => Promise<'started' | 'already-running'>
   /** Zustand des Dienstes. Braucht kein Ticket – für die Fortschrittsanzeige. */
   fetchStatus: () => Promise<NasStatus>
+  /** Die Ordner, die sich umstellen lassen. Nur fürs Administratorkonto. */
+  fetchFolders: () => Promise<MediaFolder[]>
+  /**
+   * Stellt einen Ordner um: ein Hörbuch oder eines je Datei.
+   *
+   * Der Dienst liest danach neu ein – wie beim Suchen nach neuen Hörbüchern
+   * kommt die Antwort sofort, der Scan läuft weiter.
+   */
+  setFolderMode: (folder: string, mode: FolderMode | null) => Promise<void>
+  /** Legt ein Cover von Hand fest. Liefert die neue Adresse. */
+  uploadCover: (bookId: string, image: Blob) => Promise<string>
+  /** Nimmt es wieder weg; danach gilt wieder, was auf dem NAS liegt. */
+  removeCover: (bookId: string) => Promise<void>
   coverUrl: (coverPath: string) => string | null
   audioUrl: (bookId: string, fileIdx: number) => string | null
   /**
@@ -292,6 +320,63 @@ export function createMediaClient(options: {
     return 'started'
   }
 
+  /** Gemeinsame Fehlerlesart der Admin-Aufrufe. */
+  function adminError(response: Response): MediaRequestError | null {
+    if (response.ok) return null
+    if (response.status === 403) return new MediaRequestError('forbidden')
+    if (response.status === 401) return new MediaRequestError('unauthorized')
+    return new MediaRequestError('server')
+  }
+
+  async function adminCall(
+    path: string,
+    init: RequestInit & { body?: BodyInit },
+  ): Promise<Response> {
+    let response: Response
+    try {
+      response = await withFreshTicket((ticket) => doFetch(withTicket(path, ticket), init))
+    } catch (error) {
+      if (error instanceof MediaRequestError) throw error
+      throw new MediaRequestError('offline')
+    }
+    const fehler = adminError(response)
+    if (fehler !== null) throw fehler
+    return response
+  }
+
+  async function fetchFolders(): Promise<MediaFolder[]> {
+    const response = await adminCall('/admin/struktur', { method: 'GET' })
+
+    let raw: unknown
+    try {
+      raw = await response.json()
+    } catch {
+      throw new MediaRequestError('malformed')
+    }
+
+    const body = raw as { folders?: unknown }
+    if (!Array.isArray(body.folders)) throw new MediaRequestError('malformed')
+
+    // Defensiv wie beim Katalog: Was nicht passt, fliegt raus, statt die ganze
+    // Liste unbrauchbar zu machen.
+    return body.folders.flatMap((entry): MediaFolder[] => {
+      const folder = entry as Partial<Record<keyof MediaFolder, unknown>>
+      if (typeof folder.path !== 'string' || typeof folder.files !== 'number') return []
+      return [
+        {
+          path: folder.path,
+          books: typeof folder.books === 'number' ? folder.books : 0,
+          files: folder.files,
+          titles: Array.isArray(folder.titles)
+            ? folder.titles.filter((title): title is string => typeof title === 'string')
+            : [],
+          mode:
+            folder.mode === 'einzelfolgen' || folder.mode === 'einBuch' ? folder.mode : null,
+        },
+      ]
+    })
+  }
+
   async function fetchStatus(): Promise<NasStatus> {
     let response: Response
     try {
@@ -331,6 +416,30 @@ export function createMediaClient(options: {
     fetchCatalog,
     startRescan,
     fetchStatus,
+    fetchFolders,
+    setFolderMode: async (folder, mode) => {
+      await adminCall('/admin/struktur', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ordner: folder, modus: mode }),
+      })
+    },
+    uploadCover: async (bookId, image) => {
+      const response = await adminCall(`/admin/cover/${bookId}`, {
+        method: 'POST',
+        // Das Bild geht roh hinaus, nicht als Formular: Der Dienst braucht
+        // dafür keinen Multipart-Parser.
+        headers: { 'Content-Type': image.type === '' ? 'application/octet-stream' : image.type },
+        body: image,
+      })
+
+      const body = (await response.json()) as { cover?: unknown }
+      if (typeof body.cover !== 'string') throw new MediaRequestError('malformed')
+      return body.cover
+    },
+    removeCover: async (bookId) => {
+      await adminCall(`/admin/cover/${bookId}`, { method: 'DELETE' })
+    },
     coverUrl: (coverPath) => {
       const ticket = ownTicket()?.ticket
       return ticket === undefined ? null : withTicket(coverPath, ticket)

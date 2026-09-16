@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 
 import { issueTicket } from '../src/auth/ticket.js'
-import { createCatalogStore } from '../src/catalogStore.js'
+import { type CatalogStore, createCatalogStore } from '../src/catalogStore.js'
 import type { Config } from '../src/config.js'
 import { buildServer } from '../src/server.js'
 import { SCHEMA_VERSION } from '../src/catalog/types.js'
@@ -13,6 +13,7 @@ const SECRET = 's'.repeat(40)
 const UID = 'uid-papa'
 
 let app: FastifyInstance
+let store: CatalogStore
 let ticket: string
 let bookId: string
 let bookWithoutCoverId: string
@@ -50,7 +51,7 @@ beforeAll(async () => {
     { path: 'Ohne Cover', files: [{ name: 'a.wav', seconds: 1 }] },
   ])
 
-  const store = createCatalogStore({ mediaRoot, cacheDir })
+  store = createCatalogStore({ mediaRoot, cacheDir })
   await store.rescan()
 
   bookId = store.catalog().books.find((b) => b.title === 'Mit Cover')!.id
@@ -289,5 +290,137 @@ describe('POST /admin/rescan', () => {
 
   it('verlangt ein Ticket', async () => {
     expect((await app.inject({ method: 'POST', url: '/admin/rescan' })).statusCode).toBe(401)
+  })
+})
+
+describe('Cover von Hand setzen', () => {
+  it('nimmt ein Bild an und liefert es danach aus', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookWithoutCoverId}?t=${ticket}`,
+      headers: { 'content-type': 'image/png' },
+      payload: PNG_1X1,
+    })
+
+    expect(response.statusCode).toBe(200)
+    const cover = response.json<{ cover: string }>().cover
+    expect(cover).toContain(bookWithoutCoverId)
+
+    // Sofort sichtbar, ohne auf den nächsten Scan zu warten.
+    expect(store.book(bookWithoutCoverId)?.cover).toBe(cover)
+
+    const bild = await app.inject({ method: 'GET', url: `${cover}&t=${ticket}` })
+    expect(bild.statusCode).toBe(200)
+    expect(bild.headers['content-type']).toBe('image/jpeg')
+  })
+
+  it('schlägt das Bild aus dem Ordner', async () => {
+    const vorher = store.book(bookId)?.cover
+    await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookId}?t=${ticket}`,
+      headers: { 'content-type': 'image/png' },
+      payload: PNG_1X1,
+    })
+    expect(store.book(bookId)?.cover).not.toBe(vorher)
+
+    // Und wieder zurück: Dann gilt erneut, was auf dem NAS liegt.
+    const weg = await app.inject({ method: 'DELETE', url: `/admin/cover/${bookId}?t=${ticket}` })
+    expect(weg.statusCode).toBe(200)
+    expect(store.book(bookId)?.cover).toBe(vorher)
+  })
+
+  it('lehnt ab, was kein Bild ist', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookId}?t=${ticket}`,
+      headers: { 'content-type': 'image/png' },
+      payload: Buffer.from('kein Bild'),
+    })
+    expect(response.statusCode).toBe(415)
+  })
+
+  it('antwortet 404 für ein unbekanntes Buch', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/b_gibtsnicht?t=${ticket}`,
+      headers: { 'content-type': 'image/png' },
+      payload: PNG_1X1,
+    })
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('verlangt ein Ticket', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookId}`,
+      headers: { 'content-type': 'image/png' },
+      payload: PNG_1X1,
+    })
+    expect(response.statusCode).toBe(401)
+  })
+})
+
+describe('Ordner umstellen', () => {
+  it('nennt die Ordner, für die sich das lohnt', async () => {
+    const response = await app.inject({ method: 'GET', url: `/admin/struktur?t=${ticket}` })
+    expect(response.statusCode).toBe(200)
+
+    const { folders } = response.json<{
+      folders: { path: string; files: number; books: number; mode: string | null }[]
+    }>()
+    // „Ohne Cover" hat eine einzige Datei – da gibt es nichts aufzuteilen.
+    expect(folders.map((eintrag) => eintrag.path)).toEqual(['Reihe/01 - Mit Cover'])
+    expect(folders[0]?.files).toBe(2)
+    expect(folders[0]?.mode).toBeNull()
+  })
+
+  it('stellt um, liest neu ein und merkt sich die Wahl', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/struktur?t=${ticket}`,
+      payload: { ordner: 'Reihe/01 - Mit Cover', modus: 'einzelfolgen' },
+    })
+    // 202: Die Einstellung steht, der Scan läuft noch – wie bei /admin/rescan.
+    expect(response.statusCode).toBe(202)
+    await store.rescan()
+
+    // Aus einem Buch mit zwei Kapiteln sind zwei Hörbücher geworden.
+    expect(store.catalog().books.filter((buch) => buch.series === 'Reihe')).toHaveLength(2)
+
+    const liste = await app.inject({ method: 'GET', url: `/admin/struktur?t=${ticket}` })
+    const { folders } = liste.json<{ folders: { path: string; mode: string | null }[] }>()
+    expect(folders.find((eintrag) => eintrag.path === 'Reihe/01 - Mit Cover')?.mode).toBe(
+      'einzelfolgen',
+    )
+
+    // Zurückstellen ergibt wieder ein Buch.
+    await app.inject({
+      method: 'POST',
+      url: `/admin/struktur?t=${ticket}`,
+      payload: { ordner: 'Reihe/01 - Mit Cover', modus: null },
+    })
+    await store.rescan()
+    expect(store.catalog().books.filter((buch) => buch.series === 'Reihe')).toHaveLength(1)
+  })
+
+  it('lehnt Unsinn ab', async () => {
+    const ohneOrdner = await app.inject({
+      method: 'POST',
+      url: `/admin/struktur?t=${ticket}`,
+      payload: { modus: 'einzelfolgen' },
+    })
+    expect(ohneOrdner.statusCode).toBe(400)
+
+    const falscherModus = await app.inject({
+      method: 'POST',
+      url: `/admin/struktur?t=${ticket}`,
+      payload: { ordner: 'Reihe/01 - Mit Cover', modus: 'irgendwas' },
+    })
+    expect(falscherModus.statusCode).toBe(400)
+  })
+
+  it('verlangt ein Ticket', async () => {
+    expect((await app.inject({ method: 'GET', url: '/admin/struktur' })).statusCode).toBe(401)
   })
 })

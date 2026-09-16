@@ -1,9 +1,10 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AdminScreen } from '@/routes/AdminScreen'
 import { type AccessRequest } from '@/features/auth/accessRequest'
+import type { MediaClient, MediaFolder } from '@/features/library/mediaClient'
 import {
   makeAdminValue,
   makeAuthValue,
@@ -104,5 +105,139 @@ describe('Adminbereich', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Speichern' }))
 
     expect(setTitle).toHaveBeenCalledWith('b_1', '68 - Chaos im Dunkeln (Hörspiel)')
+  })
+})
+
+/**
+ * Ein Medien-Dienst, der nur das kann, was der Adminbereich von ihm braucht.
+ *
+ * Bewusst kein Mock der ganzen Schnittstelle: Geprüft wird, was die App
+ * hinausschickt, wenn jemand auf einen Knopf drückt.
+ */
+function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
+  return {
+    ensureTicket: () => Promise.resolve('t'),
+    currentTicket: () => 't',
+    fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
+    startRescan: () => Promise.resolve('started'),
+    fetchStatus: () =>
+      Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
+    fetchFolders: () => Promise.resolve([]),
+    setFolderMode: () => Promise.resolve(),
+    uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=2'),
+    removeCover: () => Promise.resolve(),
+    coverUrl: (path) => `https://nas.example${path}&t=t`,
+    audioUrl: () => null,
+    canonicalAudioUrl: (bookId, fileIdx) => `/audio/${bookId}/${String(fileIdx)}`,
+    canonicalCoverUrl: (path) => path,
+    forgetTicket: () => undefined,
+    ...overrides,
+  }
+}
+
+const ORDNER: MediaFolder = {
+  path: 'Die Drei Ausrufezeichen',
+  books: 1,
+  files: 94,
+  titles: ['Die Drei Ausrufezeichen'],
+  mode: null,
+}
+
+describe('Cover im Adminbereich', () => {
+  const BUCH = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: null })
+
+  function zeigen(client: MediaClient, refresh = vi.fn()) {
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [BUCH], client, refresh }),
+    })
+    return refresh
+  }
+
+  it('schickt ein gewähltes Bild an das NAS', async () => {
+    const uploadCover = vi.fn().mockResolvedValue('/cover/b_1.jpg?v=2')
+    const refresh = zeigen(makeClient({ uploadCover }))
+
+    // Erst suchen: Bei tausend Hörbüchern ist die Liste sonst der Bildschirm.
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+
+    const bild = new File(['x'], 'papagei.png', { type: 'image/png' })
+    await userEvent.upload(screen.getByLabelText('Bild für Der Super-Papagei'), bild)
+
+    expect(uploadCover).toHaveBeenCalledWith('b_1', bild)
+    // Ohne das Neuladen zeigte die App weiter das alte Bild: Die Adresse mit
+    // der neuen Version steht im Katalog.
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled()
+    })
+  })
+
+  it('nimmt ein gesetztes Bild wieder weg', async () => {
+    const removeCover = vi.fn().mockResolvedValue(undefined)
+    const mitBild = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: '/cover/b_1.jpg' })
+
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [mitBild], client: makeClient({ removeCover }) }),
+    })
+
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+    await userEvent.click(screen.getByRole('button', { name: 'Bild wegnehmen' }))
+
+    expect(removeCover).toHaveBeenCalledWith('b_1')
+  })
+
+  it('bietet das Wegnehmen nur an, wo ein Bild ist', async () => {
+    zeigen(makeClient())
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+
+    expect(screen.queryByRole('button', { name: 'Bild wegnehmen' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Ordner umstellen', () => {
+  function zeigen(client: MediaClient) {
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [makeBook()], client }),
+    })
+  }
+
+  it('zeigt die Ordner mit ihren Zahlen', async () => {
+    zeigen(makeClient({ fetchFolders: () => Promise.resolve([ORDNER]) }))
+
+    expect(await screen.findByText('Die Drei Ausrufezeichen')).toBeInTheDocument()
+    expect(screen.getByText(/94 Dateien/)).toBeInTheDocument()
+    expect(screen.getByText('Ein Hörbuch, jede Datei ein Kapitel.')).toBeInTheDocument()
+  })
+
+  it('stellt einen Ordner auf Einzelfolgen um', async () => {
+    const setFolderMode = vi.fn().mockResolvedValue(undefined)
+    zeigen(makeClient({ fetchFolders: () => Promise.resolve([ORDNER]), setFolderMode }))
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Jede Datei ein Hörbuch' }))
+
+    await waitFor(() => {
+      expect(setFolderMode).toHaveBeenCalledWith('Die Drei Ausrufezeichen', 'einzelfolgen')
+    })
+  })
+
+  it('bietet bei umgestellten Ordnern den Weg zurück an', async () => {
+    const setFolderMode = vi.fn().mockResolvedValue(undefined)
+    zeigen(
+      makeClient({
+        fetchFolders: () => Promise.resolve([{ ...ORDNER, mode: 'einzelfolgen', books: 94 }]),
+        setFolderMode,
+      }),
+    )
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Doch ein Hörbuch' }))
+
+    await waitFor(() => {
+      expect(setFolderMode).toHaveBeenCalledWith('Die Drei Ausrufezeichen', 'einBuch')
+    })
   })
 })

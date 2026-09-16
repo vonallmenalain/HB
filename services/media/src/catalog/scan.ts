@@ -3,11 +3,17 @@ import { mkdir, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join, relative, sep } from 'node:path'
 
 import { parseFile } from 'music-metadata'
-import sharp from 'sharp'
 
 import { type BookOverride, type ProbedFile, buildBook, coverPath, parseOverride } from './build.js'
+import {
+  coverVersionOf,
+  manualCoverPath,
+  scannedCoverPath,
+  writeCover,
+} from './cover.js'
 import { bookId } from './ids.js'
 import { audioMime, isCoverFile, naturalCompare } from './naming.js'
+import { type Structure, readStructure } from './settings.js'
 import {
   isDiscFolder,
   isSplitAcrossParts,
@@ -19,7 +25,6 @@ import { SCHEMA_VERSION } from './types.js'
 
 const MAX_DEPTH = 4
 const ADDED_AT_FILE = 'added-at.json'
-const COVER_MAX_PIXELS = 600
 const OVERRIDE_FILE = 'buch.json'
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
@@ -81,43 +86,6 @@ async function probe(
 async function readOverride(folder: string): Promise<BookOverride | null> {
   try {
     return parseOverride(JSON.parse(await readFile(join(folder, OVERRIDE_FILE), 'utf8')))
-  } catch {
-    return null
-  }
-}
-
-/**
- * Fingerabdruck der Cover-Quelle.
- *
- * Bewusst die Quelle und nicht das erzeugte JPEG: Das wird bei jedem Scan neu
- * geschrieben und bekäme jedes Mal eine neue Änderungszeit – die Adresse würde
- * sich dann grundlos ändern und jeden Browser-Cache verwerfen.
- */
-async function coverVersionOf(sourcePath: string): Promise<string | null> {
-  try {
-    const stats = await stat(sourcePath)
-    return createHash('sha1')
-      .update(`${String(stats.size)}:${String(stats.mtimeMs)}`, 'utf8')
-      .digest('hex')
-      .slice(0, 8)
-  } catch {
-    return null
-  }
-}
-
-/** Aufbereitetes Cover in den Cache schreiben. Liefert den Pfad oder null. */
-async function writeCover(
-  bookId: string,
-  cacheDir: string,
-  source: Buffer | string,
-): Promise<string | null> {
-  const target = join(cacheDir, 'covers', `${bookId}.jpg`)
-  try {
-    await sharp(source)
-      .resize(COVER_MAX_PIXELS, COVER_MAX_PIXELS, { fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 82 })
-      .toFile(target)
-    return target
   } catch {
     return null
   }
@@ -211,9 +179,9 @@ function chainOf(mediaRoot: string, path: string): string[] {
 
 async function scanBook(
   source: BookSource,
-  options: ScanOptions,
-  knownAddedAt: ReadonlyMap<string, string>,
+  run: ScanRun,
 ): Promise<{ book: Book; location: BookLocation } | null> {
+  const { options, knownAddedAt } = run
   const { cacheDir } = options
 
   const files: ProbedFile[] = []
@@ -275,16 +243,17 @@ async function scanBook(
 
   let writtenCover: string | null = null
   let coverVersion: string | null = null
+  const target = scannedCoverPath(cacheDir, withoutCover.id)
 
   if (source.coverFile !== null) {
-    writtenCover = await writeCover(withoutCover.id, cacheDir, source.coverFile)
+    writtenCover = await writeCover(target, source.coverFile)
     coverVersion = await coverVersionOf(source.coverFile)
   } else if (embeddedPictureFrom !== null) {
     try {
       const metadata = await parseFile(embeddedPictureFrom)
       const picture = metadata.common.picture?.[0]
       if (picture) {
-        writtenCover = await writeCover(withoutCover.id, cacheDir, Buffer.from(picture.data))
+        writtenCover = await writeCover(target, Buffer.from(picture.data))
         coverVersion = await coverVersionOf(embeddedPictureFrom)
       }
     } catch {
@@ -292,12 +261,27 @@ async function scanBook(
     }
   }
 
-  const book: Book =
-    writtenCover === null
-      ? withoutCover
-      : { ...withoutCover, cover: coverPath(withoutCover.id, coverVersion) }
+  const scannedCover =
+    writtenCover === null ? null : coverPath(withoutCover.id, coverVersion)
 
-  return { book, location: { id: book.id, filePaths, coverPath: writtenCover } }
+  // Ein im Adminbereich hochgeladenes Bild gewinnt über alles, was auf dem NAS
+  // liegt: Es ist die jüngere und ausdrückliche Ansage. Es überlebt den Scan,
+  // weil es in einem eigenen Ordner liegt.
+  const manualVersion = await coverVersionOf(manualCoverPath(cacheDir, withoutCover.id))
+  const cover = manualVersion === null ? scannedCover : coverPath(withoutCover.id, manualVersion)
+
+  const book: Book = cover === null ? withoutCover : { ...withoutCover, cover }
+
+  return {
+    book,
+    location: {
+      id: book.id,
+      folder: relative(options.mediaRoot, source.folder),
+      filePaths,
+      coverPath: writtenCover,
+      scannedCover,
+    },
+  }
 }
 
 interface Collected {
@@ -305,16 +289,25 @@ interface Collected {
   locations: Map<string, BookLocation>
 }
 
-async function collect(
-  source: BookSource,
-  options: ScanOptions,
-  collected: Collected,
-  knownAddedAt: ReadonlyMap<string, string>,
-): Promise<void> {
-  const result = await scanBook(source, options, knownAddedAt)
+/**
+ * Was während eines Scans überall gebraucht wird.
+ *
+ * Gebündelt statt einzeln durchgereicht: Sonst trüge jede Funktion hier unten
+ * fünf Parameter, von denen sie vier nur weitergibt.
+ */
+interface ScanRun {
+  options: ScanOptions
+  collected: Collected
+  knownAddedAt: ReadonlyMap<string, string>
+  /** Was der Adminbereich über einzelne Ordner sagt. */
+  structure: Structure
+}
+
+async function collect(source: BookSource, run: ScanRun): Promise<void> {
+  const result = await scanBook(source, run)
   if (!result) return
-  collected.books.push(result.book)
-  collected.locations.set(result.book.id, result.location)
+  run.collected.books.push(result.book)
+  run.collected.locations.set(result.book.id, result.location)
 }
 
 /**
@@ -330,10 +323,9 @@ async function collectEpisodes(
   folder: string,
   contents: FolderContents,
   override: BookOverride | null,
-  options: ScanOptions,
-  collected: Collected,
-  knownAddedAt: ReadonlyMap<string, string>,
+  run: ScanRun,
 ): Promise<void> {
+  const { options } = run
   const relativeFolder = relative(options.mediaRoot, folder)
   const folderChain = relativeFolder === '' ? [] : relativeFolder.split(sep)
   const forEpisode = overrideForEpisode(override)
@@ -357,9 +349,7 @@ async function collectEpisodes(
         // sich sonst etwas im Ordner ändert.
         addedAtFrom: path,
       },
-      options,
-      collected,
-      knownAddedAt,
+      run,
     )
   }
 
@@ -372,13 +362,8 @@ function coverOf(folder: string, contents: FolderContents): string | null {
   return contents.cover === null ? null : join(folder, contents.cover)
 }
 
-async function walk(
-  folder: string,
-  depth: number,
-  options: ScanOptions,
-  collected: Collected,
-  knownAddedAt: ReadonlyMap<string, string>,
-): Promise<void> {
+async function walk(folder: string, depth: number, run: ScanRun): Promise<void> {
+  const { options } = run
   if (depth > MAX_DEPTH) return
 
   let contents: FolderContents
@@ -396,8 +381,8 @@ async function walk(
   if (contents.audio.length > 0) {
     const override = await readOverride(folder)
 
-    if (splitsIntoEpisodes(override)) {
-      await collectEpisodes(folder, contents, override, options, collected, knownAddedAt)
+    if (splitsIntoEpisodes(override, run.structure.get(relative(options.mediaRoot, folder)))) {
+      await collectEpisodes(folder, contents, override, run)
       return
     }
 
@@ -416,9 +401,7 @@ async function walk(
         override,
         addedAtFrom: folder,
       },
-      options,
-      collected,
-      knownAddedAt,
+      run,
     )
     return
   }
@@ -456,9 +439,7 @@ async function walk(
           override: await readOverride(folder),
           addedAtFrom: folder,
         },
-        options,
-        collected,
-        knownAddedAt,
+        run,
       )
       return
     }
@@ -489,9 +470,7 @@ async function walk(
             override: (await readOverride(innerPath)) ?? (await readOverride(folder)),
             addedAtFrom: innerPath,
           },
-          options,
-          collected,
-          knownAddedAt,
+          run,
         )
         return
       }
@@ -501,7 +480,7 @@ async function walk(
   }
 
   for (const name of contents.subdirectories) {
-    await walk(join(folder, name), depth + 1, options, collected, knownAddedAt)
+    await walk(join(folder, name), depth + 1, run)
   }
 }
 
@@ -542,10 +521,18 @@ async function readKnownAddedAt(cacheDir: string): Promise<Map<string, string>> 
 export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
   await mkdir(join(options.cacheDir, 'meta'), { recursive: true })
   await mkdir(join(options.cacheDir, 'covers'), { recursive: true })
+  // Hochgeladene Cover liegen getrennt von den erzeugten: Der Scan schreibt
+  // `covers/` bei jedem Lauf neu.
+  await mkdir(join(options.cacheDir, 'manual'), { recursive: true })
 
-  const knownAddedAt = await readKnownAddedAt(options.cacheDir)
   const collected: Collected = { books: [], locations: new Map() }
-  await walk(options.mediaRoot, 0, options, collected, knownAddedAt)
+  const run: ScanRun = {
+    options,
+    collected,
+    knownAddedAt: await readKnownAddedAt(options.cacheDir),
+    structure: await readStructure(options.cacheDir),
+  }
+  await walk(options.mediaRoot, 0, run)
 
   await writeFile(
     join(options.cacheDir, ADDED_AT_FILE),
