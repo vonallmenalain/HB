@@ -293,10 +293,49 @@ die Dateien. Fällt eine Stelle aus, bleibt die andere wirksam.
 
 ## 9. Aktualisieren
 
-Sobald am Medien-Dienst etwas geändert wird, baut GitHub das Image neu. Auf dem
-NAS gibt es zwei Wege, es dort auch laufen zu lassen.
+**Am NAS ist dafür nichts zu tun.** Sobald am Medien-Dienst etwas geändert
+wird, baut GitHub das Image neu, und der Wächter auf dem NAS holt es sich:
 
-**Von Hand – zwei Zeilen:**
+```
+Änderung an services/media/**
+        │
+        ├─ GitHub Action „Medien-Dienst": baut amd64 + arm64,
+        │  legt ghcr.io/…/hb-media:latest ab                  ~2 Minuten
+        │
+        └─ Wächter auf dem NAS: sieht alle 5 Minuten nach,
+           holt das Image, startet hb-media neu               ~5 Minuten
+```
+
+Zusammen also eine knappe Viertelstunde von „gemerged" bis „läuft". Prüfen
+lässt sich das an der Kennung des Stands, der tatsächlich läuft:
+
+```bash
+curl http://localhost:18080/health
+# {"ok":true,"version":"1a2b3c4","schemaVersion":2,"books":187,…}
+```
+
+`version` ist die Kennung des Standes, aus dem das Image gebaut wurde – sie
+steht auch in der Zusammenfassung des GitHub-Laufs. `schemaVersion` sagt,
+welche Katalogform der Dienst liefert; die App zeigt im Elternbereich eine
+Warnung, solange dort noch `1` steht.
+
+**Der Wächter läuft ab dem ersten `docker compose up -d` mit.** Er heisst
+`hb-watchtower`, sieht alle `HB_UPDATE_INTERVAL_SECONDS` nach (Vorgabe: 300)
+und fasst nur `hb-media` an, nichts anderes auf dem NAS.
+
+> **Was das kostet:** Der Wächter braucht den Docker-Socket und darf damit
+> alles, was Docker auf dem NAS darf. Für ein Heim-NAS mit einem einzigen
+> Dienst ist das vertretbar – die Alternative wäre, dass wochenlang ein alter
+> Stand läuft, weil niemand daran denkt. Wer ihn trotzdem nicht will, startet
+> nur den Dienst selbst: `docker compose up -d hb-media`.
+
+> **Wenn gerade jemand hört:** Der Neustart dauert Sekunden. Fällt er mitten in
+> eine Folge, zeigt die App „Nochmal versuchen" und es geht an derselben Stelle
+> weiter. Wer das ausschliessen will, setzt `HB_UPDATE_INTERVAL_SECONDS` hoch
+> (z. B. `21600` für alle sechs Stunden) – dann kommt die Änderung später, aber
+> mit weniger Gelegenheiten, jemanden zu stören.
+
+**Von Hand geht es weiterhin** – etwa, wenn eine Änderung sofort da sein soll:
 
 ```bash
 cd /share/CACHEDEV2_DATA/Container/hb-media
@@ -306,39 +345,16 @@ docker compose pull && docker compose up -d
 `up -d` startet den Container nur neu, wenn sich das Image tatsächlich geändert
 hat. Ist schon der neue Stand da, passiert nichts.
 
-**Von selbst – einmal einschalten:**
-
-```bash
-docker compose --profile auto-update up -d
-```
-
-Damit läuft zusätzlich ein kleiner Wächter (Watchtower), der stündlich nach
-einem neuen Image sieht und `hb-media` bei Bedarf neu startet. Den Abstand
-bestimmt `HB_UPDATE_INTERVAL_SECONDS`.
-
-> **Was das kostet:** Der Wächter braucht den Docker-Socket und darf damit
-> alles, was Docker auf dem NAS darf. Für ein Heim-NAS ist das vertretbar, aber
-> es ist eine Entscheidung – deshalb liegt er in einem eigenen Profil und
-> startet nicht von allein mit.
-
-**Prüfen, was läuft:**
-
-```bash
-curl http://localhost:18080/health
-# {"ok":true,"version":"1a2b3c4","schemaVersion":2,"books":187,…}
-```
-
-`version` ist die Kennung des Standes, aus dem das Image gebaut wurde – sie
-steht auch im Protokoll des GitHub-Workflows. `schemaVersion` sagt, welche
-Katalogform der Dienst liefert; die App zeigt im Elternbereich eine Warnung,
-solange dort noch `1` steht.
-
 **Einen Stand zurücknehmen:** In der `.env` `HB_IMAGE` auf eine bestimmte
 Kennung setzen und neu starten:
 
 ```bash
 HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 ```
+
+Das hält den Stand auch fest: Der Wächter sieht dann nach einer Kennung, die
+sich nie ändert, und startet nichts mehr neu. Zurück in den Fluss kommt man,
+indem man `HB_IMAGE` wieder leert.
 
 ---
 
@@ -354,6 +370,7 @@ HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 | Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
 | `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port. Steht in der `.env` `HB_HOST_PORT` gar nicht oder nur leer (`HB_HOST_PORT=`), greift die Vorgabe – Zeile auf `HB_HOST_PORT=18080` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
+| Änderungen kommen nicht von selbst an | Läuft `hb-watchtower`? `docker compose ps` zeigt es. Fehlt er, wurde die Anwendung vor dieser Fassung der `docker-compose.yml` gestartet – einmal `docker compose up -d` mit der neuen Datei |
 | Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` (nur, wenn der Tunnel vorher lief) |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
