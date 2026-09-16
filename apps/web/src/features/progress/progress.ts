@@ -118,6 +118,20 @@ export function hasStarted(entry: Progress): boolean {
   return entry.positionSec >= Math.min(CONTINUE_MIN_SECONDS, entry.durationSec * CONTINUE_MIN_RATIO)
 }
 
+/**
+ * Wurde überhaupt schon etwas gehört?
+ *
+ * Die blosse Zahl der Einträge taugt dafür nicht: Nach dem Zurücksetzen steht
+ * zu jedem Buch ein Eintrag auf 0 – gehört wurde trotzdem nichts, und die
+ * Startseite soll wieder aussehen wie am ersten Tag.
+ */
+export function hasListened(entries: Iterable<Progress>): boolean {
+  for (const entry of entries) {
+    if (entry.finished || hasStarted(entry)) return true
+  }
+  return false
+}
+
 export function pickContinue(
   entries: readonly Progress[],
   hasBook: (bookId: string) => boolean,

@@ -75,7 +75,7 @@ export function ContinueTile({
       <RemoveFromShelf
         title={book.title}
         onRemove={onRemove}
-        className="absolute right-3 top-3"
+        className="absolute right-0 top-0"
       />
     </div>
   )

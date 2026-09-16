@@ -46,9 +46,11 @@ export function RemoveFromShelf({
     <button
       type="button"
       aria-label={fragt ? `${title} wirklich entfernen` : `${title} entfernen`}
-      className={`flex size-11 items-center justify-center rounded-full text-xl shadow transition-transform active:scale-90 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-        fragt ? 'bg-accent text-white' : 'bg-surface text-ink-soft'
-      } ${className}`}
+      // Die Fläche misst 64px – die Untergrenze aus KONZEPT §5.5 –, der
+      // sichtbare Kreis bleibt kleiner. Andersherum, mit einem Ziel von der
+      // Grösse des Kreises, landete jeder Fehlgriff auf der Kachel darunter
+      // und startete das Hörbuch.
+      className={`flex size-touch items-center justify-center rounded-full focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent ${className}`}
       onClick={() => {
         if (!fragt) {
           setFragt(true)
@@ -58,7 +60,14 @@ export function RemoveFromShelf({
         onRemove()
       }}
     >
-      <span aria-hidden="true">{fragt ? '✓' : '✕'}</span>
+      <span
+        aria-hidden="true"
+        className={`flex size-11 items-center justify-center rounded-full text-xl shadow transition-transform ${
+          fragt ? 'bg-accent text-white' : 'bg-surface text-ink-soft'
+        }`}
+      >
+        {fragt ? '✓' : '✕'}
+      </span>
     </button>
   )
 }

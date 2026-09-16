@@ -6,7 +6,7 @@ import { useLibrary } from '@/features/library/libraryContext'
 import { suggestBooks } from '@/features/library/suggestions'
 import { ParentEntry } from '@/features/parents/ParentEntry'
 import { ContinueTile } from '@/features/player/ContinueTile'
-import { pickRecent } from '@/features/progress/progress'
+import { hasListened, pickRecent } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { Avatar } from '@/ui/Avatar'
@@ -49,15 +49,17 @@ export function HomeScreen() {
   // Ohne einen einzigen gehörten Satz gibt es nichts vorzuschlagen. Dann
   // stünde dort einfach das Neueste – und darunter, im Ausschnitt der
   // Bibliothek, noch einmal dasselbe.
-  const vorschlaege =
-    entries.size === 0
-      ? []
-      : suggestBooks({
-          books,
-          entries: [...entries.values()],
-          exclude: schonZuSehen,
-          limit: 6,
-        })
+  //
+  // Gezählt werden angefangene Bücher, nicht Einträge: Nach dem Zurücksetzen
+  // steht zu jedem Buch ein Eintrag auf 0, gehört wurde aber nichts.
+  const vorschlaege = !hasListened(entries.values())
+    ? []
+    : suggestBooks({
+        books,
+        entries: [...entries.values()],
+        exclude: schonZuSehen,
+        limit: 6,
+      })
 
   for (const book of vorschlaege) schonZuSehen.add(book.id)
 

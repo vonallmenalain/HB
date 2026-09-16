@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
+import { blankProgress } from '@/features/progress/progress'
 import {
   makeAuthValue,
   makeBook,
@@ -156,6 +157,23 @@ describe('Hörbücher von der Startseite nehmen', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Folge 5 wirklich entfernen' }))
 
     expect(reset).toHaveBeenCalledWith('kids_5')
+  })
+
+  it('schlägt nach dem Zurücksetzen nichts mehr vor', () => {
+    // Zurückgesetzt heisst: Einträge auf 0, aber eben Einträge. Würde die
+    // Startseite nur zählen, wie viele es sind, stünden hier weiter Vorschläge
+    // – obwohl nichts gehört wurde.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({ books: KIDS }),
+      progress: makeProgressValue({
+        entries: new Map(KIDS.map((book) => [book.id, blankProgress(book.id)])),
+      }),
+    })
+
+    expect(
+      screen.queryByRole('heading', { name: 'Vielleicht auch etwas für dich' }),
+    ).not.toBeInTheDocument()
   })
 
   it('stellt kein Kreuz an Vorschläge und Gemerktes', () => {

@@ -11,6 +11,7 @@ import {
 
 import { useAuth, useUser } from '@/features/auth/authContext'
 import { HISTORY_COLLECTION } from '@/features/history/HistoryProvider'
+import { useHistory } from '@/features/history/historyContext'
 import { deviceId } from '@/features/progress/cloud'
 import { blankProgress } from '@/features/progress/progress'
 import { toRemoteDoc } from '@/features/progress/sync'
@@ -101,6 +102,7 @@ export function ResetProvider({ children }: { children: ReactNode }) {
   const user = useUser()
   const { isAdmin } = useAuth()
   const { profiles } = useProfiles()
+  const { forget } = useHistory()
 
   const config = useMemo(() => readFirebaseConfig(), [])
   const db = useMemo(() => (config.ok ? getFirebase(config.config).db : null), [config])
@@ -116,13 +118,18 @@ export function ResetProvider({ children }: { children: ReactNode }) {
       favorites += bilanz.favorites
     }
 
+    // Erst vergessen, dann löschen: Die Historie sammelt gehörte Sekunden eine
+    // Minute lang im Speicher. Geht dieser Rest nach dem Löschen hinaus, legt
+    // `increment` die eben gelöschten Dokumente wieder an.
+    forget()
+
     // Die Historie gehört dem Administrator; die Regeln lassen sonst niemanden
     // sie auch nur lesen. Ohne diese Abfrage liefe die Anfrage in einen Fehler
     // und nähme das gelungene Zurücksetzen mit.
     const history = isAdmin ? await historieLoeschen(db, user.uid) : null
 
     return { progress, favorites, history }
-  }, [db, user.uid, profiles, isAdmin])
+  }, [db, user.uid, profiles, isAdmin, forget])
 
   const value = useMemo(() => ({ resetAll }), [resetAll])
 

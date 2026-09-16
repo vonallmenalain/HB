@@ -91,7 +91,7 @@ export function BookTile({
       <RemoveFromShelf
         title={bookLabel(book)}
         onRemove={onRemove}
-        className="absolute right-2 top-2"
+        className="absolute right-0 top-0"
       />
     </div>
   )
