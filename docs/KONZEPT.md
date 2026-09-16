@@ -808,7 +808,7 @@ eigenen Weg:
 |---|---|
 | App | Netlify baut aus `main`; veröffentlicht wird von Hand |
 | Firestore-Regeln | GitHub deployt sie bei jeder Änderung an der Vorlage ([`FIREBASE-DEPLOY.md`](./FIREBASE-DEPLOY.md)) |
-| Medien-Dienst | GitHub baut das Image für `amd64` und `arm64` und legt es in der GitHub Container Registry ab; ein Wächter auf dem NAS holt es von selbst und startet den Dienst neu – am NAS ist nichts zu tun ([`QNAP-SETUP.md`](./QNAP-SETUP.md#9-aktualisieren)) |
+| Medien-Dienst | GitHub baut das Image für `amd64` und `arm64` und legt es in der GitHub Container Registry ab; ein Wächter auf dem NAS holt es von selbst und startet den Dienst neu – am NAS ist nichts zu tun. Läuft dort schon einer für andere Dienste, genügt ihm das Label an `hb-media`; sonst bringt die `docker-compose.yml` einen mit ([`QNAP-SETUP.md`](./QNAP-SETUP.md#9-aktualisieren)) |
 
 Das ist Absicht: Die App darf sich ändern, ohne das NAS anzufassen, und
 umgekehrt. Welcher Stand auf dem NAS läuft, sagt `/health` – ohne die Angabe

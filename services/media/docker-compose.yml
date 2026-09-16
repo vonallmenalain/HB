@@ -11,6 +11,11 @@
 # Minuten nach, ob GitHub ein neues Image gebaut hat, und startet hb-media
 # damit neu. Am NAS ist dafür nichts mehr zu tun.
 #
+# Läuft auf dem NAS schon ein Wächter für andere Dienste, übernimmt der das –
+# hb-media trägt dafür nur das Label unten. Wo keiner läuft:
+#
+#   Eigenen Wächter mitstarten:  docker compose --profile waechter up -d
+#
 # Selber bauen geht weiterhin (etwa zum Ausprobieren einer Änderung):
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml build
 
@@ -21,6 +26,12 @@ services:
     image: ${HB_IMAGE:-ghcr.io/vonallmenalain/hb-media:latest}
     container_name: hb-media
     restart: unless-stopped
+    labels:
+      # Ein Wächter, der mit `--label-enable` läuft, fasst nur Container mit
+      # diesem Label an. Viele NAS haben einen solchen schon für ihre übrigen
+      # Dienste – dann genügt diese Zeile, und es braucht hier keinen zweiten.
+      # Ohne einen solchen Wächter tut das Label nichts.
+      com.centurylinklabs.watchtower.enable: 'true'
     ports:
       # Vorgabe 18080 und nicht 8080: Auf dem QNAP gehört 8080 der
       # QTS-Weboberfläche, und der Start scheitert dann mit
@@ -58,21 +69,22 @@ services:
     depends_on:
       - hb-media
 
-  # Holt neue Images von selbst und startet hb-media damit neu. Damit landet
-  # jede Änderung, die GitHub gebaut hat, ohne Zutun auf dem NAS.
+  # Holt neue Images von selbst und startet hb-media damit neu – für ein NAS,
+  # auf dem noch kein Wächter läuft.
   #
-  # Läuft bewusst von Anfang an mit und nicht in einem eigenen Profil: Die
-  # halbe Automatik – GitHub baut, aber jemand muss auf dem NAS `pull` tippen –
-  # ist die Variante, bei der am Ende wochenlang der alte Stand läuft, ohne
-  # dass es jemandem auffällt.
+  # Im Profil `waechter`, weil ein zweiter Wächter neben einem bestehenden
+  # nichts besser macht: Er bräuchte noch einmal den Docker-Socket, und beide
+  # würden dasselbe Image ziehen. Wo schon einer läuft, genügt das Label an
+  # hb-media weiter oben. Welcher Fall zutrifft, verrät:
   #
-  # Was das kostet, steht in docs/QNAP-SETUP.md §9: Der Wächter braucht den
-  # Docker-Socket und darf damit alles, was Docker auf dem NAS darf. Wer das
-  # nicht will, startet nur den Dienst:
-  #   docker compose up -d hb-media
+  #   docker ps --filter ancestor=containrrr/watchtower
+  #
+  # Was der Wächter kostet, steht in docs/QNAP-SETUP.md §9: Er braucht den
+  # Docker-Socket und darf damit alles, was Docker auf dem NAS darf.
   watchtower:
     image: containrrr/watchtower:latest
     container_name: hb-watchtower
+    profiles: ['waechter']
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
