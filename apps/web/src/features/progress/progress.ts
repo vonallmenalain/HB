@@ -140,16 +140,29 @@ export function pickContinue(
 }
 
 /**
+ * Wie viele angefangene Bücher die Startseite zeigt – das grosse eingerechnet.
+ *
+ * Es waren fünf, also vier Kacheln unter der grossen. Wer abends in drei
+ * Büchern gleichzeitig liest und dazu einen Sprachkurs hört, fand das fünfte
+ * nur noch über die Bibliothek wieder – und dort ohne die Stelle, an der es
+ * steht. Ganz ohne Grenze wäre der Abschnitt dagegen kein Abschnitt mehr,
+ * sondern eine zweite Bibliothek: Gemerktes und Vorschläge lägen dann eine
+ * halbe Handylänge weiter unten. Zwölf sind auf dem Telefon sechs Zeilen, und
+ * was darüber hinausgeht, nimmt das Kreuz an der Kachel weg.
+ */
+export const CONTINUE_LIMIT = 12
+
+/**
  * Die zuletzt angefangenen Bücher, das jüngste zuerst.
  *
  * Auf der Startseite steht darüber „Weiterhören": das erste gross, der Rest als
- * Kacheln daneben. Fertig gehörte Bücher gehören nicht dazu – sie fingen wieder
+ * Kacheln darunter. Fertig gehörte Bücher gehören nicht dazu – sie fingen wieder
  * von vorn an, und das will niemand angeboten bekommen.
  */
 export function pickRecent(
   entries: readonly Progress[],
   hasBook: (bookId: string) => boolean,
-  limit = 6,
+  limit: number = CONTINUE_LIMIT,
 ): Progress[] {
   return entries
     .filter((entry) => !entry.finished && hasStarted(entry) && hasBook(entry.bookId))

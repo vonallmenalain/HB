@@ -9,7 +9,8 @@ import { useEffect, useState } from 'react'
 const ASK_TIMEOUT_MS = 5000
 
 /**
- * Nimmt ein Hörbuch von „Weiterhören" und „Zuletzt gehört".
+ * Nimmt ein Hörbuch von „Weiterhören" – von der grossen Kachel wie von den
+ * Kacheln im Abschnitt darunter.
  *
  * Zwei Tipps, nicht einer: Der erste fragt, der zweite entfernt. Für ein Kind
  * ist das kein Umweg, sondern der Unterschied zwischen „daneben getippt" und

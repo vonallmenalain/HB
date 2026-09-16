@@ -132,6 +132,59 @@ describe('Bibliothek', () => {
     expect(screen.getByRole('link', { name: /Startseite/ })).toHaveAttribute('href', '/')
   })
 
+  it('stellt ein Hörbuch ohne Reihe neben die Reihen statt in ein Sammelfach', () => {
+    // Früher lagen alle Bücher ohne Reihe zusammen in „Einzelne Hörbücher".
+    // Ein Sprachkurs und „Die unendliche Geschichte" haben miteinander aber
+    // nichts zu tun – ausser dass ihr Ordner eine Ebene höher liegt als bei
+    // den anderen. Wer sie suchte, musste erst die Restekiste kennen.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({
+        books: [
+          ...BOOKS,
+          makeBook({ id: 'b_8', title: 'Englisch', series: null, seriesIndex: null }),
+          makeBook({
+            id: 'b_9',
+            title: 'Die unendliche Geschichte',
+            series: null,
+            seriesIndex: null,
+          }),
+        ],
+      }),
+    })
+
+    expect(screen.getByRole('link', { name: 'Englisch' })).toHaveAttribute('href', '/buch/b_8')
+    expect(screen.getByRole('link', { name: 'Die unendliche Geschichte' })).toHaveAttribute(
+      'href',
+      '/buch/b_9',
+    )
+    expect(screen.queryByText('Einzelne Hörbücher')).not.toBeInTheDocument()
+  })
+
+  it('sortiert einzelne Hörbücher alphabetisch zwischen die Reihen', () => {
+    // Nicht angehängt, sondern einsortiert: Sonst wäre die Restekiste nur von
+    // einem Fach zu einem Abschnitt am Ende geworden.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/bibliothek',
+      library: makeLibraryValue({
+        books: [
+          ...BOOKS,
+          makeBook({ id: 'b_8', title: 'Chinesisch', series: null, seriesIndex: null }),
+          makeBook({ id: 'b_9', title: 'Englisch', series: null, seriesIndex: null }),
+        ],
+      }),
+    })
+
+    const namen = screen
+      .getAllByRole('link')
+      .map((link) => link.textContent ?? '')
+      .filter((text) => /Chinesisch|Die drei|Englisch/.test(text))
+
+    expect(namen[0]).toContain('Chinesisch')
+    expect(namen[1]).toContain('Die drei ???')
+    expect(namen[2]).toContain('Englisch')
+  })
+
   it('führt bei einer Reihe mit einem einzigen Buch direkt zum Buch', () => {
     // Eine Reihe mit einem Eintrag ist keine Reihe – der Zwischenschritt wäre
     // nur ein Tap für eine Liste mit einer Kachel.

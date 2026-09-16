@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
-import { blankProgress } from '@/features/progress/progress'
+import { CONTINUE_LIMIT, blankProgress } from '@/features/progress/progress'
 import {
   makeAuthValue,
   makeBook,
@@ -181,5 +181,77 @@ describe('Hörbücher von der Startseite nehmen', () => {
     zeigen()
 
     expect(screen.queryByRole('button', { name: '07 - Folge 7 entfernen' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Weiterhören', () => {
+  // Zwanzig angefangene Hörbücher, das erste zuletzt gehört – mehr als die
+  // Startseite zeigt. Buchstaben statt Zahlen als Titel: „Buch 1" steckt auch
+  // in „Buch 10", und eine Prüfung darauf hielte stillschweigend.
+  const NAMEN = [...'ABCDEFGHIJKLMNOPQRST']
+  const ANGEFANGEN = NAMEN.map((name) =>
+    makeBook({
+      id: `b_${name.toLowerCase()}`,
+      title: `Buch ${name}`,
+      series: null,
+      seriesIndex: null,
+    }),
+  )
+  const fortschritt = new Map(
+    ANGEFANGEN.map((book, index) => [
+      book.id,
+      makeProgressEntry({
+        bookId: book.id,
+        // Absteigend: „Buch A" ist das jüngste und wird die grosse Kachel.
+        updatedAt: `2026-01-${String(NAMEN.length - index).padStart(2, '0')}T00:00:00.000Z`,
+      }),
+    ]),
+  )
+
+  function zeigen(reset = vi.fn()) {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({ books: ANGEFANGEN }),
+      progress: makeProgressValue({ entries: fortschritt, reset }),
+    })
+    return reset
+  }
+
+  it('stellt die weiteren angefangenen Hörbücher unter die grosse Kachel', () => {
+    // Bisher hiess der Abschnitt „Zuletzt gehört" – zwei Namen für dieselbe
+    // Liste, und keiner sagte, was beim Antippen passiert.
+    zeigen()
+
+    const weiter = abschnitt('Weiterhören')
+    expect(weiter.textContent).toContain('Buch B')
+    expect(weiter.textContent).toContain('Buch C')
+    // Das jüngste steht gross darüber und nicht noch einmal als Kachel.
+    expect(weiter.textContent).not.toContain('Buch A')
+    expect(screen.queryByRole('heading', { name: 'Zuletzt gehört' })).not.toBeInTheDocument()
+  })
+
+  it('zeigt deutlich mehr als die vier von früher, aber nicht endlos', () => {
+    // Vier Kacheln waren zu wenig: Wer in mehreren Büchern gleichzeitig hört,
+    // fand das fünfte nur noch über die Bibliothek wieder – und dort ohne die
+    // Stelle, an der es steht. Ganz ohne Grenze lägen Gemerktes und Vorschläge
+    // dagegen eine halbe Handylänge weiter unten.
+    zeigen()
+
+    const weiter = abschnitt('Weiterhören')
+    expect(weiter.querySelectorAll('li')).toHaveLength(CONTINUE_LIMIT - 1)
+    expect(weiter.textContent).toContain(`Buch ${NAMEN[CONTINUE_LIMIT - 1]!}`)
+    expect(weiter.textContent).not.toContain(`Buch ${NAMEN[CONTINUE_LIMIT]!}`)
+  })
+
+  it('nimmt auch aus dem Abschnitt ein Hörbuch wieder weg', async () => {
+    // Das Kreuz ist der einzige Weg, die Liste zu kürzen – ohne es wüchse sie
+    // mit jedem versehentlich angetippten Buch.
+    const reset = zeigen()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Buch D entfernen' }))
+    expect(reset).not.toHaveBeenCalled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Buch D wirklich entfernen' }))
+    expect(reset).toHaveBeenCalledWith('b_d')
   })
 })

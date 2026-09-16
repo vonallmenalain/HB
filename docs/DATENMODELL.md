@@ -343,8 +343,8 @@ jedem Öffnen aus dem Hörfortschritt gerechnet und sind damit automatisch mit
 zurückgesetzt.
 
 Dieselbe Mechanik im Kleinen steht den Kindern zur Verfügung: Das Kreuz an einer
-Kachel unter „Weiterhören" oder „Zuletzt gehört" schreibt genau einen solchen
-Null-Eintrag. Zwei Tipps sind nötig – der erste fragt, der zweite nimmt weg.
+Kachel unter „Weiterhören" schreibt genau einen solchen Null-Eintrag. Zwei Tipps
+sind nötig – der erste fragt, der zweite nimmt weg.
 
 ### Sicherheitsregeln
 

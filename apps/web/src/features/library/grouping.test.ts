@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest'
 
 import { makeBook } from '@/test/renderWithProfiles'
 
-import { OHNE_REIHE, buildSeries, findSeries, groupBooks, seriesSlug } from './grouping'
+import {
+  buildSeries,
+  countSeries,
+  findSeries,
+  groupBooks,
+  seriesOf,
+  seriesSlug,
+} from './grouping'
 
 const BOOKS = [
   makeBook({ id: 'b_1', series: 'Die drei ??? Kids', group: null, title: 'Chaos' }),
@@ -16,10 +23,43 @@ describe('buildSeries', () => {
     const series = buildSeries(BOOKS)
     expect(series.map((entry) => entry.name)).toEqual([
       'Bibi Blocksberg',
+      'Der Weihnachtsmann',
       'Die drei ??? Kids',
-      OHNE_REIHE,
     ])
     expect(series.find((entry) => entry.name === 'Die drei ??? Kids')?.books).toHaveLength(2)
+  })
+
+  it('stellt ein Buch ohne Reihe einzeln zwischen die Reihen', () => {
+    // Früher lagen alle diese Bücher in einem Fach „Einzelne Hörbücher". Wer
+    // „Die unendliche Geschichte" suchte, musste erst wissen, dass sie in der
+    // Restekiste liegt – und dann noch einen Tap dafür bezahlen.
+    const series = buildSeries([
+      makeBook({ id: 'b_1', series: 'Bibi Blocksberg', title: 'Hexerei' }),
+      makeBook({ id: 'b_2', series: null, title: 'Englisch' }),
+      makeBook({ id: 'b_3', series: null, title: 'Die unendliche Geschichte' }),
+    ])
+
+    expect(series.map((entry) => entry.name)).toEqual([
+      'Bibi Blocksberg',
+      'Die unendliche Geschichte',
+      'Englisch',
+    ])
+    // Ein Eintrag mit genau einem Buch – die Übersicht zeigt dafür die
+    // Buchkachel und führt direkt zum Buch.
+    for (const eintrag of series.slice(1)) expect(eintrag.books).toHaveLength(1)
+  })
+
+  it('wirft zwei gleichnamige Einzelbücher nicht zusammen', () => {
+    // Zwei Ordner, ein Titel: Das gibt es auf einem gewachsenen NAS. Fielen sie
+    // zu einem Eintrag zusammen, wäre aus zwei Kacheln eine Reihe mit zwei
+    // Folgen geworden – und ein Buch von der Startseite verschwunden.
+    const series = buildSeries([
+      makeBook({ id: 'b_1', series: null, title: 'Gute Nacht' }),
+      makeBook({ id: 'b_2', series: null, title: 'Gute Nacht' }),
+    ])
+
+    expect(series).toHaveLength(2)
+    expect(new Set(series.map((entry) => entry.slug)).size).toBe(2)
   })
 
   it('nimmt für die Kachel ein Buch mit Cover', () => {
@@ -42,6 +82,29 @@ describe('buildSeries', () => {
   it('findet eine Reihe über ihr Kürzel wieder', () => {
     expect(findSeries(BOOKS, seriesSlug('Die drei ??? Kids'))?.books).toHaveLength(2)
     expect(findSeries(BOOKS, 'gibtesnicht')).toBeNull()
+  })
+})
+
+describe('countSeries', () => {
+  it('zählt nur echte Reihen', () => {
+    // Im Elternbereich steht die Zahl als „N Reihen". Einzelne Hörbücher sind
+    // keine Reihe, auch wenn die Übersicht sie gleichberechtigt zeigt.
+    expect(countSeries(BOOKS)).toBe(2)
+  })
+})
+
+describe('seriesOf', () => {
+  it('findet die Reihe eines Buchs, auch wenn ein Einzelbuch so heisst', () => {
+    // Gesucht wird über die Zugehörigkeit, nicht über den Namen: Ein Einzelbuch
+    // trägt seinen Titel als Namen des Eintrags, und der kann derselbe sein wie
+    // der einer Reihe. Über den Namen fände der Weg zurück sonst die Kachel
+    // statt der Reihe – und führte in die Übersicht statt zu den Geschwistern.
+    const einzeln = makeBook({ id: 'b_9', series: null, title: 'Bibi Blocksberg' })
+    const inReihe = makeBook({ id: 'b_3', series: 'Bibi Blocksberg', title: 'Hexerei' })
+    const books = [einzeln, inReihe, makeBook({ id: 'b_4', series: 'Bibi Blocksberg' })]
+
+    expect(seriesOf(books, inReihe)?.books).toHaveLength(2)
+    expect(seriesOf(books, einzeln)?.books).toHaveLength(1)
   })
 })
 
