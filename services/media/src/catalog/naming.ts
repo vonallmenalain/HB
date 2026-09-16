@@ -94,6 +94,23 @@ function tokenize(text: string): Token[] {
 }
 
 /**
+ * Die Wörter eines Namens, zum Vergleichen aufbereitet.
+ *
+ * Kleingeschrieben, ohne Akzente, Zahlwort als Ziffer und `???` als
+ * „fragezeichen" – damit „Die drei ???" und „Die 3 Fragezeichen" dieselben
+ * Wörter ergeben. Zum Anzeigen taugt das nicht, zum Abgleichen mit einer
+ * Online-Quelle schon.
+ */
+export function comparableWords(text: string): string[] {
+  return tokenize(text).map((token) => token.value)
+}
+
+/** Ein Wort, das beim Vergleich zweier Namen nichts beiträgt. */
+export function isFillerWord(word: string): boolean {
+  return FILLER_WORDS.has(word)
+}
+
+/**
  * Vereinheitlicht Trennzeichen und Abstände.
  *
  * Gewachsene Sammlungen schreiben denselben Gedanken auf drei Arten:

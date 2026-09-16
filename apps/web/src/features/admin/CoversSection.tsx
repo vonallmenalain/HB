@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { type Book } from '@/features/library/catalog'
 import { libraryErrorMessage } from '@/features/library/errors'
 import { useLibrary } from '@/features/library/libraryContext'
-import { MediaRequestError } from '@/features/library/mediaClient'
+import { type CoverHerkunft, MediaRequestError } from '@/features/library/mediaClient'
 import { bookLabel } from '@/features/library/titles'
 import { BookCover } from '@/ui/BookCover'
 import { BigButton } from '@/ui/BigButton'
@@ -48,22 +48,22 @@ export function CoversSection() {
   const [fehler, setFehler] = useState<string | null>(null)
   const [erledigt, setErledigt] = useState<string | null>(null)
   /**
-   * Die Bücher mit einem hochgeladenen Bild.
+   * Die Bücher mit einem eigenen Bild – und woher es kommt.
    *
-   * Ohne diese Liste stünde „Eigenes Bild zurücknehmen" an jedem Buch mit
-   * Cover – auch an denen, deren Bild vom NAS kommt. Der Knopf täte dort
-   * nichts, und ein Knopf, der nichts tut, sieht aus wie ein Fehler.
+   * Ohne diese Liste stünde „Bild zurücknehmen" an jedem Buch mit Cover – auch
+   * an denen, deren Bild vom NAS kommt. Der Knopf täte dort nichts, und ein
+   * Knopf, der nichts tut, sieht aus wie ein Fehler.
    */
-  const [eigene, setEigene] = useState<ReadonlySet<string>>(new Set())
+  const [eigene, setEigene] = useState<Readonly<Record<string, CoverHerkunft>>>({})
   // Ein Dateifeld je Buch – der Knopf daneben löst es aus.
   const felder = useRef(new Map<string, HTMLInputElement | null>())
 
   const eigeneLaden = useCallback(() => {
     if (!client) return
     void client
-      .fetchManualCovers()
-      .then((ids) => {
-        setEigene(new Set(ids))
+      .fetchOwnCovers()
+      .then((covers) => {
+        setEigene(covers)
       })
       .catch(() => {
         // Ohne die Liste fehlt nur der Knopf zum Zurücknehmen; das Hochladen
@@ -87,7 +87,7 @@ export function CoversSection() {
         // Der Katalog trägt die Adresse des Covers samt Version – ohne das
         // Neuladen zeigte die App weiter das alte Bild aus dem Cache.
         refresh()
-        setEigene((bisher) => new Set(bisher).add(book.id))
+        setEigene((bisher) => ({ ...bisher, [book.id]: 'hochgeladen' }))
         setErledigt(book.id)
       })
       .catch((error: unknown) => {
@@ -109,9 +109,8 @@ export function CoversSection() {
       .then(() => {
         refresh()
         setEigene((bisher) => {
-          const naechste = new Set(bisher)
-          naechste.delete(book.id)
-          return naechste
+          const { [book.id]: _weg, ...rest } = bisher
+          return rest
         })
       })
       .catch((error: unknown) => {
@@ -161,7 +160,7 @@ export function CoversSection() {
       <ul className="flex flex-col gap-3">
         {treffer.slice(0, MAX_TREFFER).map((book) => {
           const bild = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
-          const eigenes = eigene.has(book.id)
+          const herkunft = eigene[book.id]
 
           return (
             <li key={book.id} className="flex items-center gap-4 rounded-tile bg-surface p-4">
@@ -173,11 +172,13 @@ export function CoversSection() {
                 <p className="truncate font-semibold">{bookLabel(book)}</p>
                 <p className="truncate text-sm text-ink-soft">{book.folderName}</p>
                 <p className="text-sm text-ink-soft">
-                  {eigenes
+                  {herkunft === 'hochgeladen'
                     ? 'Eigenes Bild – gilt für alle Geräte.'
-                    : book.cover !== null
-                      ? 'Bild vom NAS.'
-                      : 'Kein Bild – es steht eine farbige Kachel.'}
+                    : herkunft === 'online'
+                      ? 'Online gefunden – gilt für alle Geräte.'
+                      : book.cover !== null
+                        ? 'Bild vom NAS.'
+                        : 'Kein Bild – es steht eine farbige Kachel.'}
                 </p>
 
                 {erledigt === book.id ? (
@@ -212,7 +213,7 @@ export function CoversSection() {
                     {laeuft === book.id ? 'Einen Moment …' : 'Bild wählen'}
                   </BigButton>
 
-                  {eigenes ? (
+                  {herkunft !== undefined ? (
                     <BigButton
                       variant="secondary"
                       disabled={client === null || laeuft === book.id}
@@ -220,7 +221,9 @@ export function CoversSection() {
                         wegnehmen(book)
                       }}
                     >
-                      Eigenes Bild zurücknehmen
+                      {herkunft === 'online'
+                        ? 'Gefundenes Bild zurücknehmen'
+                        : 'Eigenes Bild zurücknehmen'}
                     </BigButton>
                   ) : null}
                 </div>

@@ -29,6 +29,18 @@ export function manualCoverPath(cacheDir: string, bookId: string): string {
 }
 
 /**
+ * Das online gefundene Cover.
+ *
+ * Eine eigene Stufe zwischen den beiden anderen: Es schlägt, was auf dem NAS
+ * liegt – dort steht meist gar nichts, sonst hätte niemand danach gesucht –,
+ * und wird selbst von einem hochgeladenen Bild geschlagen. Wer von Hand etwas
+ * hinlegt, hat sich das Buch angesehen; eine Suche hat nur gerechnet.
+ */
+export function onlineCoverPath(cacheDir: string, bookId: string): string {
+  return join(cacheDir, 'online', `${bookId}.jpg`)
+}
+
+/**
  * Fingerabdruck der Cover-Quelle.
  *
  * Bewusst die Quelle und nicht das erzeugte JPEG: Das wird bei jedem Scan neu

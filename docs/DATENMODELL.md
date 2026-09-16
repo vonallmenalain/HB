@@ -73,6 +73,7 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 | Reihenfolge der Bücher | Erst Reihe, dann Gruppe, dann genau das, was auf der Kachel steht: `01` vor `02` vor `50A` vor `103` vor `125`. Natürlich verglichen; Bücher ohne Folgennummer stehen hinter den nummerierten |
 | Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
 | `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet – bei Einzelfolgen nur, wenn kein Bild mit dem Namen der Datei daneben liegt |
+| Rangfolge der Cover | Von Hand hochgeladen › online gefunden › auf dem NAS gefunden. Wer von Hand etwas hinlegt, hat sich das Buch angesehen; eine Suche hat nur gerechnet. Die beiden oberen liegen in `manual/` und `online/` im Cache-Volume und überleben jeden Scan |
 | Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
@@ -545,6 +546,45 @@ steht").
 
 ### `POST /admin/struktur?t=<ticket>`
 `{ "ordner": "Die Drei Ausrufezeichen", "modus": "einzelfolgen" | "einBuch" | null }`
+
+### Cover online suchen
+
+Wo auf dem NAS kein Bild liegt, steht in der Bibliothek eine farbige
+Buchstabenkachel – für ein Kind, das noch nicht liest, ist das Buch damit kaum
+wiederzufinden. Der Adminbereich kann deshalb nach Bildern suchen lassen.
+
+| Route | Was sie tut |
+|---|---|
+| `POST /admin/cover-suche` | Startet den Lauf über alle Bücher ohne Bild. Antwortet sofort mit 202; ein zweiter Aufruf während des Laufs bekommt 409 |
+| `GET /admin/cover-suche` | Stand (`laeuft`, `erledigt`, `gesamt`, `gesetzt`, `offen`, `hinweis`) und die Vorschläge je Buch |
+| `GET /admin/cover-vorschlag/:bookId?bild=…` | Reicht ein vorgeschlagenes Bild zum Ansehen durch |
+| `POST /admin/cover/:bookId/vorschlag` | Übernimmt einen Vorschlag: `{ "bild": "<Adresse aus der Vorschlagsliste>" }` |
+
+**Quellen:** [iTunes/Apple Search](https://performance-partners.apple.com/search-api)
+(ohne Schlüssel, etwa 20 Abfragen pro Minute) und, wenn die nichts hergibt,
+[MusicBrainz](https://musicbrainz.org/doc/MusicBrainz_API) mit dem
+[Cover Art Archive](https://musicbrainz.org/doc/Cover_Art_Archive/API) (ohne
+Schlüssel, eine Abfrage pro Sekunde, eigener `User-Agent` Pflicht). Das Tempo
+hält der Dienst ein – bei neunhundert Büchern dauert ein Lauf entsprechend
+lange, deshalb läuft er im Hintergrund wie der Scan.
+
+**Gesetzt wird nur, was eindeutig passt.** Bewertet wird, wie viel vom
+gesuchten Namen im Treffer wiederkommt; die Folgennummer ist der Riegel davor,
+dass Folge 3 das Bild von Folge 30 bekommt. Nennt der Treffer Zahlen und ist die
+gesuchte nicht darunter, ist er hinfällig; nennt er gar keine, reicht es für
+einen Vorschlag, nicht fürs stille Setzen. Der Grund: Ein falsches Cover ist
+schlechter als gar keines – die Buchstabenkachel sagt wenigstens nichts
+Falsches.
+
+**Zwei Riegel in den Routen:** Eine Adresse wird nur angefasst, wenn dieser
+Dienst sie selbst vorgeschlagen hat – sonst wären die beiden unteren Routen
+eine Aufforderung, irgendeine Adresse abzurufen, auch eine im Heimnetz. Und die
+Vorschau läuft über den Dienst statt direkt aus dem Browser, damit die
+Content-Security-Policy keine fremden Bildquellen zulassen muss und kein Aufruf
+dem Anbieter verrät, wer gerade im Adminbereich sitzt.
+
+Die Vorschläge liegen als `cover-vorschlaege.json` im Cache-Volume: Ein Lauf
+über neunhundert Bücher soll einen Neustart überleben.
 
 Stellt einen Ordner um und stösst danach einen Scan an – Antwort `202`, der
 Scan läuft im Hintergrund. `modus: null` nimmt die Einstellung zurück; dann
