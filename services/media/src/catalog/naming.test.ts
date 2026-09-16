@@ -94,6 +94,37 @@ describe('parseBookFolder', () => {
     })
   })
 
+  it('nimmt das Bindewort hinter dem Reihennamen mit', () => {
+    // „Die drei ??? und der Karpatenhund" ist Reihe plus Titel, keine Aussage.
+    // Ohne diese Regel hiesse in der Reihe jede zweite Kachel „und der …" –
+    // und abgeschnitten sähen alle gleich aus.
+    expect(
+      parseBookFolder('Die drei Fragezeichen und der Karpatenhund', ['Die 3 Fragezeichen']),
+    ).toEqual({ title: 'Der Karpatenhund', seriesIndex: null })
+
+    expect(
+      parseBookFolder('03 - Die drei Fragezeichen und der Karpatenhund', ['Die drei ???']),
+    ).toEqual({ title: 'Der Karpatenhund', seriesIndex: 3 })
+
+    expect(parseBookFolder('Bibi Blocksberg und das Hexenkraut', ['Bibi Blocksberg'])).toEqual({
+      title: 'Das Hexenkraut',
+      seriesIndex: null,
+    })
+  })
+
+  it('lässt eine Präposition stehen – das ist ein Satz, keine Aufzählung', () => {
+    // Hier trägt der Reihenname den Titel: „auf der Felseninsel" allein wäre
+    // kein Hörbuchtitel, „Der Karpatenhund" schon.
+    expect(parseBookFolder('5 Freunde auf der Felseninsel', ['5 Freunde'])).toEqual({
+      title: '5 Freunde auf der Felseninsel',
+      seriesIndex: null,
+    })
+    expect(parseBookFolder('Fünf Freunde im Zeltlager', ['Fünf Freunde'])).toEqual({
+      title: 'Fünf Freunde im Zeltlager',
+      seriesIndex: null,
+    })
+  })
+
   it('liest die Nummer auch ohne Trennzeichen dahinter', () => {
     // So stehen sie auf dem NAS auch: „79 Achtung, Abenteuer!". Ab zwei
     // Ziffern oder mit führender Null ist das eine Folgennummer und kein

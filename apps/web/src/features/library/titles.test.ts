@@ -184,6 +184,32 @@ describe('tidyBook', () => {
     expect(book.title).toBe('Abenteuer mit Bibi Blocksberg - Hexerei')
   })
 
+  it('nimmt das Bindewort hinter dem Reihennamen mit', () => {
+    const book = tidyBook(
+      makeBook({
+        title: 'Die drei Fragezeichen und der Karpatenhund',
+        series: 'Die 3 Fragezeichen',
+        group: null,
+        seriesIndex: 3,
+      }),
+    )
+
+    expect(bookLabel(book)).toBe('03 - Der Karpatenhund')
+  })
+
+  it('lässt eine Präposition stehen – das ist ein Satz, keine Aufzählung', () => {
+    const book = tidyBook(
+      makeBook({
+        title: '5 Freunde auf der Felseninsel',
+        series: '5 Freunde',
+        group: null,
+        seriesIndex: null,
+      }),
+    )
+
+    expect(book.title).toBe('5 Freunde auf der Felseninsel')
+  })
+
   it('behält den Titel, wenn nichts aufzuräumen ist', () => {
     const book = tidyBook(
       makeBook({ title: 'Der Super-Papagei', series: 'Die drei ???', seriesIndex: 1 }),
