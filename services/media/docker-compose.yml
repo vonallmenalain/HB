@@ -6,7 +6,10 @@
 #
 #   Holen und starten:      docker compose pull && docker compose up -d
 #   Mit Tunnel:             docker compose --profile tunnel up -d
-#   Selbst aktuell halten:  docker compose --profile auto-update up -d
+#
+# Danach hält sich der Dienst selbst aktuell: Ein Wächter sieht alle paar
+# Minuten nach, ob GitHub ein neues Image gebaut hat, und startet hb-media
+# damit neu. Am NAS ist dafür nichts mehr zu tun.
 #
 # Selber bauen geht weiterhin (etwa zum Ausprobieren einer Änderung):
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml build
@@ -58,21 +61,29 @@ services:
   # Holt neue Images von selbst und startet hb-media damit neu. Damit landet
   # jede Änderung, die GitHub gebaut hat, ohne Zutun auf dem NAS.
   #
-  # Bewusst ein eigenes Profil und nicht die Vorgabe: Watchtower braucht den
-  # Docker-Socket und darf damit alles, was Docker darf. Das ist für ein
-  # Heim-NAS vertretbar, aber es soll eine Entscheidung sein und keine
-  # Überraschung. Ohne das Profil bleibt der Weg von Hand:
-  #   docker compose pull && docker compose up -d
+  # Läuft bewusst von Anfang an mit und nicht in einem eigenen Profil: Die
+  # halbe Automatik – GitHub baut, aber jemand muss auf dem NAS `pull` tippen –
+  # ist die Variante, bei der am Ende wochenlang der alte Stand läuft, ohne
+  # dass es jemandem auffällt.
+  #
+  # Was das kostet, steht in docs/QNAP-SETUP.md §9: Der Wächter braucht den
+  # Docker-Socket und darf damit alles, was Docker auf dem NAS darf. Wer das
+  # nicht will, startet nur den Dienst:
+  #   docker compose up -d hb-media
   watchtower:
     image: containrrr/watchtower:latest
     container_name: hb-watchtower
-    profiles: ['auto-update']
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
     # Nur hb-media, nichts anderes auf dem NAS. `--cleanup` wirft das alte
     # Image weg, sonst füllt sich die Platte mit jeder Version.
-    command: --interval ${HB_UPDATE_INTERVAL_SECONDS:-3600} --cleanup hb-media
+    #
+    # Fünf Minuten sind der Abstand zwischen „GitHub ist fertig" und „läuft auf
+    # dem NAS". Der Neustart dauert Sekunden; wer ihn nie zur Hörzeit riskieren
+    # will, setzt HB_UPDATE_INTERVAL_SECONDS hoch – dann sieht der Wächter
+    # entsprechend seltener nach.
+    command: --interval ${HB_UPDATE_INTERVAL_SECONDS:-300} --cleanup hb-media
 
 volumes:
   # Katalog, gelesene ID3-Daten und aufbereitete Cover. Überlebt Updates und

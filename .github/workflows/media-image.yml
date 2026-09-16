@@ -9,7 +9,8 @@
 #
 #   docker compose pull && docker compose up -d
 #
-# Wer das Profil `auto-update` mitstartet, braucht auch den nicht mehr.
+# Von Hand braucht es den aber nicht: Auf dem NAS läuft ein Wächter, der alle
+# paar Minuten nach einem neuen Image sieht und den Dienst damit neu startet.
 #
 # Nötig ist dafür kein Geheimnis: `GITHUB_TOKEN` darf in das eigene Repository
 # veröffentlichen. Einmalig muss das Paket in GitHub auf „public" gestellt
@@ -81,17 +82,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Was jetzt auf dem NAS zu tun ist
+      - name: Wann das auf dem NAS ankommt
         run: |
           {
             echo "### Neues Image: \`${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.version }}\`"
             echo
-            echo 'Auf dem QNAP holt es sich der Dienst mit:'
+            echo 'Der Wächter auf dem NAS holt es sich in den nächsten Minuten von'
+            echo 'selbst (`HB_UPDATE_INTERVAL_SECONDS`, Vorgabe 300) und startet'
+            echo '`hb-media` damit neu. Zu tun ist dort nichts.'
+            echo
+            echo 'Ob es angekommen ist, sagt `version` im Gesundheitsbericht:'
+            echo
+            echo '```bash'
+            echo 'curl http://localhost:18080/health'
+            echo '```'
+            echo
+            echo 'Schneller geht es nur von Hand:'
             echo
             echo '```bash'
             echo 'cd /share/CACHEDEV2_DATA/Container/hb-media   # Ordner mit docker-compose.yml'
             echo 'docker compose pull && docker compose up -d'
             echo '```'
-            echo
-            echo 'Mit dem Profil `auto-update` passiert das von selbst.'
           } >> "$GITHUB_STEP_SUMMARY"
