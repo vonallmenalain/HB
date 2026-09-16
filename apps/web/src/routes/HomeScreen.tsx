@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 
 import { useFavorites } from '@/features/favorites/favoritesContext'
 import { BookShelf } from '@/features/library/BookShelf'
+import { LibraryGrid } from '@/features/library/LibraryGrid'
 import { useLibrary } from '@/features/library/libraryContext'
 import { suggestBooks } from '@/features/library/suggestions'
 import { ParentEntry } from '@/features/parents/ParentEntry'
@@ -10,7 +11,6 @@ import { hasListened, pickRecent } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 import { useProfiles } from '@/features/profiles/profilesContext'
 import { Avatar } from '@/ui/Avatar'
-import { BigLinkButton } from '@/ui/BigButton'
 import { EmptyState } from '@/ui/EmptyState'
 import { Screen } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
@@ -19,13 +19,19 @@ import { Spinner } from '@/ui/Spinner'
  * Die Startseite.
  *
  * Von oben nach unten: wer hier hört, wo es weitergeht, was gemerkt ist, was
- * dazu passt – und erst ganz unten die ganze Bibliothek. Die Reihenfolge ist
- * die Antwort auf „was will ein Kind, das die App öffnet": weiterhören, fast
- * immer.
+ * dazu passt – und ganz unten die ganze Bibliothek, Reihe für Reihe. Die
+ * Reihenfolge ist die Antwort auf „was will ein Kind, das die App öffnet":
+ * weiterhören, fast immer.
+ *
+ * Unten stand früher ein Ausschnitt mit den sechs neuesten Folgen und darunter
+ * ein Knopf in die Bibliothek. Am ersten Tag – ohne Weiterhören, ohne
+ * Gemerktes, ohne Vorschläge – war die Startseite damit eine fast leere Seite
+ * mit einem Knopf: Die Sammlung lag einen Tap entfernt, ohne dass etwas davon
+ * zu sehen war. Jetzt stehen die Reihen gleich hier.
  */
 export function HomeScreen() {
   const { selected } = useProfiles()
-  const { status, books, bookById } = useLibrary()
+  const { status, books, bookById, schemaVersion } = useLibrary()
   const { entries, reset } = useProgress()
   const { ids: favoriten } = useFavorites()
 
@@ -47,8 +53,8 @@ export function HomeScreen() {
   ])
 
   // Ohne einen einzigen gehörten Satz gibt es nichts vorzuschlagen. Dann
-  // stünde dort einfach das Neueste – und darunter, im Ausschnitt der
-  // Bibliothek, noch einmal dasselbe.
+  // stünde dort einfach das Neueste – und darunter, im Raster mit allen
+  // Reihen, noch einmal dasselbe.
   //
   // Gezählt werden angefangene Bücher, nicht Einträge: Nach dem Zurücksetzen
   // steht zu jedem Buch ein Eintrag auf 0, gehört wurde aber nichts.
@@ -60,15 +66,6 @@ export function HomeScreen() {
         exclude: schonZuSehen,
         limit: 6,
       })
-
-  for (const book of vorschlaege) schonZuSehen.add(book.id)
-
-  const neueste = [...books]
-    .sort((a, b) => b.addedAt.localeCompare(a.addedAt))
-    .filter((book) => !schonZuSehen.has(book.id))
-    // Sechs füllen das Raster auf Handy und Tablet – und am ersten Tag, wenn
-    // sonst noch nichts auf der Seite steht, wirkt sie damit nicht leer.
-    .slice(0, 6)
 
   return (
     <Screen>
@@ -104,7 +101,6 @@ export function HomeScreen() {
         <EmptyState
           title="Noch keine Hörbücher"
           hint="Sobald der Hörbuch-Ordner auf dem NAS verbunden ist, erscheinen hier die Bücher."
-          action={<BigLinkButton to="/bibliothek">Alle Hörbücher</BigLinkButton>}
         />
       ) : null}
 
@@ -121,12 +117,16 @@ export function HomeScreen() {
       <BookShelf title="Gemerkt" books={gemerkt} />
       <BookShelf title="Vielleicht auch etwas für dich" books={vorschlaege} />
 
+      {/*
+        Die ganze Sammlung, Reihe für Reihe – dasselbe Raster wie unter „Alle
+        Hörbücher". Ein Knopf dorthin steht hier nicht mehr: Er führte auf eine
+        Seite, die dasselbe zeigt wie die Zeilen darüber.
+      */}
       {books.length > 0 ? (
-        <BookShelf
-          title="Alle Hörbücher"
-          books={neueste}
-          action={<BigLinkButton to="/bibliothek">Alle Hörbücher</BigLinkButton>}
-        />
+        <section className="pb-8">
+          <h2 className="pb-3 text-xl font-bold">Alle Hörbücher</h2>
+          <LibraryGrid books={books} schemaVersion={schemaVersion} />
+        </section>
       ) : null}
     </Screen>
   )

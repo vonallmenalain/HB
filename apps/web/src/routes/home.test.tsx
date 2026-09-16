@@ -110,16 +110,15 @@ describe('Startseite', () => {
     expect(screen.getByText(/Noch keine PIN/)).toBeInTheDocument()
   })
 
-  it('zeigt einen Weg in die ganze Bibliothek', () => {
+  it('zeigt die ganze Sammlung unten als Reihen', () => {
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/',
       library: makeLibraryValue({ books: KIDS }),
     })
 
-    expect(screen.getByRole('link', { name: 'Alle Hörbücher' })).toHaveAttribute(
-      'href',
-      '/bibliothek',
-    )
+    const alle = abschnitt('Alle Hörbücher')
+    expect(alle.textContent).toContain('Fragezeichen Kids')
+    expect(alle.textContent).toContain('4 Hörbücher')
   })
 })
 
