@@ -28,6 +28,17 @@ Ein dedizierter Ordner, vom Dienst **nur lesend** eingebunden:
 │           └── 01 - Alarm.mp3
 ├── Bibi Blocksberg - Hexerei/
 │   └── ...
+├── Harry Potter/
+│   └── Harry Potter und der Feuerkelch/   ← ein Buch, über CD-Ordner verteilt
+│       ├── CD 1/
+│       │   └── 01 - Anfang.mp3
+│       ├── CD 2/
+│       └── CD 20/
+├── Die Drei Ausrufezeichen/               ← jede Datei eine ganze Folge
+│   ├── buch.json                          ← {"einzelfolgen": true}
+│   ├── Drei Ausrufezeichen 001 - Die Handy-Falle.mp3
+│   ├── Drei Ausrufezeichen 001 - Die Handy-Falle.jpg   ← Cover dieser Folge
+│   └── Drei Ausrufezeichen 002 - Betrug beim Casting.mp3
 └── .hb-cache/                             ← vom Scanner angelegt
     ├── catalog.json
     └── meta/                              ← gelesene ID3-Daten, hash-basiert
@@ -50,9 +61,12 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 | Ordner enthält Audiodateien | → ist ein Buch |
 | Ordner enthält nur Unterordner | → ist Reihe oder Gruppe; der oberste wird `series`, die dazwischen `group` |
 | Einziger Unterordner heisst `CD1`, `Teil 2`, `01` … | Wird übersprungen: Das Buch erscheint unter dem Namen des Ordners darüber. Sonst hiesse die Folge in der Bibliothek „CD1". Vierstellige Zahlen zählen nicht – `2019` ist eine Jahresangabe |
+| **Alle** Unterordner heissen `CD 1`, `CD 2`, `Teil 3` … | → **ein** Buch über alle Teile, in natürlicher Reihenfolge (`CD 2` vor `CD 10`). Der Teil steht vor dem Kapitelnamen: „CD 3 · Anfang". Verlangt wird das Wort: `01`, `02` und `Folge 1`, `Folge 2` bleiben eigene Bücher – so legen manche Sammlungen ihre Folgen ab |
+| `buch.json` mit `{"einzelfolgen": true}` | → **jede Audiodatei im Ordner ist ein eigenes Hörbuch.** Titel und Folgennummer kommen aus dem Dateinamen (dieselben Regeln wie bei Ordnernamen), der Ordner selbst wird zur Reihe. Geraten wird das nie: Ein Roman mit langen, benannten Kapiteln sähe von aussen genauso aus |
+| Bild mit demselben Namen wie die Audiodatei | Wird ihr Cover: `001 - Die Handy-Falle.jpg` neben `001 - Die Handy-Falle.mp3`. So bekommt in einem `einzelfolgen`-Ordner jede Folge ihr eigenes Bild |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
 | Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
-| `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet |
+| `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet – bei Einzelfolgen nur, wenn kein Bild mit dem Namen der Datei daneben liegt |
 | Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
@@ -74,9 +88,21 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
   "author": "Robert Arthur",
   "narrator": "Oliver Rohrbeck",
   "tags": ["Krimi", "ab 8"],
-  "hidden": false
+  "hidden": false,
+  "einzelfolgen": false
 }
 ```
+
+**`einzelfolgen`** ist das einzige Feld, das nicht beschreibt, sondern
+umstellt: `true` macht aus jeder Audiodatei im Ordner ein eigenes Hörbuch.
+`title` und `seriesIndex` gelten dann nicht mehr – sie stünden bei jeder Folge
+gleich da und kommen deshalb aus dem Dateinamen. Alles andere (`series`,
+`group`, `author`, `narrator`, `tags`, `hidden`) gilt weiter für alle Folgen im
+Ordner.
+
+Wer den Ordner mit `{"einzelfolgen": true}` umstellt, sollte wissen: Die
+Kennungen ändern sich, weil sie am Pfad hängen. Ein angefangenes Hörbuch fängt
+danach einmalig wieder von vorn an – die Folgen selbst bleiben unberührt.
 
 ---
 

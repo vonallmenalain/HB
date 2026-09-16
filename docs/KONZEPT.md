@@ -481,6 +481,31 @@ Gebaut wird für den vorliegenden Fall: **ein Ordner pro Buch mit nummerierten
 MP3-Dateien**, jede Datei ein Kapitel. Dauer, Titel, Autor und das eingebettete
 Cover liest der Scanner aus den ID3-Tags.
 
+**Zwei andere Ablagen kommen auf jedem gewachsenen NAS trotzdem vor**, und
+beide sahen in der Bibliothek falsch aus:
+
+*Ein Buch über zwanzig `CD`-Ordner.* Jeder Ordner wurde ein Buch – die Reihe
+„Harry Potter" bestand aus „CD 1", „CD 10", „CD 11". Der Scanner fasst
+Unterordner, die alle `CD 1`, `Teil 2` … heissen, jetzt zu einem Buch zusammen.
+Verlangt wird dafür das Wort: Blosse Nummern (`01`, `02`) und `Folge 1` bleiben
+eigene Bücher – so legen andere Sammlungen ihre Folgen ab, und aus zwanzig
+Folgen dürfte nie ein Buch werden.
+
+*Neunzig Folgen als neunzig Dateien in einem Ordner.* Das ergab ein Hörbuch von
+hundert Stunden mit neunzig „Kapiteln"; eine bestimmte Folge zu finden hiess,
+in einer Kapitelliste zu suchen. Mit `{"einzelfolgen": true}` in der `buch.json`
+wird jede Datei ein eigenes Hörbuch, der Ordner zur Reihe, und Titel und Nummer
+kommen aus dem Dateinamen.
+
+**Warum das eine Ansage ist und keine Automatik.** Von aussen sieht ein Roman
+mit langen, benannten Kapiteln genauso aus wie eine Folgensammlung: numerierte
+Dateien, je eine halbe Stunde, jede mit eigenem Titel. Ein Fehlgriff wäre
+einseitig teuer – aus einem Buch würden zwölf, die Reihenfolge ginge verloren,
+gemerkte Stellen zeigten ins Leere. Eine Zeile in einer Datei auf dem NAS ist
+dagegen in einer halben Minute geschrieben. Bequemer wird das erst, wenn der
+Elternbereich die Ordner selbst umstellen kann – dazu müsste der Medien-Dienst
+schreiben dürfen (Ausbaustufe).
+
 Im Katalog bleiben `files[]` (was geladen wird) und `chapters[]` (was das Kind
 sieht) trotzdem getrennte Listen, auch wenn sie hier 1:1 aufeinander abbilden.
 Das kostet nichts und hält die Tür offen: Kämen später M4B-Dateien mit

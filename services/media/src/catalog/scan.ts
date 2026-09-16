@@ -5,9 +5,15 @@ import { basename, dirname, join, relative, sep } from 'node:path'
 import { parseFile } from 'music-metadata'
 import sharp from 'sharp'
 
-import { type ProbedFile, buildBook, coverPath, parseOverride } from './build.js'
+import { type BookOverride, type ProbedFile, buildBook, coverPath, parseOverride } from './build.js'
 import { bookId } from './ids.js'
 import { audioMime, isCoverFile, naturalCompare } from './naming.js'
+import {
+  isDiscFolder,
+  isSplitAcrossParts,
+  overrideForEpisode,
+  splitsIntoEpisodes,
+} from './structure.js'
 import type { Book, BookLocation, ScanResult } from './types.js'
 import { SCHEMA_VERSION } from './types.js'
 
@@ -15,6 +21,7 @@ const MAX_DEPTH = 4
 const ADDED_AT_FILE = 'added-at.json'
 const COVER_MAX_PIXELS = 600
 const OVERRIDE_FILE = 'buch.json'
+const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 
 export interface ScanOptions {
   mediaRoot: string
@@ -71,7 +78,7 @@ async function probe(
   return entry
 }
 
-async function readOverride(folder: string): Promise<ReturnType<typeof parseOverride>> {
+async function readOverride(folder: string): Promise<BookOverride | null> {
   try {
     return parseOverride(JSON.parse(await readFile(join(folder, OVERRIDE_FILE), 'utf8')))
   } catch {
@@ -116,25 +123,18 @@ async function writeCover(
   }
 }
 
-/**
- * Ordnernamen, die nichts über den Inhalt sagen: `CD1`, `Teil 2`, `01`.
- *
- * Vierstellige Zahlen bleiben aussen vor – `2019` unter „Adventskalender" ist
- * eine Jahresangabe und damit sehr wohl eine Aussage.
- */
-function isDiscFolder(name: string): boolean {
-  return /^(cd|disc|disk|teil|part|folge|track)?[\s._-]*\d{1,3}$/i.test(name.trim())
-}
-
 interface FolderContents {
   audio: string[]
   cover: string | null
+  /** Alle Bilddateien im Ordner – auch die, die keine `cover.jpg` sind. */
+  images: string[]
   subdirectories: string[]
 }
 
 async function readFolder(folder: string): Promise<FolderContents> {
   const entries = await readdir(folder, { withFileTypes: true })
   const audio: string[] = []
+  const images: string[] = []
   const subdirectories: string[] = []
   let cover: string | null = null
 
@@ -144,103 +144,141 @@ async function readFolder(folder: string): Promise<FolderContents> {
       subdirectories.push(entry.name)
     } else if (entry.isFile()) {
       if (audioMime(entry.name) !== null) audio.push(entry.name)
-      else if (cover === null && isCoverFile(entry.name)) cover = entry.name
+      else {
+        const dot = entry.name.lastIndexOf('.')
+        if (dot >= 0 && IMAGE_EXTENSIONS.includes(entry.name.slice(dot).toLowerCase())) {
+          images.push(entry.name)
+        }
+        if (cover === null && isCoverFile(entry.name)) cover = entry.name
+      }
     }
   }
 
   audio.sort(naturalCompare)
+  images.sort(naturalCompare)
   subdirectories.sort(naturalCompare)
-  return { audio, cover, subdirectories }
+  return { audio, cover, images, subdirectories }
+}
+
+function withoutExtension(fileName: string): string {
+  return fileName.replace(/\.[a-z0-9]+$/i, '')
+}
+
+/**
+ * Das Bild, das neben einer Audiodatei liegt und genauso heisst.
+ *
+ * `001 - Die Handy-Falle.mp3` neben `001 - Die Handy-Falle.jpg`: So lässt sich
+ * einer einzelnen Folge ein Cover mitgeben, ohne die Datei selbst anzufassen –
+ * für Ordner, in denen jede Datei ein eigenes Hörbuch ist.
+ */
+function coverBeside(fileName: string, images: readonly string[]): string | null {
+  const base = withoutExtension(fileName).toLowerCase()
+  return images.find((image) => withoutExtension(image).toLowerCase() === base) ?? null
+}
+
+/** Eine Audiodatei, wie der Scanner sie gefunden hat. */
+interface AudioEntry {
+  /** Absoluter Pfad. */
+  path: string
+  fileName: string
+  /** Teil-Ordner, aus dem sie stammt („CD 3"), sonst null. */
+  discName: string | null
+}
+
+/** Ein Buch, bevor es gelesen ist: woher es kommt und wie es heissen soll. */
+interface BookSource {
+  /** Ordner, aus dem `buch.json` und der Zeitpunkt kommen. */
+  folder: string
+  /** Pfad relativ zum Stamm, aus dem die dauerhafte ID entsteht. */
+  idPath: string
+  /** Name, unter dem das Buch in der Bibliothek erscheint. */
+  displayName: string
+  /** Ordner darüber, von oben nach unten – der oberste ist die Reihe. */
+  folderChain: string[]
+  audio: AudioEntry[]
+  /** Absoluter Pfad eines Bildes, das als Cover dienen soll. */
+  coverFile: string | null
+  override: BookOverride | null
+  /** Was den Zeitpunkt „dazugekommen" bestimmt, wenn er noch nicht bekannt ist. */
+  addedAtFrom: string
+}
+
+/** Die Ordner über einem Pfad, vom Medien-Stamm abwärts. */
+function chainOf(mediaRoot: string, path: string): string[] {
+  const parent = dirname(relative(mediaRoot, path))
+  return parent === '.' || parent === '' ? [] : parent.split(sep)
 }
 
 async function scanBook(
-  folder: string,
-  contents: FolderContents,
+  source: BookSource,
   options: ScanOptions,
   knownAddedAt: ReadonlyMap<string, string>,
-  /**
-   * Der Ordner, unter dessen Namen das Buch erscheint.
-   *
-   * Normalerweise der Ordner mit den Dateien selbst. Steckt das Buch aber in
-   * einem nichtssagenden Unterordner („CD1"), ist es der Ordner darüber –
-   * sonst hiesse die Folge in der Bibliothek „CD1".
-   */
-  presentedAs: string = folder,
 ): Promise<{ book: Book; location: BookLocation } | null> {
-  const { mediaRoot, cacheDir } = options
-  const relativePath = relative(mediaRoot, folder)
-  const anzeigePfad = relative(mediaRoot, presentedAs)
-  const parent = dirname(anzeigePfad)
-  // Alle Ordner über dem Buch: der oberste ist die Reihe, alles darunter eine
-  // Gruppe darin („Adventskalender", „Mini-Fälle").
-  const folderChain = parent === '.' || parent === '' ? [] : parent.split(sep)
+  const { cacheDir } = options
 
   const files: ProbedFile[] = []
   const filePaths: string[] = []
   let embeddedPictureFrom: string | null = null
 
-  for (const name of contents.audio) {
-    const path = join(folder, name)
+  for (const entry of source.audio) {
     try {
-      const stats = await stat(path)
-      const entry = await probe(path, stats.size, stats.mtimeMs, cacheDir)
+      const stats = await stat(entry.path)
+      const probed = await probe(entry.path, stats.size, stats.mtimeMs, cacheDir)
       files.push({
-        fileName: name,
+        fileName: entry.fileName,
         bytes: stats.size,
-        durationSec: entry.durationSec,
-        mime: audioMime(name) ?? 'application/octet-stream',
-        tagTitle: entry.tagTitle,
-        tagArtist: entry.tagArtist,
-        tagAlbumArtist: entry.tagAlbumArtist,
+        durationSec: probed.durationSec,
+        mime: audioMime(entry.fileName) ?? 'application/octet-stream',
+        tagTitle: probed.tagTitle,
+        tagArtist: probed.tagArtist,
+        tagAlbumArtist: probed.tagAlbumArtist,
+        discName: entry.discName,
       })
-      filePaths.push(path)
-      if (entry.hasPicture && embeddedPictureFrom === null) embeddedPictureFrom = path
+      filePaths.push(entry.path)
+      if (probed.hasPicture && embeddedPictureFrom === null) embeddedPictureFrom = entry.path
     } catch (error) {
       options.onNotice?.(
-        `Übersprungen: ${path} (${error instanceof Error ? error.message : 'Lesefehler'})`,
+        `Übersprungen: ${entry.path} (${error instanceof Error ? error.message : 'Lesefehler'})`,
       )
     }
   }
 
   if (files.length === 0) return null
+  if (source.override?.hidden === true) return null
 
-  const override = await readOverride(folder)
-  if (override?.hidden === true) return null
-
-  const id = bookId(relativePath)
+  const id = bookId(source.idPath)
 
   // Ein bereits bekanntes Buch behält seinen Zeitpunkt. Sonst würde jeder
   // Sechs-Stunden-Scan die ganze Bibliothek als „neu dazugekommen" markieren
   // und die Sortierung auf dem Startbildschirm wertlos machen.
   const addedAt =
     knownAddedAt.get(id) ??
-    (await stat(folder)
+    (await stat(source.addedAtFrom)
       .then((stats) => new Date(stats.mtimeMs).toISOString())
       .catch(() => (options.now?.() ?? new Date()).toISOString()))
 
   // Erst ohne Cover bauen, um die ID zu bekommen – der Cover-Dateiname hängt
   // daran.
   const withoutCover = buildBook({
-    // Die Kennung hängt am echten Ordner, nicht am angezeigten: Sie muss über
-    // Scans hinweg gleich bleiben, sonst verliert jedes Kind seinen
+    // Die Kennung hängt am echten Pfad, nicht am angezeigten Namen: Sie muss
+    // über Scans hinweg gleich bleiben, sonst verliert jedes Kind seinen
     // Fortschritt.
-    relativePath,
-    folderName: basename(presentedAs),
-    folderChain,
+    relativePath: source.idPath,
+    folderName: source.displayName,
+    folderChain: source.folderChain,
     files,
     coverAvailable: false,
     coverVersion: null,
-    override,
+    override: source.override,
     addedAt,
   })
 
   let writtenCover: string | null = null
   let coverVersion: string | null = null
 
-  if (contents.cover !== null) {
-    const source = join(folder, contents.cover)
-    writtenCover = await writeCover(withoutCover.id, cacheDir, source)
-    coverVersion = await coverVersionOf(source)
+  if (source.coverFile !== null) {
+    writtenCover = await writeCover(withoutCover.id, cacheDir, source.coverFile)
+    coverVersion = await coverVersionOf(source.coverFile)
   } else if (embeddedPictureFrom !== null) {
     try {
       const metadata = await parseFile(embeddedPictureFrom)
@@ -262,11 +300,83 @@ async function scanBook(
   return { book, location: { id: book.id, filePaths, coverPath: writtenCover } }
 }
 
+interface Collected {
+  books: Book[]
+  locations: Map<string, BookLocation>
+}
+
+async function collect(
+  source: BookSource,
+  options: ScanOptions,
+  collected: Collected,
+  knownAddedAt: ReadonlyMap<string, string>,
+): Promise<void> {
+  const result = await scanBook(source, options, knownAddedAt)
+  if (!result) return
+  collected.books.push(result.book)
+  collected.locations.set(result.book.id, result.location)
+}
+
+/**
+ * Jede Datei im Ordner wird ein eigenes Hörbuch.
+ *
+ * Der Ordner selbst rückt dabei eine Ebene hoch: Aus „Die Drei
+ * Ausrufezeichen/001 - Die Handy-Falle.mp3" wird die Folge „Die Handy-Falle"
+ * in der Reihe „Die Drei Ausrufezeichen". Titel und Nummer kommen aus dem
+ * Dateinamen – nach denselben Regeln, nach denen sonst Ordnernamen gelesen
+ * werden.
+ */
+async function collectEpisodes(
+  folder: string,
+  contents: FolderContents,
+  override: BookOverride | null,
+  options: ScanOptions,
+  collected: Collected,
+  knownAddedAt: ReadonlyMap<string, string>,
+): Promise<void> {
+  const relativeFolder = relative(options.mediaRoot, folder)
+  const folderChain = relativeFolder === '' ? [] : relativeFolder.split(sep)
+  const forEpisode = overrideForEpisode(override)
+
+  for (const fileName of contents.audio) {
+    const path = join(folder, fileName)
+    const eigenes = coverBeside(fileName, contents.images)
+    await collect(
+      {
+        folder,
+        idPath: join(relativeFolder, fileName),
+        displayName: withoutExtension(fileName),
+        folderChain,
+        audio: [{ path, fileName, discName: null }],
+        // Erst das Bild mit demselben Namen, dann das Cover des Ordners: Ein
+        // gemeinsames `cover.jpg` ist für neunzig Folgen besser als nichts,
+        // aber schlechter als das Bild der Folge.
+        coverFile: eigenes !== null ? join(folder, eigenes) : coverOf(folder, contents),
+        override: forEpisode,
+        // Jede Folge kommt dann dazu, wenn ihre Datei dazukommt – nicht, wenn
+        // sich sonst etwas im Ordner ändert.
+        addedAtFrom: path,
+      },
+      options,
+      collected,
+      knownAddedAt,
+    )
+  }
+
+  options.onNotice?.(
+    `Einzelfolgen: ${relativeFolder} – ${String(contents.audio.length)} Hörbücher`,
+  )
+}
+
+function coverOf(folder: string, contents: FolderContents): string | null {
+  return contents.cover === null ? null : join(folder, contents.cover)
+}
+
 async function walk(
   folder: string,
   depth: number,
   options: ScanOptions,
-  collected: { books: Book[]; locations: Map<string, BookLocation> },
+  collected: Collected,
   knownAddedAt: ReadonlyMap<string, string>,
 ): Promise<void> {
   if (depth > MAX_DEPTH) return
@@ -284,26 +394,105 @@ async function walk(
   // Ein Ordner mit Audiodateien ist ein Buch. Einer ohne ist eine Reihe oder
   // schlicht Ablage – dann weiter nach unten.
   if (contents.audio.length > 0) {
-    const result = await scanBook(folder, contents, options, knownAddedAt)
-    if (result) {
-      collected.books.push(result.book)
-      collected.locations.set(result.book.id, result.location)
+    const override = await readOverride(folder)
+
+    if (splitsIntoEpisodes(override)) {
+      await collectEpisodes(folder, contents, override, options, collected, knownAddedAt)
+      return
     }
+
+    await collect(
+      {
+        folder,
+        idPath: relative(options.mediaRoot, folder),
+        displayName: basename(folder),
+        folderChain: chainOf(options.mediaRoot, folder),
+        audio: contents.audio.map((fileName) => ({
+          path: join(folder, fileName),
+          fileName,
+          discName: null,
+        })),
+        coverFile: coverOf(folder, contents),
+        override,
+        addedAtFrom: folder,
+      },
+      options,
+      collected,
+      knownAddedAt,
+    )
     return
+  }
+
+  // Ein Buch, das über `CD 1` … `CD 20` verteilt liegt, ist ein Buch und nicht
+  // zwanzig. Zusammengefasst wird nur, wo alle Unterordner benannte Teile sind
+  // – blosse Zahlen (`01`, `02`) und `Folge 3` bleiben eigene Bücher, so legen
+  // manche Sammlungen ihre Folgen ab.
+  if (isSplitAcrossParts(contents.subdirectories)) {
+    const audio: AudioEntry[] = []
+    let coverFile = coverOf(folder, contents)
+
+    for (const teil of contents.subdirectories) {
+      const innerPath = join(folder, teil)
+      try {
+        const inner = await readFolder(innerPath)
+        for (const fileName of inner.audio) {
+          audio.push({ path: join(innerPath, fileName), fileName, discName: teil })
+        }
+        coverFile ??= coverOf(innerPath, inner)
+      } catch {
+        // Nicht lesbar: Dann fehlt dieser Teil, der Rest bleibt ein Buch.
+      }
+    }
+
+    if (audio.length > 0) {
+      await collect(
+        {
+          folder,
+          idPath: relative(options.mediaRoot, folder),
+          displayName: basename(folder),
+          folderChain: chainOf(options.mediaRoot, folder),
+          audio,
+          coverFile,
+          override: await readOverride(folder),
+          addedAtFrom: folder,
+        },
+        options,
+        collected,
+        knownAddedAt,
+      )
+      return
+    }
   }
 
   // Ein einzelner Unterordner ohne eigene Aussage („CD1", „Teil 2", „01")
   // gehört nicht in die Bibliothek: Die Folge heisst nach dem Ordner darüber.
   if (contents.subdirectories.length === 1 && isDiscFolder(contents.subdirectories[0]!)) {
-    const innerPath = join(folder, contents.subdirectories[0]!)
+    const teil = contents.subdirectories[0]!
+    const innerPath = join(folder, teil)
     try {
       const inner = await readFolder(innerPath)
       if (inner.audio.length > 0) {
-        const result = await scanBook(innerPath, inner, options, knownAddedAt, folder)
-        if (result) {
-          collected.books.push(result.book)
-          collected.locations.set(result.book.id, result.location)
-        }
+        await collect(
+          {
+            folder: innerPath,
+            // Die ID hängt am Ordner mit den Dateien, der Name am Ordner
+            // darüber: Sonst hiesse die Folge in der Bibliothek „CD1".
+            idPath: relative(options.mediaRoot, innerPath),
+            displayName: basename(folder),
+            folderChain: chainOf(options.mediaRoot, folder),
+            audio: inner.audio.map((fileName) => ({
+              path: join(innerPath, fileName),
+              fileName,
+              discName: null,
+            })),
+            coverFile: coverOf(folder, contents) ?? coverOf(innerPath, inner),
+            override: (await readOverride(innerPath)) ?? (await readOverride(folder)),
+            addedAtFrom: innerPath,
+          },
+          options,
+          collected,
+          knownAddedAt,
+        )
         return
       }
     } catch {
@@ -355,7 +544,7 @@ export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
   await mkdir(join(options.cacheDir, 'covers'), { recursive: true })
 
   const knownAddedAt = await readKnownAddedAt(options.cacheDir)
-  const collected = { books: [] as Book[], locations: new Map<string, BookLocation>() }
+  const collected: Collected = { books: [], locations: new Map() }
   await walk(options.mediaRoot, 0, options, collected, knownAddedAt)
 
   await writeFile(

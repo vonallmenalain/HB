@@ -10,6 +10,14 @@ export interface ProbedFile {
   tagTitle: string | null
   tagArtist: string | null
   tagAlbumArtist: string | null
+  /**
+   * Der Teil-Ordner, aus dem die Datei stammt („CD 3"), sonst `null`.
+   *
+   * Geht ein Buch über zwanzig CD-Ordner, heissen die Dateien darin oft in
+   * jedem Ordner gleich. Ohne den Namen davor stünden im Player zwanzigmal
+   * dieselben Kapitelnamen untereinander.
+   */
+  discName: string | null
 }
 
 /** Inhalt einer optionalen `buch.json` – alle Felder freiwillig. */
@@ -22,6 +30,14 @@ export interface BookOverride {
   narrator?: string
   tags?: string[]
   hidden?: boolean
+  /**
+   * Jede Audiodatei im Ordner ist ein eigenes Hörbuch.
+   *
+   * Für Sammlungen, die neunzig vollständige Folgen als neunzig Dateien in
+   * einem Ordner ablegen. Ohne das Feld wäre das ein Buch mit neunzig
+   * „Kapiteln" von je einer Stunde.
+   */
+  einzelfolgen?: boolean
 }
 
 export interface BookInput {
@@ -88,9 +104,13 @@ export function buildBook(input: BookInput): Book {
   let elapsed = 0
   input.files.forEach((file, idx) => {
     const duration = Math.round(file.durationSec)
+    const eigener = chapterTitle(file.fileName, file.tagTitle, idx + 1)
     chapters.push({
       idx,
-      title: chapterTitle(file.fileName, file.tagTitle, idx + 1),
+      // Bei einem Buch über mehrere CD-Ordner steht der Teil davor: „CD 3 ·
+      // Kapitel 2". Sonst hiesse in zwanzig Ordnern jedes zweite Kapitel
+      // gleich, und die Kapitelliste wäre zum Suchen unbrauchbar.
+      title: file.discName === null ? eigener : `${tidyName(file.discName)} · ${eigener}`,
       fileIdx: idx,
       startSec: elapsed,
       endSec: elapsed + duration,
@@ -146,6 +166,7 @@ export function parseOverride(raw: unknown): BookOverride | null {
     override.tags = record.tags.filter((tag): tag is string => typeof tag === 'string')
   }
   if (record.hidden === true) override.hidden = true
+  if (typeof record.einzelfolgen === 'boolean') override.einzelfolgen = record.einzelfolgen
 
   return override
 }
