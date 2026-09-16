@@ -22,18 +22,37 @@ interface TicketQuery {
   t?: string
 }
 
+/** Grenze für ein hochgeladenes Cover: grosszügig, aber kein Videoupload. */
+const MAX_COVER_BYTES = 12 * 1024 * 1024
+
 export function buildServer(options: ServerOptions): FastifyInstance {
   const { config, store, verifyIdToken } = options
   const app = Fastify({ logger: options.logger ?? false })
 
   void app.register(cors, {
     origin: config.allowedOrigins,
-    methods: ['GET', 'POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'DELETE', 'OPTIONS'],
     // Der Katalog wird per ETag revalidiert; ohne diese Freigabe sieht der
     // Browser den Header bei einer Cross-Origin-Antwort nicht.
     exposedHeaders: ['Content-Range', 'Accept-Ranges', 'ETag'],
     maxAge: 600,
   })
+
+  /**
+   * Hochgeladene Cover kommen als Rohdaten, nicht als Formular.
+   *
+   * Ein `multipart`-Parser wäre eine Abhängigkeit mehr für genau einen Zweck;
+   * der Browser kann ein `File`-Objekt direkt als Body schicken. Die Grenze
+   * liegt bewusst über dem, was ein Handyfoto wiegt – verkleinert wird danach
+   * ohnehin auf 600 Pixel.
+   */
+  app.addContentTypeParser(
+    ['image/jpeg', 'image/png', 'image/webp', 'application/octet-stream'],
+    { parseAs: 'buffer', bodyLimit: MAX_COVER_BYTES },
+    (_request, body, done) => {
+      done(null, body)
+    },
+  )
 
   /**
    * Holt die UID aus dem Ticket in der Adresszeile.
@@ -53,6 +72,26 @@ export function buildServer(options: ServerOptions): FastifyInstance {
     const uid = await verifyTicket(config.ticketSecret, ticket)
     if (uid === null) {
       await reply.code(401).send({ error: 'ticket_invalid' })
+      return null
+    }
+    return uid
+  }
+
+  /**
+   * Wie {@link ticketUid}, verlangt aber das Administratorkonto.
+   *
+   * Ist keines konfiguriert, darf jedes freigeschaltete Konto verwalten – auf
+   * einem Familien-NAS ohne Adminliste ist das die einzige Lesart, die nicht
+   * alle aussperrt.
+   */
+  async function adminUid(
+    request: FastifyRequest<{ Querystring: TicketQuery }>,
+    reply: FastifyReply,
+  ): Promise<string | null> {
+    const uid = await ticketUid(request, reply)
+    if (uid === null) return null
+    if (config.adminUids.length > 0 && !config.adminUids.includes(uid)) {
+      await reply.code(403).send({ error: 'not_admin' })
       return null
     }
     return uid
@@ -123,8 +162,8 @@ export function buildServer(options: ServerOptions): FastifyInstance {
       // Nur die ID aus dem Dateinamen nehmen und im Katalog nachschlagen –
       // ein Pfad aus der URL wird nirgends verwendet.
       const bookId = request.params.file.replace(/\.jpg$/i, '')
-      const coverPath = store.location(bookId)?.coverPath
-      if (coverPath === null || coverPath === undefined) {
+      const coverPath = await store.coverFile(bookId)
+      if (coverPath === null) {
         return reply.code(404).send({ error: 'cover_not_found' })
       }
 
@@ -194,12 +233,8 @@ export function buildServer(options: ServerOptions): FastifyInstance {
   )
 
   app.post<{ Querystring: TicketQuery }>('/admin/rescan', async (request, reply) => {
-    const uid = await ticketUid(request, reply)
-    if (uid === null) return reply
+    if ((await adminUid(request, reply)) === null) return reply
 
-    if (config.adminUids.length > 0 && !config.adminUids.includes(uid)) {
-      return reply.code(403).send({ error: 'not_admin' })
-    }
     if (store.scanning()) {
       return reply.code(409).send({ error: 'scan_running' })
     }
@@ -209,6 +244,100 @@ export function buildServer(options: ServerOptions): FastifyInstance {
     })
     return reply.code(202).send({ started: true })
   })
+
+  app.get<{ Querystring: TicketQuery }>('/admin/struktur', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+    return reply.send({ folders: await store.folders() })
+  })
+
+  /**
+   * Einen Ordner umstellen: ein Hörbuch oder eines je Datei.
+   *
+   * Danach läuft ein Scan, denn die Kennungen hängen am Pfad – ohne ihn zeigte
+   * die App weiter Bücher, die es so nicht mehr gibt. Der Aufrufer sieht am
+   * `scanning` in `/health`, wann er fertig ist.
+   */
+  app.post<{ Querystring: TicketQuery; Body: { ordner?: unknown; modus?: unknown } }>(
+    '/admin/struktur',
+    async (request, reply) => {
+      if ((await adminUid(request, reply)) === null) return reply
+
+      const { ordner, modus } = request.body
+      if (typeof ordner !== 'string' || ordner === '') {
+        return reply.code(400).send({ error: 'folder_missing' })
+      }
+      if (modus !== 'einzelfolgen' && modus !== 'einBuch' && modus !== null) {
+        return reply.code(400).send({ error: 'mode_invalid' })
+      }
+      if (store.scanning()) {
+        return reply.code(409).send({ error: 'scan_running' })
+      }
+
+      await store.setFolderMode(ordner, modus)
+      request.log.info({ ordner, modus }, 'Ordner umgestellt')
+      void store.rescan().catch((error: unknown) => {
+        request.log.error({ error }, 'Scan nach dem Umstellen fehlgeschlagen')
+      })
+      return reply.code(202).send({ ordner, modus })
+    },
+  )
+
+  /**
+   * Zu welchen Büchern ein Bild hochgeladen wurde.
+   *
+   * Die App braucht das, um „Eigenes Bild zurücknehmen" nur dort anzubieten,
+   * wo es etwas zurückzunehmen gibt: Ein Cover vom NAS lässt sich hier nicht
+   * wegnehmen, und ein Knopf, der nichts tut, sieht aus wie ein Fehler.
+   */
+  app.get<{ Querystring: TicketQuery }>('/admin/cover', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+    return reply.send({ bookIds: await store.manualCovers() })
+  })
+
+  /**
+   * Ein Cover von Hand setzen.
+   *
+   * Es landet im Cache-Volume des Dienstes, nicht im Hörbuch-Ordner: Der ist
+   * nur lesend eingebunden, und das soll er bleiben. Ein Scan überschreibt es
+   * nicht – er sieht es und benutzt es weiter.
+   */
+  app.post<{ Params: { bookId: string }; Querystring: TicketQuery }>(
+    '/admin/cover/:bookId',
+    { bodyLimit: MAX_COVER_BYTES },
+    async (request, reply) => {
+      if ((await adminUid(request, reply)) === null) return reply
+
+      const image = request.body
+      if (!Buffer.isBuffer(image) || image.length === 0) {
+        return reply.code(400).send({ error: 'image_missing' })
+      }
+      if (store.book(request.params.bookId) === undefined) {
+        return reply.code(404).send({ error: 'book_not_found' })
+      }
+
+      const cover = await store.setManualCover(request.params.bookId, image)
+      if (cover === null) return reply.code(415).send({ error: 'image_unreadable' })
+
+      request.log.info({ bookId: request.params.bookId }, 'Cover gesetzt')
+      return reply.send({ cover })
+    },
+  )
+
+  app.delete<{ Params: { bookId: string }; Querystring: TicketQuery }>(
+    '/admin/cover/:bookId',
+    async (request, reply) => {
+      if ((await adminUid(request, reply)) === null) return reply
+      if (store.book(request.params.bookId) === undefined) {
+        return reply.code(404).send({ error: 'book_not_found' })
+      }
+
+      const entfernt = await store.clearManualCover(request.params.bookId)
+      return reply.send({
+        entfernt,
+        cover: store.book(request.params.bookId)?.cover ?? null,
+      })
+    },
+  )
 
   return app
 }

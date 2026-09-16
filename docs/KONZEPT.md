@@ -414,13 +414,30 @@ nicht.
 
 **Ein Stockwerk darüber liegt der Adminbereich.** Der Elternmodus ist für alle,
 die das Tablet verwalten; der Adminbereich für das eine Konto, das über Zugänge
-entscheidet. Er enthält drei Dinge, die es sonst nirgends gibt:
+entscheidet – und darüber, wie die Sammlung aussieht. Er enthält fünf Dinge,
+die es sonst nirgends gibt:
 
 | | |
 |---|---|
 | **Zugriffsanfragen** | Wer sich mit einer fremden Adresse anmeldet, erscheint hier mit Namen und Adresse. Ein Tap gibt frei. Vorher stand auf dem Sperrbildschirm eine UID zum Abschreiben, die von Hand in die Firebase-Konsole gehörte – der einzige Schritt der ganzen App, der einen Rechner verlangte. |
 | **Titel** | Was die Automatik aus §5.3 falsch aufräumt, lässt sich hier hinschreiben. Der Eintrag gilt für alle Geräte und alle Kinder. |
+| **Cover** | Wo auf dem NAS kein Bild liegt, lässt sich hier eines hochladen. Für ein Kind, das noch nicht liest, ist das Cover der Name des Hörbuchs – eine farbige Buchstabenkachel ist der Notbehelf, nicht das Ziel. |
+| **Ordner** | Ein Ordner mit vielen Dateien ist entweder ein Hörbuch mit Kapiteln oder eine Sammlung ganzer Folgen. Hier wird umgestellt, welches von beidem (§6.4). |
 | **Gehört** | Wer hat was wie oft gehört – je Profil, mit den meistgehörten Folgen. Beantwortet die Frage, die sich zu Hause tatsächlich stellt („läuft eigentlich immer nur dieselbe Folge?"), ohne ein Protokoll über den Tag eines Kindes anzulegen: gezählt werden Starts und abgespielte Sekunden, sonst nichts. |
+
+**Warum Cover und Ordner in die App gehören und nicht aufs NAS.** Beides liesse
+sich dort erledigen – eine `cover.jpg` in den Ordner legen, eine `buch.json`
+danebenschreiben. Nur heisst das: Rechner aufklappen, Freigabe verbinden,
+Ordner suchen. Die Hürde ist hoch genug, dass es liegen bleibt, und dann steht
+in der Bibliothek eben ein Jahr lang eine Buchstabenkachel. In der App sind es
+drei Taps vom Sofa aus.
+
+**Geschrieben wird dabei trotzdem nichts auf dem NAS.** Der Hörbuch-Ordner
+bleibt nur lesend eingebunden – das ist die Zusage, die den Dienst überhaupt
+erst unbedenklich macht: Er kann eine Sammlung nicht kaputtmachen, auch nicht
+durch einen Fehler. Hochgeladene Cover und umgestellte Ordner liegen deshalb im
+Cache-Volume des Dienstes. Sie überleben Neustarts und jeden Scan, und wer sie
+loswerden will, nimmt sie dort wieder weg, wo er sie gesetzt hat.
 
 Wer nicht das Administratorkonto ist, sieht den Eingang gar nicht erst – und
 bekäme dort auch nichts zu lesen: Die Firestore-Regeln geben die Listen nur einer
@@ -502,9 +519,13 @@ mit langen, benannten Kapiteln genauso aus wie eine Folgensammlung: numerierte
 Dateien, je eine halbe Stunde, jede mit eigenem Titel. Ein Fehlgriff wäre
 einseitig teuer – aus einem Buch würden zwölf, die Reihenfolge ginge verloren,
 gemerkte Stellen zeigten ins Leere. Eine Zeile in einer Datei auf dem NAS ist
-dagegen in einer halben Minute geschrieben. Bequemer wird das erst, wenn der
-Elternbereich die Ordner selbst umstellen kann – dazu müsste der Medien-Dienst
-schreiben dürfen (Ausbaustufe).
+dagegen in einer halben Minute geschrieben.
+
+**Seit M10 geht dasselbe auch ohne NAS-Zugriff:** Der Adminbereich listet die
+Ordner mit mehreren Dateien, die längsten zuerst, und stellt sie auf Knopfdruck
+um (§5.7). Die Wahl liegt im Cache-Volume des Dienstes und schlägt die
+`buch.json` – an eine Datei auf dem NAS kommt nicht jeder heran, an den
+Adminbereich schon.
 
 Im Katalog bleiben `files[]` (was geladen wird) und `chapters[]` (was das Kind
 sieht) trotzdem getrennte Listen, auch wenn sie hier 1:1 aufeinander abbilden.
@@ -826,6 +847,7 @@ Jeder Meilenstein ist ein eigener Pull Request und für sich lauffähig.
 | **M7** | Offline-Download über Background Fetch, Cache Storage, Verwaltung im Elternmodus | Reisetauglich ✅ |
 | **M8** | Sleep-Timer ✅, Elternmodus mit PIN ✅, Feinschliff ✅, Barrierefreiheit ✅ | Fertig für den Alltag ✅ |
 | **M9** | Bibliothek nach Reihen, aufgeräumte Titel, Startseite als Dashboard (Favoriten, Vorschläge), Adminbereich mit Freigaben, Titeln und Hörhistorie, Spulen im Player, Regel-Deployment über GitHub | Aus „läuft" wird „macht Freude" ✅ |
+| **M10** | Die Sammlung von der App aus in Form bringen: Reihen direkt auf der Startseite, CD-Ordner als ein Buch, Ordner mit ganzen Folgen aufteilen, Cover hochladen – beides auch im Adminbereich, ohne ans NAS zu müssen | Eine gewachsene Sammlung sieht aus wie eine gepflegte ✅ |
 
 **Realistische Reihenfolge-Logik:** Nach M5 ist die App für ein Kind zuhause im
 WLAN bereits vollständig nutzbar. M6–M8 sind Komfort, der aber den Unterschied

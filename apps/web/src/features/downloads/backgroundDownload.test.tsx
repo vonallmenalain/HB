@@ -43,6 +43,11 @@ const client: MediaClient = {
   startRescan: () => Promise.resolve('started'),
   fetchStatus: () =>
     Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
+  fetchFolders: () => Promise.resolve([]),
+  fetchManualCovers: () => Promise.resolve([]),
+  setFolderMode: () => Promise.resolve(),
+  uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=1'),
+  removeCover: () => Promise.resolve(),
   coverUrl: (path) => `https://nas.example${path}&t=t`,
   audioUrl: (bookId, fileIdx) => `https://nas.example/audio/${bookId}/${String(fileIdx)}?t=t`,
   canonicalAudioUrl: (bookId, fileIdx) =>

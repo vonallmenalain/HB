@@ -287,3 +287,152 @@ describe('scanLibrary', () => {
     expect(catalog.generatedAt).toBe('2026-01-01T00:00:00.000Z')
   })
 })
+
+describe('Ein Hörbuch über mehrere CD-Ordner', () => {
+  it('fasst die Teile zu einem Buch zusammen', async () => {
+    // Vorher wurde jeder CD-Ordner ein eigenes Buch – die Reihe „Harry Potter"
+    // bestand dann aus „CD 1", „CD 10", „CD 11".
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Harry Potter/Der Feuerkelch/CD 1', files: [{ name: '01 - Anfang.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/CD 2', files: [{ name: '01 - Anfang.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/CD 10', files: [{ name: '01 - Anfang.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.title).toBe('Der Feuerkelch')
+    expect(catalog.books[0]?.series).toBe('Harry Potter')
+    expect(catalog.books[0]?.files).toHaveLength(3)
+  })
+
+  it('sortiert die Teile natürlich und nennt sie im Kapitel', async () => {
+    // Alphabetisch käme CD 10 vor CD 2, und in zwanzig Ordnern hiesse jedes
+    // Kapitel gleich.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Buch/CD 1', files: [{ name: '01 - Anfang.wav' }] },
+      { path: 'Reihe/Buch/CD 2', files: [{ name: '01 - Anfang.wav' }] },
+      { path: 'Reihe/Buch/CD 10', files: [{ name: '01 - Anfang.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books[0]?.chapters.map((kapitel) => kapitel.title)).toEqual([
+      'CD 1 · Anfang',
+      'CD 2 · Anfang',
+      'CD 10 · Anfang',
+    ])
+  })
+
+  it('lässt nummerierte Folgen-Ordner in Ruhe', async () => {
+    // „Folge 1" und „Folge 2" sind zwei Hörbücher, keine zwei Teile von einem.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Bibi Blocksberg/Folge 1', files: [{ name: 'a.wav' }] },
+      { path: 'Bibi Blocksberg/Folge 2', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/01', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/02', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(catalog.books).toHaveLength(4)
+  })
+})
+
+describe('Ordner, in dem jede Datei ein Hörbuch ist', () => {
+  const ausrufezeichen = () =>
+    makeLibrary([
+      {
+        path: 'Die Drei Ausrufezeichen',
+        files: [
+          { name: 'buch.json', content: JSON.stringify({ einzelfolgen: true }) },
+          { name: 'Drei Ausrufezeichen 001 - Die Handy-Falle.wav', seconds: 2 },
+          { name: 'Drei Ausrufezeichen 002 - Betrug beim Casting.wav', seconds: 1 },
+          { name: 'Drei Ausrufezeichen 002 - Betrug beim Casting.png', content: PNG_1X1 },
+        ],
+      },
+    ])
+
+  it('macht aus jeder Datei ein eigenes Buch', async () => {
+    const { mediaRoot, cacheDir } = await ausrufezeichen()
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(2)
+    expect(catalog.books.map((book) => [book.series, book.seriesIndex, book.title])).toEqual([
+      ['Die Drei Ausrufezeichen', 1, 'Die Handy-Falle'],
+      ['Die Drei Ausrufezeichen', 2, 'Betrug beim Casting'],
+    ])
+    // Eine Folge, eine Datei – und damit auch nur ein Kapitel.
+    expect(catalog.books[0]?.files).toHaveLength(1)
+    expect(catalog.books[0]?.chapters).toHaveLength(1)
+  })
+
+  it('gibt jeder Folge ihre eigene Kennung', async () => {
+    const { mediaRoot, cacheDir } = await ausrufezeichen()
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books[0]?.id).not.toBe(catalog.books[1]?.id)
+  })
+
+  it('nimmt das Bild, das neben der Datei liegt', async () => {
+    // Ohne das hätten neunzig Folgen ein gemeinsames Cover – oder keins.
+    const { mediaRoot, cacheDir } = await ausrufezeichen()
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    const mitBild = catalog.books.find((book) => book.title === 'Betrug beim Casting')
+    expect(mitBild?.cover).toContain(mitBild?.id ?? '')
+    expect(catalog.books.find((book) => book.title === 'Die Handy-Falle')?.cover).toBeNull()
+  })
+
+  it('lässt den Adminbereich über die buch.json entscheiden', async () => {
+    // An die Datei auf dem NAS kommt nicht jeder heran – was im Adminbereich
+    // eingestellt wurde, lässt sich dort auch wieder zurücknehmen.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: 'Reihe',
+        files: [
+          { name: 'buch.json', content: JSON.stringify({ einzelfolgen: true }) },
+          { name: '01 - Eins.wav', seconds: 1 },
+          { name: '02 - Zwei.wav', seconds: 1 },
+        ],
+      },
+    ])
+
+    await writeFile(
+      join(cacheDir, 'struktur.json'),
+      JSON.stringify({ Reihe: 'einBuch' }),
+      'utf8',
+    )
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(catalog.books).toHaveLength(1)
+  })
+
+  it('merkt sich zu jedem Buch den Ordner, auf den sich die Einstellung bezieht', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Buch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/CD 2', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog, locations } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    // Nicht „Reihe/Buch/CD 1": Umstellen liesse sich nur der Ordner, der das
+    // Buch ausmacht.
+    expect(locations.get(catalog.books[0]!.id)?.folder).toBe(join('Reihe', 'Buch'))
+  })
+
+  it('bleibt ohne die Ansage ein einziges Buch', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: 'Die Drei Ausrufezeichen',
+        files: [
+          { name: 'Drei Ausrufezeichen 001 - Die Handy-Falle.wav', seconds: 2 },
+          { name: 'Drei Ausrufezeichen 002 - Betrug beim Casting.wav', seconds: 1 },
+        ],
+      },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.chapters).toHaveLength(2)
+  })
+})

@@ -62,10 +62,33 @@ export interface Catalog {
 /** Interner Index: verbindet Katalog-IDs mit echten Pfaden. */
 export interface BookLocation {
   id: string
+  /**
+   * Ordner relativ zum Medien-Stamm, aus dem das Buch stammt.
+   *
+   * Beim gewöhnlichen Buch der Ordner mit den Dateien, bei einem Buch über
+   * CD-Ordner der Ordner darüber, bei einer Einzelfolge der Ordner, in dem sie
+   * liegt.
+   */
+  folder: string
+  /**
+   * Lässt sich dieser Ordner im Adminbereich umstellen?
+   *
+   * Nur wo die Audiodateien unmittelbar liegen: Ein Buch aus `CD 1` … `CD 20`
+   * entsteht in einem anderen Zweig des Scanners, der die Einstellung gar
+   * nicht liest – ein Knopf dafür wäre ein Knopf, der nichts tut.
+   */
+  switchable: boolean
   /** Absolute Pfade, Reihenfolge entspricht `files[].idx`. */
   filePaths: string[]
   /** Absoluter Pfad des aufbereiteten Covers oder null. */
   coverPath: string | null
+  /**
+   * Die Cover-Adresse aus dem Scan – ohne ein im Adminbereich hochgeladenes.
+   *
+   * Wird gebraucht, wenn jemand das hochgeladene Bild wieder wegnimmt: Dann
+   * gilt wieder, was auf dem NAS liegt, ohne dafür neu einlesen zu müssen.
+   */
+  scannedCover: string | null
 }
 
 export interface ScanResult {

@@ -57,6 +57,28 @@ export function useRescan(
   client: MediaClient | null,
   refresh: () => void,
 ): { state: RescanState; start: () => void } {
+  const { state, run } = useScanWatch(client, refresh)
+  return {
+    state,
+    // Ohne diese Hülle bekäme `run` das Klickereignis als Aufgabe gereicht.
+    start: () => {
+      run((bereit) => bereit.startRescan())
+    },
+  }
+}
+
+/**
+ * Stösst etwas an, das auf dem NAS einen Scan auslöst, und wartet ihn ab.
+ *
+ * Das Warten ist bei jedem Auslöser dasselbe: Der Dienst antwortet sofort und
+ * liest im Hintergrund weiter; fertig ist er erst, wenn `/health` keinen Scan
+ * mehr meldet **und** einen neueren Zeitstempel trägt. Neue Ordner suchen und
+ * einen Ordner umstellen unterscheiden sich nur im ersten Aufruf.
+ */
+export function useScanWatch(
+  client: MediaClient | null,
+  refresh: () => void,
+): { state: RescanState; run: (start: (client: MediaClient) => Promise<unknown>) => void } {
   const [state, setState] = useState<RescanState>({ kind: 'idle' })
 
   // Nach dem Verlassen des Elternbereichs soll nichts mehr gesetzt werden.
@@ -68,72 +90,75 @@ export function useRescan(
     }
   }, [])
 
-  const start = useCallback(() => {
-    if (client === null) {
-      refresh()
-      return
-    }
-    setState({ kind: 'running' })
-
-    void (async () => {
-      let vorher: NasStatus
-      try {
-        vorher = await client.fetchStatus()
-        await client.startRescan()
-      } catch (error) {
-        if (lebt.current) setState({ kind: 'failed', reason: reasonOf(error) })
+  const run = useCallback(
+    (start: (client: MediaClient) => Promise<unknown>) => {
+      if (client === null) {
+        refresh()
         return
       }
+      setState({ kind: 'running' })
 
-      const bis = Date.now() + MAX_WAIT_MS
-      let fehlversuche = 0
-
-      while (Date.now() < bis) {
-        await sleep(PROBE_INTERVAL_MS)
-        if (!lebt.current) return
-
-        let jetzt: NasStatus
+      void (async () => {
+        let vorher: NasStatus
         try {
-          jetzt = await client.fetchStatus()
-          fehlversuche = 0
+          vorher = await client.fetchStatus()
+          await start(client)
         } catch (error) {
-          // Ein einzelner Aussetzer während eines langen Scans ist normal –
-          // erst mehrere hintereinander heissen, dass das NAS wirklich weg ist.
-          fehlversuche += 1
-          if (fehlversuche < MAX_PROBE_FAILURES) continue
           if (lebt.current) setState({ kind: 'failed', reason: reasonOf(error) })
           return
         }
 
-        if (jetzt.scanning) continue
+        const bis = Date.now() + MAX_WAIT_MS
+        let fehlversuche = 0
 
-        // Ein gescheiterter Scan endet genauso still wie ein erfolgreicher:
-        // `scanning` steht wieder auf false, nur der Katalog ist der alte. Wer
-        // dann „Fertig" liest, sucht den fehlenden Ordner an der falschen
-        // Stelle – deshalb zählt nur ein neuer Zeitstempel als Erfolg.
-        if (
-          vorher.scannedAt !== null &&
-          jetzt.scannedAt !== null &&
-          jetzt.scannedAt === vorher.scannedAt
-        ) {
-          if (lebt.current) setState({ kind: 'incomplete' })
+        while (Date.now() < bis) {
+          await sleep(PROBE_INTERVAL_MS)
+          if (!lebt.current) return
+
+          let jetzt: NasStatus
+          try {
+            jetzt = await client.fetchStatus()
+            fehlversuche = 0
+          } catch (error) {
+            // Ein einzelner Aussetzer während eines langen Scans ist normal –
+            // erst mehrere hintereinander heissen, dass das NAS wirklich weg ist.
+            fehlversuche += 1
+            if (fehlversuche < MAX_PROBE_FAILURES) continue
+            if (lebt.current) setState({ kind: 'failed', reason: reasonOf(error) })
+            return
+          }
+
+          if (jetzt.scanning) continue
+
+          // Ein gescheiterter Scan endet genauso still wie ein erfolgreicher:
+          // `scanning` steht wieder auf false, nur der Katalog ist der alte. Wer
+          // dann „Fertig" liest, sucht den fehlenden Ordner an der falschen
+          // Stelle – deshalb zählt nur ein neuer Zeitstempel als Erfolg.
+          if (
+            vorher.scannedAt !== null &&
+            jetzt.scannedAt !== null &&
+            jetzt.scannedAt === vorher.scannedAt
+          ) {
+            if (lebt.current) setState({ kind: 'incomplete' })
+            return
+          }
+
+          refresh()
+          if (lebt.current) {
+            setState({
+              kind: 'done',
+              neu: Math.max(jetzt.books - vorher.books, 0),
+              gesamt: jetzt.books,
+            })
+          }
           return
         }
 
-        refresh()
-        if (lebt.current) {
-          setState({
-            kind: 'done',
-            neu: Math.max(jetzt.books - vorher.books, 0),
-            gesamt: jetzt.books,
-          })
-        }
-        return
-      }
+        if (lebt.current) setState({ kind: 'still-running' })
+      })()
+    },
+    [client, refresh],
+  )
 
-      if (lebt.current) setState({ kind: 'still-running' })
-    })()
-  }, [client, refresh])
-
-  return { state, start }
+  return { state, run }
 }

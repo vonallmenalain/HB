@@ -212,6 +212,22 @@ const demoClient: LibraryContextValue['client'] = {
       schemaVersion: 2,
       scannedAt: new Date().toISOString(),
     }),
+  // In der Vorschau gibt es kein NAS, das etwas umstellen könnte – die Liste
+  // bleibt leer, die Aufrufe tun nichts.
+  fetchFolders: () =>
+    Promise.resolve([
+      {
+        path: 'Die Drei Ausrufezeichen',
+        books: 1,
+        files: 94,
+        titles: ['Die Drei Ausrufezeichen'],
+        mode: null,
+      },
+    ]),
+  setFolderMode: () => Promise.resolve(),
+  fetchManualCovers: () => Promise.resolve([]),
+  uploadCover: (bookId: string) => Promise.resolve(`/cover/${bookId}.jpg?v=neu`),
+  removeCover: () => Promise.resolve(),
   coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),
   audioUrl: () => null,
   canonicalAudioUrl: () => '',
