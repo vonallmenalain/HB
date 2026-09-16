@@ -283,6 +283,18 @@ export function buildServer(options: ServerOptions): FastifyInstance {
   )
 
   /**
+   * Zu welchen Büchern ein Bild hochgeladen wurde.
+   *
+   * Die App braucht das, um „Eigenes Bild zurücknehmen" nur dort anzubieten,
+   * wo es etwas zurückzunehmen gibt: Ein Cover vom NAS lässt sich hier nicht
+   * wegnehmen, und ein Knopf, der nichts tut, sieht aus wie ein Fehler.
+   */
+  app.get<{ Querystring: TicketQuery }>('/admin/cover', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+    return reply.send({ bookIds: await store.manualCovers() })
+  })
+
+  /**
    * Ein Cover von Hand setzen.
    *
    * Es landet im Cache-Volume des Dienstes, nicht im Hörbuch-Ordner: Der ist
@@ -319,8 +331,11 @@ export function buildServer(options: ServerOptions): FastifyInstance {
         return reply.code(404).send({ error: 'book_not_found' })
       }
 
-      await store.clearManualCover(request.params.bookId)
-      return reply.send({ cover: store.book(request.params.bookId)?.cover ?? null })
+      const entfernt = await store.clearManualCover(request.params.bookId)
+      return reply.send({
+        entfernt,
+        cover: store.book(request.params.bookId)?.cover ?? null,
+      })
     },
   )
 

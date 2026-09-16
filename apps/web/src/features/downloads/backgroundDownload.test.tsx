@@ -44,6 +44,7 @@ const client: MediaClient = {
   fetchStatus: () =>
     Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
   fetchFolders: () => Promise.resolve([]),
+  fetchManualCovers: () => Promise.resolve([]),
   setFolderMode: () => Promise.resolve(),
   uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=1'),
   removeCover: () => Promise.resolve(),

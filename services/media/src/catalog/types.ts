@@ -63,13 +63,21 @@ export interface Catalog {
 export interface BookLocation {
   id: string
   /**
-   * Ordner relativ zum Medien-Stamm, auf den sich eine Einstellung bezieht.
+   * Ordner relativ zum Medien-Stamm, aus dem das Buch stammt.
    *
    * Beim gewöhnlichen Buch der Ordner mit den Dateien, bei einem Buch über
    * CD-Ordner der Ordner darüber, bei einer Einzelfolge der Ordner, in dem sie
-   * liegt. Genau dieser Pfad steht im Adminbereich zur Wahl.
+   * liegt.
    */
   folder: string
+  /**
+   * Lässt sich dieser Ordner im Adminbereich umstellen?
+   *
+   * Nur wo die Audiodateien unmittelbar liegen: Ein Buch aus `CD 1` … `CD 20`
+   * entsteht in einem anderen Zweig des Scanners, der die Einstellung gar
+   * nicht liest – ein Knopf dafür wäre ein Knopf, der nichts tut.
+   */
+  switchable: boolean
   /** Absolute Pfade, Reihenfolge entspricht `files[].idx`. */
   filePaths: string[]
   /** Absoluter Pfad des aufbereiteten Covers oder null. */

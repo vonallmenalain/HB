@@ -123,6 +123,7 @@ function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
     fetchStatus: () =>
       Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
     fetchFolders: () => Promise.resolve([]),
+    fetchManualCovers: () => Promise.resolve([]),
     setFolderMode: () => Promise.resolve(),
     uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=2'),
     removeCover: () => Promise.resolve(),
@@ -173,27 +174,54 @@ describe('Cover im Adminbereich', () => {
     })
   })
 
-  it('nimmt ein gesetztes Bild wieder weg', async () => {
+  it('nimmt ein hochgeladenes Bild wieder weg', async () => {
     const removeCover = vi.fn().mockResolvedValue(undefined)
     const mitBild = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: '/cover/b_1.jpg' })
 
     renderWithProfiles(<AdminScreen />, profiles(), {
       auth: makeAuthValue({ isAdmin: true }),
       admin: makeAdminValue(),
-      library: makeLibraryValue({ books: [mitBild], client: makeClient({ removeCover }) }),
+      library: makeLibraryValue({
+        books: [mitBild],
+        client: makeClient({ removeCover, fetchManualCovers: () => Promise.resolve(['b_1']) }),
+      }),
     })
 
     await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
-    await userEvent.click(screen.getByRole('button', { name: 'Bild wegnehmen' }))
+    await userEvent.click(
+      await screen.findByRole('button', { name: 'Eigenes Bild zurücknehmen' }),
+    )
 
     expect(removeCover).toHaveBeenCalledWith('b_1')
   })
 
-  it('bietet das Wegnehmen nur an, wo ein Bild ist', async () => {
+  it('bietet das Zurücknehmen nicht an, wo das Bild vom NAS kommt', async () => {
+    // Der Knopf löscht nur ein hochgeladenes Bild. An einem Cover aus dem
+    // Ordner täte er nichts – und ein Knopf, der nichts tut, sieht aus wie ein
+    // Fehler.
+    const mitBild = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: '/cover/b_1.jpg' })
+
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [mitBild], client: makeClient() }),
+    })
+
+    await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
+
+    expect(await screen.findByText('Bild vom NAS.')).toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Eigenes Bild zurücknehmen' }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('bietet das Zurücknehmen nicht an, wo gar kein Bild ist', async () => {
     zeigen(makeClient())
     await userEvent.type(screen.getByLabelText('Hörbuch suchen'), 'Papagei')
 
-    expect(screen.queryByRole('button', { name: 'Bild wegnehmen' })).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Eigenes Bild zurücknehmen' }),
+    ).not.toBeInTheDocument()
   })
 })
 

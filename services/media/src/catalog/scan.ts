@@ -169,6 +169,14 @@ interface BookSource {
   override: BookOverride | null
   /** Was den Zeitpunkt „dazugekommen" bestimmt, wenn er noch nicht bekannt ist. */
   addedAtFrom: string
+  /**
+   * Liegt das Buch unmittelbar in `folder` – und lässt es sich damit umstellen?
+   *
+   * Nur der Zweig für Ordner mit eigenen Audiodateien liest die Einstellung
+   * aus dem Adminbereich. Für ein Buch aus CD-Ordnern wäre der Knopf dort eine
+   * Zusage, die niemand einlöst.
+   */
+  switchable: boolean
 }
 
 /** Die Ordner über einem Pfad, vom Medien-Stamm abwärts. */
@@ -277,6 +285,7 @@ async function scanBook(
     location: {
       id: book.id,
       folder: relative(options.mediaRoot, source.folder),
+      switchable: source.switchable,
       filePaths,
       coverPath: writtenCover,
       scannedCover,
@@ -348,6 +357,7 @@ async function collectEpisodes(
         // Jede Folge kommt dann dazu, wenn ihre Datei dazukommt – nicht, wenn
         // sich sonst etwas im Ordner ändert.
         addedAtFrom: path,
+        switchable: true,
       },
       run,
     )
@@ -400,6 +410,7 @@ async function walk(folder: string, depth: number, run: ScanRun): Promise<void> 
         coverFile: coverOf(folder, contents),
         override,
         addedAtFrom: folder,
+        switchable: true,
       },
       run,
     )
@@ -438,6 +449,9 @@ async function walk(folder: string, depth: number, run: ScanRun): Promise<void> 
           coverFile,
           override: await readOverride(folder),
           addedAtFrom: folder,
+          // Dieser Ordner hat keine eigenen Audiodateien; der Zweig hier liest
+          // keine Einstellung, also steht er auch nicht zur Wahl.
+          switchable: false,
         },
         run,
       )
@@ -469,6 +483,7 @@ async function walk(folder: string, depth: number, run: ScanRun): Promise<void> 
             coverFile: coverOf(folder, contents) ?? coverOf(innerPath, inner),
             override: (await readOverride(innerPath)) ?? (await readOverride(folder)),
             addedAtFrom: innerPath,
+            switchable: false,
           },
           run,
         )

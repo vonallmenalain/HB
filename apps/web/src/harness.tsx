@@ -225,6 +225,7 @@ const demoClient: LibraryContextValue['client'] = {
       },
     ]),
   setFolderMode: () => Promise.resolve(),
+  fetchManualCovers: () => Promise.resolve([]),
   uploadCover: (bookId: string) => Promise.resolve(`/cover/${bookId}.jpg?v=neu`),
   removeCover: () => Promise.resolve(),
   coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),

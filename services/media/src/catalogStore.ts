@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
-import { mkdir, rm } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { mkdir, readdir, rm } from 'node:fs/promises'
+import { dirname, join } from 'node:path'
 
 import { coverPath } from './catalog/build.js'
 import { coverVersionOf, manualCoverPath, writeCover } from './catalog/cover.js'
@@ -40,9 +40,11 @@ export interface CatalogStore {
    * grossen Bibliothek.
    */
   setFolderMode: (folder: string, mode: FolderMode | null) => Promise<void>
+  /** Die Bücher, für die ein Bild hochgeladen wurde. */
+  manualCovers: () => Promise<string[]>
   /** Legt ein hochgeladenes Cover ab. Liefert die neue Adresse oder null. */
   setManualCover: (bookId: string, image: Buffer) => Promise<string | null>
-  /** Nimmt es wieder weg; danach gilt wieder, was auf dem NAS liegt. */
+  /** Nimmt es wieder weg. Liefert, ob überhaupt eines gesetzt war. */
   clearManualCover: (bookId: string) => Promise<boolean>
 }
 
@@ -118,9 +120,29 @@ export function createCatalogStore(options: {
     scanning: () => running !== null,
 
     coverFile: async (bookId) => {
+      // Erst nachschlagen, dann einen Pfad bauen – nie umgekehrt. Aus der
+      // Adresse kommt eine Kennung, und `join` würde ein „../" darin brav
+      // auflösen: Damit stünde der Cache-Ordner offen, obwohl die Route nie
+      // einen Pfad entgegennehmen wollte.
+      const location = current.locations.get(bookId)
+      if (location === undefined) return null
+
       const manual = manualCoverPath(options.cacheDir, bookId)
       if ((await coverVersionOf(manual)) !== null) return manual
-      return current.locations.get(bookId)?.coverPath ?? null
+      return location.coverPath
+    },
+
+    manualCovers: async () => {
+      try {
+        const dateien = await readdir(join(options.cacheDir, 'manual'))
+        return dateien
+          .map((name) => name.replace(/\.jpg$/i, ''))
+          // Nur, was auch im Katalog steht: Ein Bild zu einem Buch, das es
+          // nicht mehr gibt, interessiert niemanden.
+          .filter((bookId) => current.locations.has(bookId))
+      } catch {
+        return []
+      }
     },
 
     folders: async () => {
@@ -129,7 +151,7 @@ export function createCatalogStore(options: {
 
       for (const book of current.catalog.books) {
         const location = current.locations.get(book.id)
-        if (location === undefined) continue
+        if (location?.switchable !== true) continue
 
         const eintrag = byFolder.get(location.folder) ?? {
           path: location.folder,
@@ -145,9 +167,7 @@ export function createCatalogStore(options: {
         byFolder.set(location.folder, eintrag)
       }
 
-      // Ein Ordner mit einer einzigen Datei lässt sich nicht aufteilen, und ein
-      // Buch aus CD-Ordnern liegt nicht selbst im Ordner – beides gehört nicht
-      // in eine Liste zum Umstellen.
+      // Ein Ordner mit einer einzigen Datei lässt sich nicht aufteilen.
       return [...byFolder.values()]
         .filter((eintrag) => eintrag.files > 1)
         .sort((a, b) => b.files - a.files || a.path.localeCompare(b.path, 'de'))
@@ -175,8 +195,16 @@ export function createCatalogStore(options: {
     },
 
     clearManualCover: async (bookId) => {
-      await rm(manualCoverPath(options.cacheDir, bookId), { force: true })
-      return replaceBook(bookId, current.locations.get(bookId)?.scannedCover ?? null)
+      // Auch hier gilt: kein Pfad aus einer Kennung, die der Katalog nicht
+      // kennt. Sonst löschte ein „../" irgendein Bild im Cache-Volume.
+      const location = current.locations.get(bookId)
+      if (location === undefined) return false
+
+      const manual = manualCoverPath(options.cacheDir, bookId)
+      const gab = (await coverVersionOf(manual)) !== null
+      await rm(manual, { force: true })
+      replaceBook(bookId, location.scannedCover)
+      return gab
     },
   }
 }

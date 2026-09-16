@@ -517,6 +517,10 @@ bekommt `409`.
 Die Ordner, die sich umstellen lassen – alle mit mehr als einer Audiodatei, die
 längsten zuerst. Für den Adminbereich der App.
 
+Ein Buch, das über `CD 1` … `CD 20` verteilt liegt, steht **nicht** darin: Es
+entsteht in einem anderen Zweig des Scanners, der die Einstellung nicht liest.
+Dasselbe gilt für einen einzelnen übersprungenen `CD1`-Ordner.
+
 ```json
 {
   "folders": [
@@ -542,6 +546,11 @@ Scan läuft im Hintergrund. `modus: null` nimmt die Einstellung zurück; dann
 gilt wieder die `buch.json` auf dem NAS. Die Einstellungen liegen in
 `.hb-cache/struktur.json`, weil der Hörbuch-Ordner nur lesend eingebunden ist.
 
+### `GET /admin/cover?t=<ticket>`
+`{ "bookIds": ["b_…"] }` – die Bücher, für die ein Bild hochgeladen wurde. Die
+App bietet das Zurücknehmen nur dort an; an einem Cover vom NAS täte der Knopf
+nichts.
+
 ### `POST /admin/cover/{bookId}?t=<ticket>`
 Rohe Bilddaten im Body (`image/jpeg`, `image/png`, `image/webp`), höchstens
 12 MB – kein Multipart. Das Bild wird wie jedes Cover auf 600 px verkleinert
@@ -551,7 +560,8 @@ Scanner findet, und überlebt jeden Scan. Antwort: `{ "cover": "/cover/b_…jpg?
 
 ### `DELETE /admin/cover/{bookId}?t=<ticket>`
 Nimmt das hochgeladene Bild wieder weg; danach gilt wieder, was auf dem NAS
-liegt.
+liegt. Antwort: `{ "entfernt": true | false, "cover": … }` – `entfernt: false`
+heisst, dass gar keines gesetzt war.
 
 ### Fehlerfälle
 

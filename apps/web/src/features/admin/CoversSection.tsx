@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { type Book } from '@/features/library/catalog'
 import { libraryErrorMessage } from '@/features/library/errors'
@@ -47,8 +47,31 @@ export function CoversSection() {
   const [laeuft, setLaeuft] = useState<string | null>(null)
   const [fehler, setFehler] = useState<string | null>(null)
   const [erledigt, setErledigt] = useState<string | null>(null)
+  /**
+   * Die Bücher mit einem hochgeladenen Bild.
+   *
+   * Ohne diese Liste stünde „Eigenes Bild zurücknehmen" an jedem Buch mit
+   * Cover – auch an denen, deren Bild vom NAS kommt. Der Knopf täte dort
+   * nichts, und ein Knopf, der nichts tut, sieht aus wie ein Fehler.
+   */
+  const [eigene, setEigene] = useState<ReadonlySet<string>>(new Set())
   // Ein Dateifeld je Buch – der Knopf daneben löst es aus.
   const felder = useRef(new Map<string, HTMLInputElement | null>())
+
+  const eigeneLaden = useCallback(() => {
+    if (!client) return
+    void client
+      .fetchManualCovers()
+      .then((ids) => {
+        setEigene(new Set(ids))
+      })
+      .catch(() => {
+        // Ohne die Liste fehlt nur der Knopf zum Zurücknehmen; das Hochladen
+        // funktioniert weiter.
+      })
+  }, [client])
+
+  useEffect(eigeneLaden, [eigeneLaden])
 
   const treffer = books.filter((book) => passt(book, suche))
 
@@ -64,6 +87,7 @@ export function CoversSection() {
         // Der Katalog trägt die Adresse des Covers samt Version – ohne das
         // Neuladen zeigte die App weiter das alte Bild aus dem Cache.
         refresh()
+        setEigene((bisher) => new Set(bisher).add(book.id))
         setErledigt(book.id)
       })
       .catch((error: unknown) => {
@@ -84,6 +108,11 @@ export function CoversSection() {
       .removeCover(book.id)
       .then(() => {
         refresh()
+        setEigene((bisher) => {
+          const naechste = new Set(bisher)
+          naechste.delete(book.id)
+          return naechste
+        })
       })
       .catch((error: unknown) => {
         setFehler(fehlerText(error))
@@ -100,7 +129,8 @@ export function CoversSection() {
       <Notice>
         Die Bilder kommen aus dem Ordner auf dem NAS oder aus der Datei selbst. Wo keins
         liegt, steht eine farbige Kachel – hier lässt sich stattdessen ein Bild hochladen.
-        Es gilt für alle Geräte und überlebt das nächste Einlesen.
+        Es gilt für alle Geräte, überlebt das nächste Einlesen und lässt sich jederzeit
+        wieder zurücknehmen; dann gilt erneut, was auf dem NAS liegt.
       </Notice>
 
       {client === null ? (
@@ -131,6 +161,7 @@ export function CoversSection() {
       <ul className="flex flex-col gap-3">
         {treffer.slice(0, MAX_TREFFER).map((book) => {
           const bild = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
+          const eigenes = eigene.has(book.id)
 
           return (
             <li key={book.id} className="flex items-center gap-4 rounded-tile bg-surface p-4">
@@ -141,6 +172,13 @@ export function CoversSection() {
               <div className="flex min-w-0 flex-1 flex-col gap-2">
                 <p className="truncate font-semibold">{bookLabel(book)}</p>
                 <p className="truncate text-sm text-ink-soft">{book.folderName}</p>
+                <p className="text-sm text-ink-soft">
+                  {eigenes
+                    ? 'Eigenes Bild – gilt für alle Geräte.'
+                    : book.cover !== null
+                      ? 'Bild vom NAS.'
+                      : 'Kein Bild – es steht eine farbige Kachel.'}
+                </p>
 
                 {erledigt === book.id ? (
                   <p className="text-sm text-ink-soft">Bild gesetzt.</p>
@@ -174,7 +212,7 @@ export function CoversSection() {
                     {laeuft === book.id ? 'Einen Moment …' : 'Bild wählen'}
                   </BigButton>
 
-                  {book.cover !== null ? (
+                  {eigenes ? (
                     <BigButton
                       variant="secondary"
                       disabled={client === null || laeuft === book.id}
@@ -182,7 +220,7 @@ export function CoversSection() {
                         wegnehmen(book)
                       }}
                     >
-                      Bild wegnehmen
+                      Eigenes Bild zurücknehmen
                     </BigButton>
                   ) : null}
                 </div>

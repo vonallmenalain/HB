@@ -103,6 +103,8 @@ export interface MediaClient {
    * kommt die Antwort sofort, der Scan läuft weiter.
    */
   setFolderMode: (folder: string, mode: FolderMode | null) => Promise<void>
+  /** Die Bücher, für die ein Bild hochgeladen wurde. */
+  fetchManualCovers: () => Promise<string[]>
   /** Legt ein Cover von Hand fest. Liefert die neue Adresse. */
   uploadCover: (bookId: string, image: Blob) => Promise<string>
   /** Nimmt es wieder weg; danach gilt wieder, was auf dem NAS liegt. */
@@ -417,6 +419,20 @@ export function createMediaClient(options: {
     startRescan,
     fetchStatus,
     fetchFolders,
+    fetchManualCovers: async () => {
+      const response = await adminCall('/admin/cover', { method: 'GET' })
+
+      let raw: unknown
+      try {
+        raw = await response.json()
+      } catch {
+        throw new MediaRequestError('malformed')
+      }
+
+      const body = raw as { bookIds?: unknown }
+      if (!Array.isArray(body.bookIds)) throw new MediaRequestError('malformed')
+      return body.bookIds.filter((id): id is string => typeof id === 'string')
+    },
     setFolderMode: async (folder, mode) => {
       await adminCall('/admin/struktur', {
         method: 'POST',

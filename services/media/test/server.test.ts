@@ -7,6 +7,8 @@ import type { Config } from '../src/config.js'
 import { buildServer } from '../src/server.js'
 import { SCHEMA_VERSION } from '../src/catalog/types.js'
 
+import { join } from 'node:path'
+
 import { PNG_1X1, makeLibrary } from './fixtures.js'
 
 const SECRET = 's'.repeat(40)
@@ -263,6 +265,10 @@ describe('GET /audio', () => {
       '/audio/%2Fetc%2Fpasswd/0',
       '/audio/../../../etc/passwd/0',
       `/cover/..%2F..%2Fetc%2Fpasswd.jpg`,
+      // Auch mit hochgeladenen Covern gilt das: Die Kennung wird im Katalog
+      // nachgeschlagen, bevor überhaupt ein Pfad entsteht.
+      '/cover/..%2F..%2Fcovers%2Firgendwas.jpg',
+      '/cover/%2E%2E%2F%2E%2E%2Fetc%2Fpasswd.jpg',
     ]) {
       const response = await app.inject({ method: 'GET', url: `${attempt}?t=${ticket}` })
       expect([401, 404], `${attempt} → ${String(response.statusCode)}`).toContain(
@@ -350,6 +356,37 @@ describe('Cover von Hand setzen', () => {
     expect(response.statusCode).toBe(404)
   })
 
+  it('nennt die Bücher mit einem hochgeladenen Bild', async () => {
+    // Die App braucht das, um das Zurücknehmen nur dort anzubieten, wo es
+    // etwas zurückzunehmen gibt.
+    await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookWithoutCoverId}?t=${ticket}`,
+      headers: { 'content-type': 'image/png' },
+      payload: PNG_1X1,
+    })
+
+    const liste = await app.inject({ method: 'GET', url: `/admin/cover?t=${ticket}` })
+    expect(liste.json<{ bookIds: string[] }>().bookIds).toEqual([bookWithoutCoverId])
+
+    const weg = await app.inject({
+      method: 'DELETE',
+      url: `/admin/cover/${bookWithoutCoverId}?t=${ticket}`,
+    })
+    expect(weg.json<{ entfernt: boolean }>().entfernt).toBe(true)
+    expect(
+      (await app.inject({ method: 'GET', url: `/admin/cover?t=${ticket}` })).json<{
+        bookIds: string[]
+      }>().bookIds,
+    ).toEqual([])
+  })
+
+  it('sagt, wenn gar kein eigenes Bild gesetzt war', async () => {
+    const weg = await app.inject({ method: 'DELETE', url: `/admin/cover/${bookId}?t=${ticket}` })
+    expect(weg.statusCode).toBe(200)
+    expect(weg.json<{ entfernt: boolean }>().entfernt).toBe(false)
+  })
+
   it('verlangt ein Ticket', async () => {
     const response = await app.inject({
       method: 'POST',
@@ -362,6 +399,23 @@ describe('Cover von Hand setzen', () => {
 })
 
 describe('Ordner umstellen', () => {
+  it('lässt CD-Ordner aussen vor', async () => {
+    // Ein Buch aus „CD 1" … „CD 3" entsteht in einem anderen Zweig des
+    // Scanners, der die Einstellung gar nicht liest. Ein Knopf dafür wäre eine
+    // Zusage, die niemand einlöst.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Harry Potter/Der Feuerkelch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/CD 2', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Ein Buch', files: [{ name: 'a.wav' }, { name: 'b.wav' }] },
+    ])
+    const eigener = createCatalogStore({ mediaRoot, cacheDir })
+    await eigener.rescan()
+
+    expect((await eigener.folders()).map((eintrag) => eintrag.path)).toEqual([
+      join('Reihe', 'Ein Buch'),
+    ])
+  })
+
   it('nennt die Ordner, für die sich das lohnt', async () => {
     const response = await app.inject({ method: 'GET', url: `/admin/struktur?t=${ticket}` })
     expect(response.statusCode).toBe(200)
