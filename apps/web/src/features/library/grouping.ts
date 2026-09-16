@@ -99,14 +99,26 @@ export interface BookGroup {
  *
  * Die Folgen ohne Unterordner stehen oben – das ist die Hauptreihe, alles
  * andere ein Sonderfach.
+ *
+ * Ein Unterordner mit einem einzigen Hörbuch ist kein Fach: Seine Überschrift
+ * sagt dasselbe wie die Kachel darunter, und bei hundert solchen Ordnern
+ * besteht die Reihe aus hundert Überschriften mit je einer Kachel – eine pro
+ * Zeile, statt so vieler, wie nebeneinander Platz haben. Die Bücher stehen
+ * dann in der Hauptreihe, wo sie hingehören.
  */
 export function groupBooks(books: readonly Book[]): BookGroup[] {
+  const groesse = new Map<string, number>()
+  for (const book of books) {
+    const name = book.group?.trim() ?? ''
+    if (name !== '') groesse.set(name, (groesse.get(name) ?? 0) + 1)
+  }
+
   const gruppen = new Map<string, Book[]>()
   const ohne: Book[] = []
 
   for (const book of books) {
     const name = book.group?.trim() ?? ''
-    if (name === '') {
+    if (name === '' || groesse.get(name) === 1) {
       ohne.push(book)
       continue
     }

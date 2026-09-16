@@ -2,6 +2,7 @@ import { type ReactNode } from 'react'
 
 import { type Book } from './catalog'
 import { BookTile } from './BookTile'
+import { TILE_GRID } from './grid'
 
 /**
  * Ein Abschnitt der Startseite: Überschrift, Kacheln, darunter optional ein Weg
@@ -25,7 +26,7 @@ export function BookShelf({
   return (
     <section className="pb-8">
       <h2 className="pb-3 text-xl font-bold">{title}</h2>
-      <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <ul className={TILE_GRID}>
         {books.map((book) => (
           <li key={book.id}>
             <BookTile

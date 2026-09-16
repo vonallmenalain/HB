@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 
 import { BookTile } from '@/features/library/BookTile'
+import { TILE_GRID } from '@/features/library/grid'
 import { findSeries, groupBooks } from '@/features/library/grouping'
 import { useLibrary } from '@/features/library/libraryContext'
 import { BigLinkButton } from '@/ui/BigButton'
@@ -20,7 +21,7 @@ export function SeriesScreen() {
 
   if (status === 'loading') {
     return (
-      <Screen>
+      <Screen wide>
         <Spinner label="Bücher werden geladen" />
       </Screen>
     )
@@ -30,7 +31,7 @@ export function SeriesScreen() {
 
   if (!series) {
     return (
-      <Screen>
+      <Screen wide>
         <div className="flex flex-1 items-center">
           <EmptyState
             title="Diese Reihe gibt es nicht mehr"
@@ -45,7 +46,7 @@ export function SeriesScreen() {
   const groups = groupBooks(series.books)
 
   return (
-    <Screen>
+    <Screen wide>
       <div className="py-4">
         <Link
           to="/bibliothek"
@@ -65,7 +66,7 @@ export function SeriesScreen() {
           {group.name !== null ? (
             <h2 className="pt-2 pb-3 text-xl font-bold">{group.name}</h2>
           ) : null}
-          <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
+          <ul className={`${TILE_GRID} pb-6`}>
             {group.books.map((book) => (
               <li key={book.id}>
                 <BookTile book={book} inSeries />

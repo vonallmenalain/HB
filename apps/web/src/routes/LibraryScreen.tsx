@@ -45,7 +45,7 @@ export function LibraryScreen() {
 
   if (status === 'loading') {
     return (
-      <Screen>
+      <Screen wide>
         <ZurStartseite />
         <ScreenTitle>Alle Hörbücher</ScreenTitle>
         <Spinner label="Bücher werden geladen" />
@@ -55,7 +55,7 @@ export function LibraryScreen() {
 
   if (status === 'error' || books.length === 0) {
     return (
-      <Screen>
+      <Screen wide>
         <ZurStartseite />
         <ScreenTitle>Alle Hörbücher</ScreenTitle>
         <EmptyState
@@ -72,7 +72,7 @@ export function LibraryScreen() {
   }
 
   return (
-    <Screen>
+    <Screen wide>
       <ZurStartseite />
       <ScreenTitle>Alle Hörbücher</ScreenTitle>
 

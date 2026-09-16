@@ -59,9 +59,12 @@ describe('Bibliothek', () => {
   })
 
   it('stellt Unterordner einer Reihe als eigene Abschnitte dar', () => {
+    // Zwei Bücher im Unterordner: Bei einem einzigen sagte die Überschrift
+    // dasselbe wie die Kachel darunter, und der Abschnitt entfällt.
     const books = [
       ...BOOKS,
       makeBook({ id: 'b_3', title: 'Alarm', group: 'Mini-Fälle', seriesIndex: 5 }),
+      makeBook({ id: 'b_4', title: 'Der Fluch', group: 'Mini-Fälle', seriesIndex: 6 }),
     ]
 
     renderWithProfiles(<AppRoutes />, profiles(), {

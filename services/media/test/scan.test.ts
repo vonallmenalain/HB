@@ -215,6 +215,22 @@ describe('scanLibrary', () => {
     expect(catalog.books[0]?.seriesIndex).toBe(1)
   })
 
+  it('tut das auch, wenn ein Ordner ohne Ton daneben liegt', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: '5 Freunde/5Freunde - 001 - beim Wanderzirkus/CD1', files: [{ name: 'a.wav' }] },
+      {
+        path: '5 Freunde/5Freunde - 001 - beim Wanderzirkus/Scans',
+        files: [{ name: 'cover.png', content: PNG_1X1 }],
+      },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.group).toBeNull()
+    expect(catalog.books[0]?.title).toBe('beim Wanderzirkus')
+  })
+
   it('lässt aussagekräftige Unterordner in Ruhe', async () => {
     // „2019" ist eine Jahresangabe und keine CD-Nummer.
     const { mediaRoot, cacheDir } = await makeLibrary([
@@ -322,6 +338,64 @@ describe('Ein Hörbuch über mehrere CD-Ordner', () => {
       'CD 2 · Anfang',
       'CD 10 · Anfang',
     ])
+  })
+
+  it('lässt sich von einem Ordner daneben nicht beirren', async () => {
+    // Genau daran scheiterte es auf dem NAS: Neben zwanzig CD-Ordnern lag noch
+    // etwas anderes, und weil nicht *alle* Unterordner CDs waren, blieben aus
+    // einem Hörbuch zwanzig.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Harry Potter/Der Feuerkelch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/CD 2', files: [{ name: 'a.wav' }] },
+      {
+        path: 'Harry Potter/Der Feuerkelch/Booklet',
+        files: [{ name: 'cover.png', content: PNG_1X1 }],
+      },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.title).toBe('Der Feuerkelch')
+  })
+
+  it('lässt einen Bonus-Ordner ein eigenes Buch bleiben', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Harry Potter/Der Feuerkelch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/CD 2', files: [{ name: 'a.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/Hörprobe', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books.map((book) => book.title).sort()).toEqual(['Der Feuerkelch', 'Hörprobe'])
+  })
+
+  it('nimmt den Werknamen vor der CD-Angabe hin', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Harry Potter/Der Feuerkelch/Feuerkelch CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Harry Potter/Der Feuerkelch/Feuerkelch CD 2', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.files).toHaveLength(2)
+  })
+
+  it('nimmt lose Dateien neben den Teilen mit', async () => {
+    // Vorher gewann der Ordner mit eigenen Dateien, und die CD-Ordner daneben
+    // fielen samt Ton stillschweigend heraus.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Buch', files: [{ name: '00 - Vorwort.wav' }] },
+      { path: 'Reihe/Buch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/CD 2', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.files).toHaveLength(3)
   })
 
   it('lässt nummerierte Folgen-Ordner in Ruhe', async () => {
@@ -434,5 +508,65 @@ describe('Ordner, in dem jede Datei ein Hörbuch ist', () => {
     const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
     expect(catalog.books).toHaveLength(1)
     expect(catalog.books[0]?.chapters).toHaveLength(2)
+  })
+})
+
+describe('Ein Ordner, der nur das Buch noch einmal nennt', () => {
+  it('wird nicht zur Gruppe', async () => {
+    // Entpackte Archive legen diese Ebene zuviel an. Ungefiltert bekäme jedes
+    // Buch seine eigene Überschrift, und in der Reihe stünde eine Kachel pro
+    // Zeile.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: '5 Freunde/5Freunde - 001 - beim Wanderzirkus/5Freunde - 001 - beim Wanderzirkus',
+        files: [{ name: 'a.wav' }],
+      },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books[0]?.series).toBe('5 Freunde')
+    expect(catalog.books[0]?.group).toBeNull()
+    expect(catalog.books[0]?.title).toBe('beim Wanderzirkus')
+  })
+
+  it('lässt eine echte Gruppe stehen', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Kids/Mini-Fälle/05 - Alarm', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(catalog.books[0]?.group).toBe('Mini-Fälle')
+  })
+})
+
+describe('Reihenfolge in einer Reihe', () => {
+  it('stellt Folge 01 nach oben, egal wie die Nummer geschrieben ist', async () => {
+    // Auf dem NAS standen „50A" und „75A" vor „01": Der Titel eines erkannten
+    // Buchs hat seine Nummer nicht mehr, der eines nicht erkannten schon – und
+    // eine Ziffer steht vor jedem Buchstaben.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Kids/50A - Freundinnen in Gefahr I', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/125 - Spurlos', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/02 - Betrug beim Casting', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/Folge 103 SOS im Bike-Park', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/01 - Die Handy-Falle', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/75A - Tatort Hollywood', files: [{ name: 'a.wav' }] },
+      { path: 'Kids/79 Achtung, Abenteuer!', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books.map((book) => book.seriesIndex)).toEqual([1, 2, 50, 75, 79, 103, 125])
+  })
+
+  it('stellt Bücher ohne Nummer hinter die nummerierten', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Der Anfang', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/02 - Zwei', files: [{ name: 'a.wav' }] },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(catalog.books.map((book) => book.title)).toEqual(['Zwei', 'Der Anfang'])
   })
 })

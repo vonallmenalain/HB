@@ -245,6 +245,46 @@ export function chapterAt(book: Book, positionSec: number): Chapter | null {
   )
 }
 
+/** Sortiert so, wie Menschen es erwarten: `2` vor `10`. */
+function naturalCompare(a: string, b: string): number {
+  const chunks = (value: string): (string | number)[] =>
+    value
+      .split(/(\d+)/)
+      .filter((part) => part !== '')
+      .map((part) => (/^\d+$/.test(part) ? Number(part) : part.toLowerCase()))
+
+  const left = chunks(a)
+  const right = chunks(b)
+
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    const l = left[i]
+    const r = right[i]
+    if (l === undefined) return -1
+    if (r === undefined) return 1
+    if (typeof l === 'number' && typeof r === 'number') {
+      if (l !== r) return l - r
+      continue
+    }
+    const ls = String(l)
+    const rs = String(r)
+    if (ls !== rs) return ls.localeCompare(rs, 'de')
+  }
+  return 0
+}
+
+/**
+ * Wonach ein Buch in seiner Reihe einsortiert wird.
+ *
+ * Bewusst dasselbe, was auch auf der Kachel steht: „1 Die Handy-Falle".
+ * Verglichen wurde früher die erkannte Nummer und sonst der Titel – aber der
+ * Titel eines erkannten Buchs hat seine Nummer nicht mehr, der eines nicht
+ * erkannten schon. „50A - Freundinnen in Gefahr" landete damit vor „01 - Die
+ * Handy-Falle", weil eine Ziffer vor jedem Buchstaben steht.
+ */
+function orderKey(book: Book): string {
+  return book.seriesIndex === null ? book.title : `${String(book.seriesIndex)} ${book.title}`
+}
+
 /** Reihen zusammen, darin nach Gruppe und Nummer – wie im Dienst, aber die App verlässt sich nicht darauf. */
 export function sortBooks(books: readonly Book[]): Book[] {
   return [...books].sort((a, b) => {
@@ -252,10 +292,9 @@ export function sortBooks(books: readonly Book[]): Book[] {
     if (series !== 0) return series
     const group = (a.group ?? '').localeCompare(b.group ?? '', 'de')
     if (group !== 0) return group
-    if (a.seriesIndex !== null && b.seriesIndex !== null && a.seriesIndex !== b.seriesIndex) {
-      return a.seriesIndex - b.seriesIndex
-    }
-    return a.title.localeCompare(b.title, 'de')
+    // Natürlich, nicht alphabetisch: Sonst stünde Folge 10 vor Folge 2 und
+    // Folge 100 vor Folge 20.
+    return naturalCompare(orderKey(a), orderKey(b))
   })
 }
 

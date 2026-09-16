@@ -4,6 +4,7 @@ import { BookTile } from './BookTile'
 import { SeriesTile } from './SeriesTile'
 import { SUPPORTED_SCHEMA_VERSION, type Book } from './catalog'
 import { buildSeries } from './grouping'
+import { TILE_GRID } from './grid'
 
 /**
  * Das Raster mit allen Reihen – erst die Reihe, dann ihre Folgen.
@@ -39,7 +40,7 @@ export function LibraryGrid({
             stehen hier alle Hörbücher untereinander. Woran es liegt, steht im Elternbereich.
           </Notice>
         </div>
-        <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
+        <ul className={`${TILE_GRID} pb-6`}>
           {books.map((book) => (
             <li key={book.id}>
               <BookTile book={book} />
@@ -51,7 +52,7 @@ export function LibraryGrid({
   }
 
   return (
-    <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
+    <ul className={`${TILE_GRID} pb-6`}>
       {buildSeries(books).map((entry) => (
         <li key={entry.slug}>
           {/* Eine „Reihe" mit einem einzigen Hörbuch ist keine Reihe. Sie führt

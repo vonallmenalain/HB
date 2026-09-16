@@ -94,6 +94,29 @@ describe('parseBookFolder', () => {
     })
   })
 
+  it('liest die Nummer auch ohne Trennzeichen dahinter', () => {
+    // So stehen sie auf dem NAS auch: „79 Achtung, Abenteuer!". Ab zwei
+    // Ziffern oder mit führender Null ist das eine Folgennummer und kein
+    // Titel, der mit einer Zahl anfängt.
+    expect(parseBookFolder('79 Achtung, Abenteuer!')).toEqual({
+      title: 'Achtung, Abenteuer!',
+      seriesIndex: 79,
+    })
+    expect(parseBookFolder('Folge 103 SOS im Bike-Park')).toEqual({
+      title: 'SOS im Bike-Park',
+      seriesIndex: 103,
+    })
+  })
+
+  it('zählt einen angehängten Buchstaben zur Nummer', () => {
+    // „50A", „50B", „50C" sind die drei Teile von Fall 50 – sie gehören
+    // zwischen 49 und 51 und nicht ans Ende der Reihe.
+    expect(parseBookFolder('50A - Freundinnen in Gefahr I')).toEqual({
+      title: 'Freundinnen in Gefahr I',
+      seriesIndex: 50,
+    })
+  })
+
   it('behält die Nummer, wenn sie vor dem Reihennamen steht', () => {
     // Zuerst die Nummer, dann die Reihe – sonst wäre die Folge namenlos.
     expect(
