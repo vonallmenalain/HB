@@ -12,12 +12,12 @@ import {
   writeCover,
 } from './cover.js'
 import { bookId } from './ids.js'
-import { audioMime, isCoverFile, naturalCompare } from './naming.js'
+import { audioMime, formatSeriesIndex, isCoverFile, naturalCompare } from './naming.js'
 import { type Structure, readStructure } from './settings.js'
 import {
   isDiscFolder,
-  isSplitAcrossParts,
   overrideForEpisode,
+  partsOfOneBook,
   splitsIntoEpisodes,
 } from './structure.js'
 import type { Book, BookLocation, ScanResult } from './types.js'
@@ -372,30 +372,129 @@ function coverOf(folder: string, contents: FolderContents): string | null {
   return contents.cover === null ? null : join(folder, contents.cover)
 }
 
-async function walk(folder: string, depth: number, run: ScanRun): Promise<void> {
+/**
+ * Liest die Unterordner eines Ordners ein.
+ *
+ * Einmal, nicht zweimal: Ob ein Werk über CD-Ordner verteilt liegt, hängt
+ * daran, wo Ton liegt – und danach wird in dieselben Ordner hinabgestiegen.
+ * Ohne das Zwischenergebnis läse der Scanner jeden Ordner der Bibliothek
+ * doppelt.
+ */
+async function readChildren(
+  folder: string,
+  names: readonly string[],
+  run: ScanRun,
+): Promise<Map<string, FolderContents>> {
+  const children = new Map<string, FolderContents>()
+  for (const name of names) {
+    try {
+      children.set(name, await readFolder(join(folder, name)))
+    } catch (error) {
+      run.options.onNotice?.(
+        `Ordner nicht lesbar: ${join(folder, name)} (${
+          error instanceof Error ? error.message : 'Fehler'
+        })`,
+      )
+    }
+  }
+  return children
+}
+
+async function walk(
+  folder: string,
+  depth: number,
+  run: ScanRun,
+  /** Schon gelesen, wenn der Aufrufer den Ordner für seine Entscheidung brauchte. */
+  known?: FolderContents,
+): Promise<void> {
   const { options } = run
   if (depth > MAX_DEPTH) return
 
   let contents: FolderContents
-  try {
-    contents = await readFolder(folder)
-  } catch (error) {
-    options.onNotice?.(
-      `Ordner nicht lesbar: ${folder} (${error instanceof Error ? error.message : 'Fehler'})`,
+  if (known) {
+    contents = known
+  } else {
+    try {
+      contents = await readFolder(folder)
+    } catch (error) {
+      options.onNotice?.(
+        `Ordner nicht lesbar: ${folder} (${error instanceof Error ? error.message : 'Fehler'})`,
+      )
+      return
+    }
+  }
+
+  const override = contents.audio.length > 0 ? await readOverride(folder) : null
+
+  // Neunzig Folgen als neunzig Dateien: Das ist angesagt, nicht geraten – und
+  // die Ansage gilt für die Dateien in genau diesem Ordner.
+  if (
+    contents.audio.length > 0 &&
+    splitsIntoEpisodes(override, run.structure.get(relative(options.mediaRoot, folder)))
+  ) {
+    await collectEpisodes(folder, contents, override, run)
+    return
+  }
+
+  const children =
+    depth < MAX_DEPTH
+      ? await readChildren(folder, contents.subdirectories, run)
+      : new Map<string, FolderContents>()
+  const mitTon = [...children].filter(([, inner]) => inner.audio.length > 0).map(([name]) => name)
+
+  /** Was bleibt, nachdem ein Zweig ein paar Unterordner für sich beansprucht hat. */
+  const weiterUnten = async (verbraucht: readonly string[]): Promise<void> => {
+    for (const name of contents.subdirectories) {
+      if (verbraucht.includes(name)) continue
+      await walk(join(folder, name), depth + 1, run, children.get(name))
+    }
+  }
+
+  // Ein Buch, das über `CD 1` … `CD 20` verteilt liegt, ist ein Buch und nicht
+  // zwanzig. Was daneben liegt, bleibt davon unberührt.
+  const teile = partsOfOneBook(mitTon)
+  if (teile.length > 0) {
+    // Was lose im Ordner liegt, gehört zum selben Buch – sonst fiele es hier
+    // stillschweigend heraus.
+    const audio: AudioEntry[] = contents.audio.map((fileName) => ({
+      path: join(folder, fileName),
+      fileName,
+      discName: null,
+    }))
+    let coverFile = coverOf(folder, contents)
+
+    for (const teil of teile) {
+      const inner = children.get(teil)!
+      const innerPath = join(folder, teil)
+      for (const fileName of inner.audio) {
+        audio.push({ path: join(innerPath, fileName), fileName, discName: teil })
+      }
+      coverFile ??= coverOf(innerPath, inner)
+    }
+
+    await collect(
+      {
+        folder,
+        idPath: relative(options.mediaRoot, folder),
+        displayName: basename(folder),
+        folderChain: chainOf(options.mediaRoot, folder),
+        audio,
+        coverFile,
+        override: override ?? (await readOverride(folder)),
+        addedAtFrom: folder,
+        // Der Zweig hier liest keine Einstellung aus dem Adminbereich; ein Knopf
+        // dort wäre eine Zusage, die niemand einlöst.
+        switchable: false,
+      },
+      run,
     )
+    await weiterUnten(teile)
     return
   }
 
   // Ein Ordner mit Audiodateien ist ein Buch. Einer ohne ist eine Reihe oder
   // schlicht Ablage – dann weiter nach unten.
   if (contents.audio.length > 0) {
-    const override = await readOverride(folder)
-
-    if (splitsIntoEpisodes(override, run.structure.get(relative(options.mediaRoot, folder)))) {
-      await collectEpisodes(folder, contents, override, run)
-      return
-    }
-
     await collect(
       {
         folder,
@@ -417,86 +516,52 @@ async function walk(folder: string, depth: number, run: ScanRun): Promise<void> 
     return
   }
 
-  // Ein Buch, das über `CD 1` … `CD 20` verteilt liegt, ist ein Buch und nicht
-  // zwanzig. Zusammengefasst wird nur, wo alle Unterordner benannte Teile sind
-  // – blosse Zahlen (`01`, `02`) und `Folge 3` bleiben eigene Bücher, so legen
-  // manche Sammlungen ihre Folgen ab.
-  if (isSplitAcrossParts(contents.subdirectories)) {
-    const audio: AudioEntry[] = []
-    let coverFile = coverOf(folder, contents)
-
-    for (const teil of contents.subdirectories) {
-      const innerPath = join(folder, teil)
-      try {
-        const inner = await readFolder(innerPath)
-        for (const fileName of inner.audio) {
-          audio.push({ path: join(innerPath, fileName), fileName, discName: teil })
-        }
-        coverFile ??= coverOf(innerPath, inner)
-      } catch {
-        // Nicht lesbar: Dann fehlt dieser Teil, der Rest bleibt ein Buch.
-      }
-    }
-
-    if (audio.length > 0) {
-      await collect(
-        {
-          folder,
-          idPath: relative(options.mediaRoot, folder),
-          displayName: basename(folder),
-          folderChain: chainOf(options.mediaRoot, folder),
-          audio,
-          coverFile,
-          override: await readOverride(folder),
-          addedAtFrom: folder,
-          // Dieser Ordner hat keine eigenen Audiodateien; der Zweig hier liest
-          // keine Einstellung, also steht er auch nicht zur Wahl.
-          switchable: false,
-        },
-        run,
-      )
-      return
-    }
-  }
-
   // Ein einzelner Unterordner ohne eigene Aussage („CD1", „Teil 2", „01")
   // gehört nicht in die Bibliothek: Die Folge heisst nach dem Ordner darüber.
-  if (contents.subdirectories.length === 1 && isDiscFolder(contents.subdirectories[0]!)) {
-    const teil = contents.subdirectories[0]!
-    const innerPath = join(folder, teil)
-    try {
-      const inner = await readFolder(innerPath)
-      if (inner.audio.length > 0) {
-        await collect(
-          {
-            folder: innerPath,
-            // Die ID hängt am Ordner mit den Dateien, der Name am Ordner
-            // darüber: Sonst hiesse die Folge in der Bibliothek „CD1".
-            idPath: relative(options.mediaRoot, innerPath),
-            displayName: basename(folder),
-            folderChain: chainOf(options.mediaRoot, folder),
-            audio: inner.audio.map((fileName) => ({
-              path: join(innerPath, fileName),
-              fileName,
-              discName: null,
-            })),
-            coverFile: coverOf(folder, contents) ?? coverOf(innerPath, inner),
-            override: (await readOverride(innerPath)) ?? (await readOverride(folder)),
-            addedAtFrom: innerPath,
-            switchable: false,
-          },
-          run,
-        )
-        return
-      }
-    } catch {
-      // Nicht lesbar: dann eben den gewöhnlichen Weg weiter unten.
-    }
+  const einziger = mitTon.length === 1 ? mitTon[0] : undefined
+  if (einziger !== undefined && isDiscFolder(einziger)) {
+    const innen = children.get(einziger)!
+    const innerPath = join(folder, einziger)
+    await collect(
+      {
+        folder: innerPath,
+        // Die ID hängt am Ordner mit den Dateien, der Name am Ordner
+        // darüber: Sonst hiesse die Folge in der Bibliothek „CD1".
+        idPath: relative(options.mediaRoot, innerPath),
+        displayName: basename(folder),
+        folderChain: chainOf(options.mediaRoot, folder),
+        audio: innen.audio.map((fileName) => ({
+          path: join(innerPath, fileName),
+          fileName,
+          discName: null,
+        })),
+        coverFile: coverOf(folder, contents) ?? coverOf(innerPath, innen),
+        override: (await readOverride(innerPath)) ?? (await readOverride(folder)),
+        addedAtFrom: innerPath,
+        switchable: false,
+      },
+      run,
+    )
+    await weiterUnten([einziger])
+    return
   }
 
-  for (const name of contents.subdirectories) {
-    await walk(join(folder, name), depth + 1, run)
-  }
+  await weiterUnten([])
+}
+
+/**
+ * Wonach ein Buch in seiner Reihe einsortiert wird.
+ *
+ * Bewusst dasselbe, was auch auf der Kachel steht: „01 - Die Handy-Falle".
+ * Verglichen wurde früher die erkannte Nummer und sonst der Titel – aber der
+ * Titel eines erkannten Buchs hat seine Nummer nicht mehr, der eines nicht
+ * erkannten schon. „50A - Freundinnen in Gefahr" landete damit vor „01 - Die
+ * Handy-Falle", weil eine Ziffer vor einem Buchstaben steht.
+ */
+function orderKey(book: Book): string {
+  return book.seriesIndex === null
+    ? book.title
+    : `${formatSeriesIndex(book.seriesIndex)} ${book.title}`
 }
 
 /** Sortiert für die Anzeige: Reihen zusammen, darin nach Gruppe und Nummer, sonst nach Titel. */
@@ -506,10 +571,9 @@ export function sortBooks(books: readonly Book[]): Book[] {
     if (seriesCompare !== 0) return seriesCompare
     const groupCompare = (a.group ?? '').localeCompare(b.group ?? '', 'de')
     if (groupCompare !== 0) return groupCompare
-    if (a.seriesIndex !== null && b.seriesIndex !== null && a.seriesIndex !== b.seriesIndex) {
-      return a.seriesIndex - b.seriesIndex
-    }
-    return a.title.localeCompare(b.title, 'de')
+    // Natürlich, nicht alphabetisch: Sonst stünde Folge 10 vor Folge 2 und
+    // Folge 100 vor Folge 20.
+    return naturalCompare(orderKey(a), orderKey(b))
   })
 }
 

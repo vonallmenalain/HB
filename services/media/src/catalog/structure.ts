@@ -20,28 +20,71 @@ export function isDiscFolder(name: string): boolean {
   return /^(cd|disc|disk|teil|part|folge|track)?[\s._-]*\d{1,3}$/i.test(name.trim())
 }
 
-/**
- * Ein benannter Teil eines Werks: `CD 1`, `Disc 03`, `Teil 2`.
- *
- * Strenger als {@link isDiscFolder}, weil daraus etwas anderes folgt: Mehrere
- * solche Ordner nebeneinander werden zu **einem** Buch zusammengefasst. Die
- * blosse Zahl (`01`, `02`) reicht dafür nicht – so legen manche Sammlungen ihre
- * Folgen ab, und aus zwanzig Folgen dürfte nie ein Buch werden. `Folge 1` ist
- * aus demselben Grund kein Teil, sondern eine Folge.
- */
-export function isPartFolder(name: string): boolean {
-  return /^(cd|disc|disk|teil|part)[\s._-]*\d{1,3}$/i.test(name.trim())
+/** Ein Ordner als Teil eines Werks, zerlegt. */
+export interface PartName {
+  /** Was neben der Teilangabe im Namen steht – meist nichts. */
+  rest: string
+  number: number
 }
 
 /**
- * Gehören diese Unterordner zu einem einzigen Buch?
+ * Die Teilangabe in einem Ordnernamen, samt allem, was daneben steht.
  *
- * Nur wenn alle Teile sind und es mindestens zwei sind. Ein einzelner
- * `CD1`-Ordner ist ein anderer Fall: Dort wird der Ordner übersprungen, das
- * Buch erscheint unter dem Namen darüber (siehe `scan.ts`).
+ * Verlangt wird das Wort: `CD`, `Disc`, `Teil`, `Part`, `Seite`. Die blosse
+ * Zahl (`01`, `02`) reicht nicht – so legen manche Sammlungen ihre Folgen ab,
+ * und aus zwanzig Folgen dürfte nie ein Buch werden. `Folge 1` ist aus
+ * demselben Grund kein Teil, sondern eine Folge.
+ *
+ * Drumherum darf stehen, was will: `Feuerkelch CD 3`, `CD 3 von 20`. Der Rest
+ * kommt zurück, weil erst der Vergleich mit den Nachbarordnern etwas darüber
+ * sagt (siehe {@link isSplitAcrossParts}).
  */
-export function isSplitAcrossParts(subdirectories: readonly string[]): boolean {
-  return subdirectories.length >= 2 && subdirectories.every(isPartFolder)
+export function partName(name: string): PartName | null {
+  const match =
+    /^(.*?)[\s._-]*\b(?:cds?|discs?|disks?|teil|part|seite)[\s._-]*(\d{1,3})(?:[\s._-]*(?:von|of)[\s._-]*\d{1,3})?[\s._-]*(.*)$/i.exec(
+      name.trim(),
+    )
+  if (match === null) return null
+
+  const [, davor = '', ziffern = '', danach = ''] = match
+  return {
+    rest: `${davor} ${danach}`.trim().replace(/\s+/g, ' ').toLowerCase(),
+    number: Number(ziffern),
+  }
+}
+
+/**
+ * Welche dieser Unterordner sind zusammen ein Buch? Sonst nichts.
+ *
+ * Gezählt wird nur, was sich ausschliesslich in der Nummer unterscheidet:
+ * `CD 1` … `CD 20` gehören zusammen, `CD 1 - Anfang` und `CD 2 - Das Ende`
+ * erzählen jeder für sich etwas. Alles andere daneben – ein `Bonus`, ein
+ * `Booklet`, ein Vorschauordner des NAS – bleibt unangetastet und geht seinen
+ * eigenen Weg; vor dieser Unterscheidung blieben zwanzig CDs zwanzig Bücher,
+ * sobald ein einziger Ordner danebenlag.
+ *
+ * Bei zwei verschiedenen Sorten von Teilen (`Stein CD 1`, `Kelch CD 1`) liegen
+ * hier zwei Werke. Welche Datei zu welchem gehört, liesse sich zwar raten – nur
+ * hätten beide Bücher denselben Ordner und damit dieselbe Kennung. Dann lieber
+ * nichts zusammenfassen.
+ */
+export function partsOfOneBook(subdirectories: readonly string[]): string[] {
+  const nachRest = new Map<string, string[]>()
+
+  for (const name of subdirectories) {
+    const part = partName(name)
+    if (part === null) continue
+    const teile = nachRest.get(part.rest)
+    if (teile) teile.push(name)
+    else nachRest.set(part.rest, [name])
+  }
+
+  if (nachRest.size !== 1) return []
+
+  // Ein einzelner `CD1`-Ordner ist ein anderer Fall: Dort wird der Ordner
+  // übersprungen, das Buch erscheint unter dem Namen darüber (siehe `scan.ts`).
+  const teile = [...nachRest.values()][0] ?? []
+  return teile.length >= 2 ? teile : []
 }
 
 /**

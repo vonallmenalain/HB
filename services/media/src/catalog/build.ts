@@ -71,6 +71,30 @@ function firstNonEmpty(...values: (string | null | undefined)[]): string | null 
   return null
 }
 
+/** Zwei Ordnernamen, die dasselbe meinen – Schreibweise und Abstände egal. */
+function sameName(a: string, b: string): boolean {
+  return tidyName(a).toLowerCase() === tidyName(b).toLowerCase()
+}
+
+/**
+ * Die Ordner über dem Buch, ohne den, der nur das Buch noch einmal nennt.
+ *
+ * Entpackte Archive legen gern eine Ebene zuviel an: `5 Freunde/5Freunde - 001
+ * - beim Wanderzirkus/5Freunde - 001 - beim Wanderzirkus/`. Ungefiltert wird
+ * daraus eine Gruppe je Buch – in der Reihe steht dann über jeder einzelnen
+ * Kachel eine Überschrift mit demselben Text, und das Raster bricht auf eine
+ * Kachel pro Zeile.
+ *
+ * Die Reihe ganz oben bleibt in jedem Fall stehen: Ein Buch, das genauso heisst
+ * wie seine Reihe, gehört trotzdem hinein.
+ */
+function meaningfulChain(chain: readonly string[], folderName: string): string[] {
+  const letzter = chain[chain.length - 1]
+  return chain.length > 1 && letzter !== undefined && sameName(letzter, folderName)
+    ? chain.slice(0, -1)
+    : [...chain]
+}
+
 /**
  * Baut einen Katalogeintrag aus den ausgelesenen Dateien.
  *
@@ -79,13 +103,13 @@ function firstNonEmpty(...values: (string | null | undefined)[]): string | null 
  */
 export function buildBook(input: BookInput): Book {
   const { override } = input
-  const seriesFromPath = input.folderChain[0] ?? null
-  const groupFromPath =
-    input.folderChain.length > 1 ? input.folderChain.slice(1).join(' · ') : null
+  const chain = meaningfulChain(input.folderChain, input.folderName)
+  const seriesFromPath = chain[0] ?? null
+  const groupFromPath = chain.length > 1 ? chain.slice(1).join(' · ') : null
 
   // Der Reihenname steht auf dem NAS oft auch noch im Namen jeder Folge. In
   // der Reihe gelesen ist das nur Rauschen, also fliegt er heraus.
-  const parsed = parseBookFolder(input.folderName, input.folderChain)
+  const parsed = parseBookFolder(input.folderName, chain)
 
   const title = firstNonEmpty(override?.title, parsed.title) ?? tidyName(input.folderName)
   const id = bookId(input.relativePath)

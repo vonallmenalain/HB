@@ -14,8 +14,22 @@ export const manifest: Partial<ManifestOptions> = {
   dir: 'ltr',
   start_url: '/',
   scope: '/',
-  display: 'standalone',
-  orientation: 'portrait',
+  /*
+   * Echter Vollbildmodus: Ohne Adresszeile, ohne Statusleiste oben, ohne
+   * Navigationsleiste unten. Auf einem Tablet in der Hand eines Kindes ist
+   * jede davon eine Fläche, die aus der App herausführt.
+   *
+   * `display_override` nennt die Wunschliste in der Reihenfolge, in der sie
+   * versucht wird; `display` bleibt als Rückfallebene für Browser stehen, die
+   * die Liste noch nicht kennen.
+   */
+  display: 'fullscreen',
+  display_override: ['fullscreen', 'standalone'],
+  /*
+   * Keine feste Ausrichtung mehr. Das Raster füllt jetzt die Breite, die da
+   * ist – auf einem Tablet im Querformat sind das fünf Kacheln statt drei,
+   * und eine erzwungene Hochkant-Ansicht nähme genau das wieder weg.
+   */
   background_color: '#fbf7f0',
   theme_color: '#6d28d9',
   categories: ['entertainment', 'education'],

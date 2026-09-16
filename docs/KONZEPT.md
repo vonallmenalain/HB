@@ -470,7 +470,7 @@ sehen bekommen – ein Eingang, den nur der Finger kennt, wäre für sie keiner.
   über Kapitelgrenzen hinweg.
 - Ton ist nie stumm und nie lautstärke-0 – Browser stufen das als „spielt nicht"
   ein und beenden die Hintergrundwiedergabe.
-- Die installierte PWA (`display: standalone`) spielt bei ausgeschaltetem
+- Die installierte PWA (`display: fullscreen`) spielt bei ausgeschaltetem
   Bildschirm weiter. Auf Android hält die aktive Media Session die Wiedergabe
   am Leben, auch wenn die App im Hintergrund ist.
 - Kein Wake-Lock während der Wiedergabe: der Bildschirm **soll** ausgehen.

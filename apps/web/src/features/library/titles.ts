@@ -153,18 +153,32 @@ export interface NumberedTitle {
 /**
  * Trennt eine führende Folgennummer ab.
  *
- * Nur mit Trennzeichen dahinter: „1984“ ist ein Titel und „5 Freunde“ eine
- * Reihe – beide dürfen ihre Zahl behalten.
+ * Drei Schreibweisen kommen auf einem gewachsenen NAS vor: mit Trennzeichen
+ * („01 - Die Handy-Falle“), mit Wort davor („Folge 103 SOS im Bike-Park“) und
+ * nur mit Leerzeichen („79 Achtung, Abenteuer!“). Ein angehängter Buchstabe
+ * gehört zur Nummer: „50A“, „50B“ und „50C“ sind die drei Teile von Fall 50.
+ *
+ * Die dritte Schreibweise ist die heikle – sie unterscheidet sich von einem
+ * Titel, der mit einer Zahl anfängt, nur durch die Absicht. Deshalb gilt sie
+ * erst ab zwei Ziffern oder mit führender Null: „5 Freunde“ behält seine Fünf,
+ * „01 Panik im Paradies“ wird Folge 1. Und ohne Leerraum dahinter zählt gar
+ * nichts, sonst würde aus „1984“ die Folge 198.
  */
 export function splitNumber(raw: string): NumberedTitle {
   const tidy = tidyName(raw)
-  const match = /^(?:(?:folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})\s*[-–—.)_:]\s*(.+)$/i.exec(
-    tidy,
-  )
+  const match =
+    /^(?:(folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})[a-z]?(\s*[-–—.)_:]\s*|\s+)(.+)$/i.exec(
+      tidy,
+    )
   if (!match) return { number: null, title: tidy === '' ? raw.trim() : tidy }
 
-  const [, index = '', title = ''] = match
-  return { number: Number(index), title: tidyName(title) }
+  const [, wort, ziffern = '', trenner = '', title = ''] = match
+  const angesagt = wort !== undefined || /[-–—.)_:]/.test(trenner)
+  if (!angesagt && ziffern.length < 2 && !ziffern.startsWith('0')) {
+    return { number: null, title: tidy }
+  }
+
+  return { number: Number(ziffern), title: tidyName(title) }
 }
 
 /** `5` → `05` – zweistellig liest sich in einer Liste ruhiger. */
@@ -215,7 +229,12 @@ export function bookLabel(book: Book): string {
   return `${formatSeriesIndex(book.seriesIndex)} - ${book.title}`
 }
 
-/** Wendet die im Adminbereich gesetzten Titel auf den ganzen Katalog an. */
+/**
+ * Wendet die im Adminbereich gesetzten Titel auf den ganzen Katalog an.
+ *
+ * Sortiert wird danach, nicht hier: `sortBooks` vergleicht die aufgeräumten
+ * Titel samt Nummer, und die gibt es erst nach diesem Schritt.
+ */
 export function tidyBooks(
   books: readonly Book[],
   overrides: ReadonlyMap<string, string> = new Map(),

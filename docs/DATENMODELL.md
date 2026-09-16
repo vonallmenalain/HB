@@ -63,17 +63,21 @@ eigener Abschnitt. Ein Buch direkt im Stamm hat weder Reihe noch Gruppe.
 |---|---|
 | Ordner enthält Audiodateien | → ist ein Buch |
 | Ordner enthält nur Unterordner | → ist Reihe oder Gruppe; der oberste wird `series`, die dazwischen `group` |
-| Einziger Unterordner heisst `CD1`, `Teil 2`, `01` … | Wird übersprungen: Das Buch erscheint unter dem Namen des Ordners darüber. Sonst hiesse die Folge in der Bibliothek „CD1". Vierstellige Zahlen zählen nicht – `2019` ist eine Jahresangabe |
-| **Alle** Unterordner heissen `CD 1`, `CD 2`, `Teil 3` … | → **ein** Buch über alle Teile, in natürlicher Reihenfolge (`CD 2` vor `CD 10`). Der Teil steht vor dem Kapitelnamen: „CD 3 · Anfang". Verlangt wird das Wort: `01`, `02` und `Folge 1`, `Folge 2` bleiben eigene Bücher – so legen manche Sammlungen ihre Folgen ab |
+| Einziger Unterordner **mit Ton** heisst `CD1`, `Teil 2`, `01` … | Wird übersprungen: Das Buch erscheint unter dem Namen des Ordners darüber. Sonst hiesse die Folge in der Bibliothek „CD1". Vierstellige Zahlen zählen nicht – `2019` ist eine Jahresangabe |
+| Mehrere Unterordner heissen `CD 1`, `CD 2`, `Teil 3` … | → **ein** Buch über alle Teile, in natürlicher Reihenfolge (`CD 2` vor `CD 10`). Der Teil steht vor dem Kapitelnamen: „CD 3 · Anfang". Verlangt wird das Wort: `01`, `02` und `Folge 1`, `Folge 2` bleiben eigene Bücher – so legen manche Sammlungen ihre Folgen ab. Der Werkname darf davorstehen (`Feuerkelch CD 1`), und was daneben liegt – `Booklet`, `Bonus`, ein Vorschauordner des NAS – bleibt davon unberührt. Nur bei zwei Sorten von Teilen nebeneinander (`Stein CD 1`, `Kelch CD 1`) wird nichts zusammengefasst: Beide Bücher hätten denselben Ordner und damit dieselbe Kennung |
+| Unterordner heisst genauso wie das Buch darin | Zählt nicht als Gruppe: `5 Freunde/Folge 001/Folge 001/` ist eine Ebene zuviel, wie entpackte Archive sie anlegen – sonst stünde in der Reihe über jeder einzelnen Kachel eine Überschrift mit demselben Text |
 | Im Adminbereich umgestellter Ordner | Schlägt die `buch.json`: Was dort eingestellt wurde, lässt sich dort auch zurücknehmen – an die Datei auf dem NAS kommt nicht jeder heran |
 | `buch.json` mit `{"einzelfolgen": true}` | → **jede Audiodatei im Ordner ist ein eigenes Hörbuch.** Titel und Folgennummer kommen aus dem Dateinamen (dieselben Regeln wie bei Ordnernamen), der Ordner selbst wird zur Reihe. Geraten wird das nie: Ein Roman mit langen, benannten Kapiteln sähe von aussen genauso aus |
 | Bild mit demselben Namen wie die Audiodatei | Wird ihr Cover: `001 - Die Handy-Falle.jpg` neben `001 - Die Handy-Falle.mp3`. So bekommt in einem `einzelfolgen`-Ordner jede Folge ihr eigenes Bild |
 | Mehrere Audiodateien | Sortierung nach Dateiname (natürlich, `2` vor `10`) |
+| Reihenfolge der Bücher | Erst Reihe, dann Gruppe, dann genau das, was auf der Kachel steht: `01` vor `02` vor `50A` vor `103` vor `125`. Natürlich verglichen; Bücher ohne Folgennummer stehen hinter den nummerierten |
 | Kapiteltitel | Aus dem ID3-`TIT2`-Tag, sonst aus dem Dateinamen (führende Nummerierung wird entfernt) |
 | `cover.jpg` / `cover.png` / `folder.jpg` vorhanden | wird verwendet – bei Einzelfolgen nur, wenn kein Bild mit dem Namen der Datei daneben liegt |
 | Kein Cover-File | Eingebettetes Bild aus dem ID3-`APIC`-Frame extrahieren |
 | Auch das fehlt | `cover: null` → App generiert eine farbige Buchstabenkachel |
 | Ordnername `01 - Titel` | `seriesIndex: 1`, `title: "Titel"` |
+| Ordnername `79 Achtung, Abenteuer!`, `Folge 103 SOS` | Auch ohne Trennzeichen eine Folgennummer – ab zwei Ziffern, mit führender Null oder mit Wort davor. `5 Freunde` und `1984` behalten ihre Zahl |
+| Ordnername `50A - Titel` | Der angehängte Buchstabe zählt zur Nummer: `seriesIndex: 50`. `50A`, `50B`, `50C` stehen damit zwischen 49 und 51 statt am Ende der Reihe |
 | Ordnername beginnt mit dem Reihennamen | Der fliegt heraus: `Die Drei Fragezeichen Kids-68-Chaos` → `seriesIndex: 68`, `title: "Chaos"`. Verglichen wird unempfindlich gegen Artikel, Gross-/Kleinschreibung und Zahlwörter, `Die drei ???` gilt als `Die 3 Fragezeichen`. Übersprungen werden dabei nur Füllwörter und eine führende Zahl – `Abenteuer mit Bibi Blocksberg` ist kein Präfix |
 | Reihenname steckt im Satz | Bleibt stehen: `5 Freunde auf der Felseninsel` wird nicht zu `auf der Felseninsel` |
 | Nummer steht vor dem Reihennamen | Sie wird zuerst abgetrennt: `068 - Bibi Blocksberg - Der Schulausflug` → `seriesIndex: 68`, `title: "Der Schulausflug"` |

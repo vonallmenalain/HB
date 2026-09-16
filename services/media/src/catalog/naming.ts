@@ -193,17 +193,34 @@ export function stripSeriesPrefix(
   return shortest
 }
 
-/** Eine führende Folgennummer, wenn ein Trennzeichen dahinter steht. */
+/**
+ * Eine führende Folgennummer, wenn der Name eine ansagt.
+ *
+ * Drei Schreibweisen kommen auf einem gewachsenen NAS vor: mit Trennzeichen
+ * („01 - Die Handy-Falle"), mit Wort davor („Folge 103 SOS im Bike-Park") und
+ * nur mit Leerzeichen („79 Achtung, Abenteuer!"). Ein angehängter Buchstabe
+ * gehört zur Nummer: „50A", „50B" und „50C" sind die drei Teile von Fall 50.
+ *
+ * Die dritte Schreibweise ist die heikle – sie unterscheidet sich von einem
+ * Titel, der mit einer Zahl anfängt, nur durch die Absicht. Deshalb gilt sie
+ * erst ab zwei Ziffern oder mit führender Null: „5 Freunde" behält seine Fünf,
+ * „01 Panik im Paradies" wird Folge 1. Und ohne Leerraum dahinter zählt gar
+ * nichts, sonst würde aus „1984" die Folge 198.
+ */
 function splitLeadingNumber(text: string): { number: number | null; rest: string } {
-  // Nur mit Trennzeichen: „1984" ist ein Titel, „5 Freunde" eine Reihe –
-  // beide dürfen ihre Zahl behalten.
-  const match = /^(?:(?:folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})\s*[-–—.)_:]\s*(.+)$/i.exec(
-    text,
-  )
+  const match =
+    /^(?:(folge|teil|nr|episode|kapitel)\.?\s*)?(\d{1,3})[a-z]?(\s*[-–—.)_:]\s*|\s+)(.+)$/i.exec(
+      text,
+    )
   if (!match) return { number: null, rest: text }
 
-  const [, index = '', rest = ''] = match
-  return { number: Number(index), rest: rest.trim() }
+  const [, wort, ziffern = '', trenner = '', rest = ''] = match
+  const angesagt = wort !== undefined || /[-–—.)_:]/.test(trenner)
+  if (!angesagt && ziffern.length < 2 && !ziffern.startsWith('0')) {
+    return { number: null, rest: text }
+  }
+
+  return { number: Number(ziffern), rest: rest.trim() }
 }
 
 /**

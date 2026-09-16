@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 
 import { makeBook } from '@/test/renderWithProfiles'
 
-import { bookLabel, splitNumber, stripSeriesPrefix, tidyBook, tidyName } from './titles'
+import { sortBooks } from './catalog'
+import { bookLabel, splitNumber, stripSeriesPrefix, tidyBook, tidyBooks, tidyName } from './titles'
 
 describe('tidyName', () => {
   it('macht aus jeder Schreibweise denselben Trenner', () => {
@@ -57,6 +58,62 @@ describe('splitNumber', () => {
       number: null,
       title: '5 Freunde erforschen die Schatzinsel',
     })
+  })
+
+  it('erkennt die Nummer auch ohne Trennzeichen dahinter', () => {
+    expect(splitNumber('79 Achtung, Abenteuer!')).toEqual({
+      number: 79,
+      title: 'Achtung, Abenteuer!',
+    })
+    expect(splitNumber('Folge 103 SOS im Bike-Park')).toEqual({
+      number: 103,
+      title: 'SOS im Bike-Park',
+    })
+  })
+
+  it('zählt einen angehängten Buchstaben zur Nummer', () => {
+    // „50A", „50B", „50C" sind die drei Teile von Fall 50 und gehören
+    // zwischen 49 und 51.
+    expect(splitNumber('50A - Freundinnen in Gefahr I')).toEqual({
+      number: 50,
+      title: 'Freundinnen in Gefahr I',
+    })
+  })
+})
+
+describe('tidyBooks und sortBooks zusammen', () => {
+  it('stellt Folge 01 nach oben, egal wie die Nummer geschrieben ist', () => {
+    // Genau die Reihenfolge aus der Bibliothek: „50A" und „75A" standen vor
+    // „01", weil ihre Nummer im Titel steckenblieb und eine Ziffer vor jedem
+    // Buchstaben steht.
+    const books = sortBooks(tidyBooks([
+      makeBook({ id: 'b_1', title: '50A - Freundinnen in Gefahr I', seriesIndex: null }),
+      makeBook({ id: 'b_2', title: '125 - Spurlos', seriesIndex: null }),
+      makeBook({ id: 'b_3', title: '02 - Betrug beim Casting', seriesIndex: null }),
+      makeBook({ id: 'b_4', title: '01 - Die Handy-Falle', seriesIndex: null }),
+      makeBook({ id: 'b_5', title: 'Folge 103 SOS im Bike-Park', seriesIndex: null }),
+    ]))
+
+    expect(books.map((book) => book.seriesIndex)).toEqual([1, 2, 50, 103, 125])
+  })
+
+  it('stellt Bücher ohne Nummer hinter die nummerierten', () => {
+    const books = sortBooks(tidyBooks([
+      makeBook({ id: 'b_1', title: 'Der Anfang', seriesIndex: null }),
+      makeBook({ id: 'b_2', title: '02 - Zwei', seriesIndex: null }),
+    ]))
+
+    expect(books.map((book) => book.title)).toEqual(['Zwei', 'Der Anfang'])
+  })
+
+  it('hält Reihen zusammen', () => {
+    const books = sortBooks(tidyBooks([
+      makeBook({ id: 'b_1', title: '02 - Zwei', series: 'Zweite Reihe', seriesIndex: null }),
+      makeBook({ id: 'b_2', title: '01 - Eins', series: 'Erste Reihe', seriesIndex: null }),
+      makeBook({ id: 'b_3', title: '01 - Eins', series: 'Zweite Reihe', seriesIndex: null }),
+    ]))
+
+    expect(books.map((book) => book.id)).toEqual(['b_2', 'b_3', 'b_1'])
   })
 })
 

@@ -68,7 +68,7 @@ export function HomeScreen() {
       })
 
   return (
-    <Screen>
+    <Screen wide>
       <div className="flex items-center gap-4 py-6">
         <ParentEntry>Hörbücher</ParentEntry>
         {selected ? (

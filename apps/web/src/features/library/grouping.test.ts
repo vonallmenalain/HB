@@ -51,6 +51,8 @@ describe('groupBooks', () => {
       makeBook({ id: 'b_1', group: 'Mini-Fälle' }),
       makeBook({ id: 'b_2', group: null }),
       makeBook({ id: 'b_3', group: 'Adventskalender' }),
+      makeBook({ id: 'b_4', group: 'Mini-Fälle' }),
+      makeBook({ id: 'b_5', group: 'Adventskalender' }),
     ])
 
     expect(groups.map((group) => group.name)).toEqual([null, 'Adventskalender', 'Mini-Fälle'])
@@ -60,5 +62,21 @@ describe('groupBooks', () => {
     const groups = groupBooks([makeBook({ id: 'b_1', group: null })])
     expect(groups).toHaveLength(1)
     expect(groups[0]?.name).toBeNull()
+  })
+
+  it('macht aus einem Unterordner mit einem einzigen Buch keinen Abschnitt', () => {
+    // Auf dem NAS liegt manches Buch in einem Ordner, der nur seinen eigenen
+    // Namen trägt. Ungefiltert stünde über jeder einzelnen Kachel eine
+    // Überschrift mit demselben Text – und das Raster bräche auf eine Kachel
+    // pro Zeile.
+    const groups = groupBooks([
+      makeBook({ id: 'b_1', group: '5Freunde - 001 - beim Wanderzirkus' }),
+      makeBook({ id: 'b_2', group: '5Freunde - 002 - im Zeltlager' }),
+      makeBook({ id: 'b_3', group: null }),
+    ])
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0]?.name).toBeNull()
+    expect(groups[0]?.books.map((book) => book.id)).toEqual(['b_1', 'b_2', 'b_3'])
   })
 })

@@ -111,7 +111,16 @@ export function useInstallPrompt(): InstallPrompt {
   return { canInstall: deferred !== null, install }
 }
 
-/** Läuft die App als installierte PWA (und nicht im Browser-Tab)? */
+/**
+ * Läuft die App als installierte PWA (und nicht im Browser-Tab)?
+ *
+ * Beide Modi zählen: Installiert läuft sie im Vollbild, aber ein Browser, der
+ * das nicht hergibt, fällt auf `standalone` zurück – und dann wäre sie trotzdem
+ * installiert.
+ */
 export function isStandalone(): boolean {
-  return window.matchMedia('(display-mode: standalone)').matches
+  return (
+    window.matchMedia('(display-mode: fullscreen)').matches ||
+    window.matchMedia('(display-mode: standalone)').matches
+  )
 }
