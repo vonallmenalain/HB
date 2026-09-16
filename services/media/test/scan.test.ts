@@ -359,6 +359,30 @@ describe('Ein Hörbuch über mehrere CD-Ordner', () => {
     expect(catalog.books[0]?.title).toBe('Der Feuerkelch')
   })
 
+  it('kommt mit der Ablage zurecht, die auf dem NAS steht', async () => {
+    // Genau so liegt der Feuerkelch dort: zwanzig Ordner, in jedem noch einmal
+    // Autor und Titel vor der CD-Angabe, daneben das Titelbild als lose Datei.
+    const werk = 'J.K. Rowling - Harry Potter und der Feuerkelch'
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      ...Array.from({ length: 20 }, (_, i) => ({
+        path: `Harry Potter/${werk}/${werk} CD ${String(i + 1)}`,
+        files: [{ name: '01 - Anfang.wav' }],
+      })),
+      {
+        path: `Harry Potter/${werk}`,
+        files: [{ name: 'Harry Potter und der Feuerkelch - Front.jpg', content: PNG_1X1 }],
+      },
+    ])
+
+    const { catalog } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.files).toHaveLength(20)
+    // Natürlich sortiert: CD 2 vor CD 10, nicht alphabetisch.
+    expect(catalog.books[0]?.chapters[1]?.title).toContain('CD 2 ·')
+    expect(catalog.books[0]?.chapters[9]?.title).toContain('CD 10 ·')
+  })
+
   it('lässt einen Bonus-Ordner ein eigenes Buch bleiben', async () => {
     const { mediaRoot, cacheDir } = await makeLibrary([
       { path: 'Harry Potter/Der Feuerkelch/CD 1', files: [{ name: 'a.wav' }] },
