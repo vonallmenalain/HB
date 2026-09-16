@@ -123,7 +123,23 @@ function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
     fetchStatus: () =>
       Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
     fetchFolders: () => Promise.resolve([]),
-    fetchManualCovers: () => Promise.resolve([]),
+    fetchOwnCovers: () => Promise.resolve({}),
+    startCoverSearch: () => Promise.resolve('started' as const),
+    fetchCoverSearch: () =>
+      Promise.resolve({
+        stand: {
+          laeuft: false,
+          erledigt: 0,
+          gesamt: 0,
+          gesetzt: 0,
+          offen: 0,
+          hinweis: null,
+          beendetAm: null,
+        },
+        vorschlaege: {},
+      }),
+    applyCoverSuggestion: () => Promise.resolve('/cover/x.jpg'),
+    suggestionUrl: () => null,
     setFolderMode: () => Promise.resolve(),
     uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=2'),
     removeCover: () => Promise.resolve(),
@@ -143,6 +159,90 @@ const ORDNER: MediaFolder = {
   titles: ['Die Drei Ausrufezeichen'],
   mode: null,
 }
+
+describe('Cover online suchen', () => {
+  const OHNE_BILD = makeBook({ id: 'b_1', title: 'Der Karpatenhund', cover: null })
+
+  const VORSCHLAG = {
+    quelle: 'apple' as const,
+    title: 'Die drei ??? - Der Karpatenhund',
+    artist: 'Die drei ???',
+    imageUrl: 'https://bild.example.com/a/600x600bb.jpg',
+    score: 0.6,
+  }
+
+  const STAND = {
+    laeuft: false,
+    erledigt: 1,
+    gesamt: 1,
+    gesetzt: 0,
+    offen: 1,
+    hinweis: null,
+    beendetAm: '2026-09-16T10:00:00.000Z',
+  }
+
+  it('startet den Lauf', async () => {
+    const startCoverSearch = vi.fn().mockResolvedValue('started')
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [OHNE_BILD], client: makeClient({ startCoverSearch }) }),
+    })
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Cover suchen' }))
+    expect(startCoverSearch).toHaveBeenCalled()
+  })
+
+  it('übernimmt einen Vorschlag auf Tap', async () => {
+    // Gesetzt wird nur, was eindeutig passt – alles andere wartet hier auf
+    // einen Tap. Ein falsches Cover ist schlechter als gar keines.
+    const applyCoverSuggestion = vi.fn().mockResolvedValue('/cover/b_1.jpg?v=9')
+    const refresh = vi.fn()
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({
+        books: [OHNE_BILD],
+        refresh,
+        client: makeClient({
+          applyCoverSuggestion,
+          fetchCoverSearch: () =>
+            Promise.resolve({ stand: STAND, vorschlaege: { b_1: [VORSCHLAG] } }),
+        }),
+      }),
+    })
+
+    await userEvent.click(
+      await screen.findByRole('button', { name: /Die drei \?\?\? - Der Karpatenhund/ }),
+    )
+
+    expect(applyCoverSuggestion).toHaveBeenCalledWith('b_1', VORSCHLAG.imageUrl)
+    await waitFor(() => {
+      expect(refresh).toHaveBeenCalled()
+    })
+  })
+
+  it('holt die Vorschaubilder über den Dienst, nicht von der Quelle', async () => {
+    // Sonst müsste die Content-Security-Policy fremde Bildquellen zulassen,
+    // und jeder Aufruf verriete dem Anbieter, wer im Adminbereich sitzt.
+    const suggestionUrl = vi.fn(() => 'https://hb-media.example.com/admin/cover-vorschlag/b_1?bild=x')
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({
+        books: [OHNE_BILD],
+        client: makeClient({
+          suggestionUrl,
+          fetchCoverSearch: () =>
+            Promise.resolve({ stand: STAND, vorschlaege: { b_1: [VORSCHLAG] } }),
+        }),
+      }),
+    })
+
+    await screen.findByRole('button', { name: /Der Karpatenhund/ })
+    expect(suggestionUrl).toHaveBeenCalledWith('b_1', VORSCHLAG.imageUrl)
+  })
+})
 
 describe('Cover im Adminbereich', () => {
   const BUCH = makeBook({ id: 'b_1', title: 'Der Super-Papagei', cover: null })
@@ -183,7 +283,7 @@ describe('Cover im Adminbereich', () => {
       admin: makeAdminValue(),
       library: makeLibraryValue({
         books: [mitBild],
-        client: makeClient({ removeCover, fetchManualCovers: () => Promise.resolve(['b_1']) }),
+        client: makeClient({ removeCover, fetchOwnCovers: () => Promise.resolve({ b_1: 'hochgeladen' as const }) }),
       }),
     })
 

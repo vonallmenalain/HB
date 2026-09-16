@@ -144,6 +144,17 @@ describe('GET /library', () => {
     expect(response.json<{ books: unknown[] }>().books).toHaveLength(2)
   })
 
+  it('gibt den Stand der Cover-Suche aus, auch bevor sie je lief', async () => {
+    const response = await app.inject({ method: 'GET', url: `/admin/cover-suche?t=${ticket}` })
+    expect(response.statusCode).toBe(200)
+    const daten = response.json<{
+      stand: { laeuft: boolean; gesamt: number }
+      vorschlaege: Record<string, unknown>
+    }>()
+    expect(daten.stand.laeuft).toBe(false)
+    expect(daten.vorschlaege).toEqual({})
+  })
+
   it('verlangt ein Ticket', async () => {
     expect((await app.inject({ method: 'GET', url: '/library' })).statusCode).toBe(401)
     expect(
@@ -356,9 +367,10 @@ describe('Cover von Hand setzen', () => {
     expect(response.statusCode).toBe(404)
   })
 
-  it('nennt die Bücher mit einem hochgeladenen Bild', async () => {
+  it('nennt die Bücher mit einem eigenen Bild samt Herkunft', async () => {
     // Die App braucht das, um das Zurücknehmen nur dort anzubieten, wo es
-    // etwas zurückzunehmen gibt.
+    // etwas zurückzunehmen gibt – und um an der Kachel zu sagen, woher das
+    // Bild stammt.
     await app.inject({
       method: 'POST',
       url: `/admin/cover/${bookWithoutCoverId}?t=${ticket}`,
@@ -367,7 +379,9 @@ describe('Cover von Hand setzen', () => {
     })
 
     const liste = await app.inject({ method: 'GET', url: `/admin/cover?t=${ticket}` })
-    expect(liste.json<{ bookIds: string[] }>().bookIds).toEqual([bookWithoutCoverId])
+    expect(liste.json<{ covers: Record<string, string> }>().covers).toEqual({
+      [bookWithoutCoverId]: 'hochgeladen',
+    })
 
     const weg = await app.inject({
       method: 'DELETE',
@@ -376,9 +390,40 @@ describe('Cover von Hand setzen', () => {
     expect(weg.json<{ entfernt: boolean }>().entfernt).toBe(true)
     expect(
       (await app.inject({ method: 'GET', url: `/admin/cover?t=${ticket}` })).json<{
-        bookIds: string[]
-      }>().bookIds,
-    ).toEqual([])
+        covers: Record<string, string>
+      }>().covers,
+    ).toEqual({})
+  })
+
+  it('nimmt keine Adresse an, die niemand vorgeschlagen hat', async () => {
+    // Sonst wäre die Route eine Aufforderung an den Dienst, eine beliebige
+    // Adresse abzurufen – auch eine im Heimnetz, an die von aussen niemand
+    // herankommt.
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookId}/vorschlag?t=${ticket}`,
+      payload: { bild: 'http://192.168.1.1/admin' },
+    })
+    expect(response.statusCode).toBe(422)
+  })
+
+  it('reicht keine Adresse durch, die niemand vorgeschlagen hat', async () => {
+    // Dieselbe Sperre wie beim Übernehmen: Ohne sie wäre die Vorschau ein
+    // Fenster in jedes Gerät im Heimnetz.
+    const response = await app.inject({
+      method: 'GET',
+      url: `/admin/cover-vorschlag/${bookId}?bild=${encodeURIComponent('http://192.168.1.1/')}&t=${ticket}`,
+    })
+    expect(response.statusCode).toBe(404)
+  })
+
+  it('verlangt überhaupt eine Adresse', async () => {
+    const response = await app.inject({
+      method: 'POST',
+      url: `/admin/cover/${bookId}/vorschlag?t=${ticket}`,
+      payload: {},
+    })
+    expect(response.statusCode).toBe(400)
   })
 
   it('sagt, wenn gar kein eigenes Bild gesetzt war', async () => {

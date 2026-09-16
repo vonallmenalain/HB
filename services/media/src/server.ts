@@ -283,7 +283,7 @@ export function buildServer(options: ServerOptions): FastifyInstance {
   )
 
   /**
-   * Zu welchen Büchern ein Bild hochgeladen wurde.
+   * Zu welchen Büchern ein eigenes Bild vorliegt – und woher es kommt.
    *
    * Die App braucht das, um „Eigenes Bild zurücknehmen" nur dort anzubieten,
    * wo es etwas zurückzunehmen gibt: Ein Cover vom NAS lässt sich hier nicht
@@ -291,7 +291,89 @@ export function buildServer(options: ServerOptions): FastifyInstance {
    */
   app.get<{ Querystring: TicketQuery }>('/admin/cover', async (request, reply) => {
     if ((await adminUid(request, reply)) === null) return reply
-    return reply.send({ bookIds: await store.manualCovers() })
+    return reply.send({ covers: await store.ownCovers() })
+  })
+
+  /**
+   * Fehlende Cover online suchen.
+   *
+   * Antwortet sofort und läuft weiter – bei neunhundert Büchern dauert der
+   * Lauf eine dreiviertel Stunde, weil die Quellen um ein ruhiges Tempo
+   * bitten. Der Stand kommt aus derselben Route per GET.
+   */
+  app.post<{ Querystring: TicketQuery }>('/admin/cover-suche', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+
+    const ergebnis = store.startCoverSearch()
+    if (ergebnis === 'laeuft') return reply.code(409).send({ error: 'search_running' })
+
+    request.log.info('Cover-Suche gestartet')
+    return reply.code(202).send({ started: true })
+  })
+
+  app.get<{ Querystring: TicketQuery }>('/admin/cover-suche', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+    return reply.send({ stand: store.coverSearchState(), vorschlaege: store.coverSuggestions() })
+  })
+
+  /**
+   * Ein vorgeschlagenes Bild zum Ansehen.
+   *
+   * Der Dienst holt es und reicht es durch, statt die App direkt zur fremden
+   * Quelle zu schicken: Sonst müsste die Content-Security-Policy fremde
+   * Bildquellen zulassen, und jeder Aufruf verriete dem Anbieter, wer gerade
+   * im Adminbereich sitzt. Abgelegt wird dabei nichts – das passiert erst,
+   * wenn jemand den Vorschlag antippt.
+   */
+  app.get<{
+    Params: { bookId: string }
+    Querystring: TicketQuery & { bild?: string }
+  }>('/admin/cover-vorschlag/:bookId', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+
+    const bild = request.query.bild
+    if (typeof bild !== 'string' || bild === '') {
+      return reply.code(400).send({ error: 'image_missing' })
+    }
+
+    const geholt = await store.previewSuggestion(request.params.bookId, bild)
+    if (geholt === null) return reply.code(404).send({ error: 'suggestion_unknown' })
+
+    return reply
+      .header('Content-Type', geholt.mime)
+      // Kurz und privat: Die Vorschau ist beim nächsten Lauf eine andere, und
+      // ein Zwischenspeicher unterwegs hat hier nichts zu suchen.
+      .header('Cache-Control', 'private, max-age=300')
+      .send(geholt.bytes)
+  })
+
+  /**
+   * Einen Vorschlag übernehmen.
+   *
+   * Die Adresse muss aus der Vorschlagsliste dieses Buchs stammen. Sonst wäre
+   * die Route eine Aufforderung an den Dienst, eine beliebige Adresse
+   * abzurufen – auch eine im Heimnetz, an die von aussen niemand herankommt.
+   */
+  app.post<{
+    Params: { bookId: string }
+    Querystring: TicketQuery
+    Body: { bild?: unknown }
+  }>('/admin/cover/:bookId/vorschlag', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+
+    const bild = request.body.bild
+    if (typeof bild !== 'string' || bild === '') {
+      return reply.code(400).send({ error: 'image_missing' })
+    }
+    if (store.book(request.params.bookId) === undefined) {
+      return reply.code(404).send({ error: 'book_not_found' })
+    }
+
+    const cover = await store.applySuggestion(request.params.bookId, bild)
+    if (cover === null) return reply.code(422).send({ error: 'suggestion_unknown' })
+
+    request.log.info({ bookId: request.params.bookId }, 'Vorschlag übernommen')
+    return reply.send({ cover })
   })
 
   /**
@@ -331,7 +413,7 @@ export function buildServer(options: ServerOptions): FastifyInstance {
         return reply.code(404).send({ error: 'book_not_found' })
       }
 
-      const entfernt = await store.clearManualCover(request.params.bookId)
+      const entfernt = await store.clearOwnCover(request.params.bookId)
       return reply.send({
         entfernt,
         cover: store.book(request.params.bookId)?.cover ?? null,

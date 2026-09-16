@@ -8,6 +8,7 @@ import { type BookOverride, type ProbedFile, buildBook, coverPath, parseOverride
 import {
   coverVersionOf,
   manualCoverPath,
+  onlineCoverPath,
   scannedCoverPath,
   writeCover,
 } from './cover.js'
@@ -272,11 +273,18 @@ async function scanBook(
   const scannedCover =
     writtenCover === null ? null : coverPath(withoutCover.id, coverVersion)
 
-  // Ein im Adminbereich hochgeladenes Bild gewinnt über alles, was auf dem NAS
-  // liegt: Es ist die jüngere und ausdrückliche Ansage. Es überlebt den Scan,
-  // weil es in einem eigenen Ordner liegt.
+  // Drei Stufen, in dieser Reihenfolge: von Hand hochgeladen, online gefunden,
+  // auf dem NAS gefunden. Wer von Hand etwas hinlegt, hat sich das Buch
+  // angesehen – eine Suche hat nur gerechnet, und der Ordner hatte seine
+  // Gelegenheit. Beide oberen Stufen liegen in eigenen Ordnern und überleben
+  // den Scan, der `covers/` bei jedem Lauf neu schreibt.
   const manualVersion = await coverVersionOf(manualCoverPath(cacheDir, withoutCover.id))
-  const cover = manualVersion === null ? scannedCover : coverPath(withoutCover.id, manualVersion)
+  const onlineVersion =
+    manualVersion === null
+      ? await coverVersionOf(onlineCoverPath(cacheDir, withoutCover.id))
+      : null
+  const eigene = manualVersion ?? onlineVersion
+  const cover = eigene === null ? scannedCover : coverPath(withoutCover.id, eigene)
 
   const book: Book = cover === null ? withoutCover : { ...withoutCover, cover }
 
@@ -600,9 +608,10 @@ async function readKnownAddedAt(cacheDir: string): Promise<Map<string, string>> 
 export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
   await mkdir(join(options.cacheDir, 'meta'), { recursive: true })
   await mkdir(join(options.cacheDir, 'covers'), { recursive: true })
-  // Hochgeladene Cover liegen getrennt von den erzeugten: Der Scan schreibt
-  // `covers/` bei jedem Lauf neu.
+  // Hochgeladene und online gefundene Cover liegen getrennt von den erzeugten:
+  // Der Scan schreibt `covers/` bei jedem Lauf neu.
   await mkdir(join(options.cacheDir, 'manual'), { recursive: true })
+  await mkdir(join(options.cacheDir, 'online'), { recursive: true })
 
   const collected: Collected = { books: [], locations: new Map() }
   const run: ScanRun = {

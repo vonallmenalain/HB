@@ -1,4 +1,5 @@
 import { AccessSection } from '@/features/admin/AccessSection'
+import { CoverSearchSection } from '@/features/admin/CoverSearchSection'
 import { CoversSection } from '@/features/admin/CoversSection'
 import { HistorySection } from '@/features/admin/HistorySection'
 import { StructureSection } from '@/features/admin/StructureSection'
@@ -43,6 +44,7 @@ export function AdminScreen() {
 
       <AccessSection />
       <TitlesSection />
+      <CoverSearchSection />
       <CoversSection />
       <StructureSection />
       <HistorySection enabled={isAdmin} />

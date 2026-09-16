@@ -74,7 +74,23 @@ const client: MediaClient = {
   fetchStatus: () =>
     Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
   fetchFolders: () => Promise.resolve([]),
-  fetchManualCovers: () => Promise.resolve([]),
+  fetchOwnCovers: () => Promise.resolve({}),
+  startCoverSearch: () => Promise.resolve('started' as const),
+  fetchCoverSearch: () =>
+    Promise.resolve({
+      stand: {
+        laeuft: false,
+        erledigt: 0,
+        gesamt: 0,
+        gesetzt: 0,
+        offen: 0,
+        hinweis: null,
+        beendetAm: null,
+      },
+      vorschlaege: {},
+    }),
+  applyCoverSuggestion: () => Promise.resolve('/cover/x.jpg'),
+  suggestionUrl: () => null,
   setFolderMode: () => Promise.resolve(),
   uploadCover: () => Promise.resolve('/cover/b_1.jpg?v=1'),
   removeCover: () => Promise.resolve(),

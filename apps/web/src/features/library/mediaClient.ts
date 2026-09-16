@@ -77,6 +77,35 @@ export interface MediaFolder {
   mode: FolderMode | null
 }
 
+/** Woher ein Bild kommt, das nicht auf dem NAS liegt. */
+export type CoverHerkunft = 'hochgeladen' | 'online'
+
+/** Ein Treffer aus der Online-Suche, der auf Bestätigung wartet. */
+export interface CoverVorschlag {
+  quelle: 'apple' | 'musicbrainz'
+  title: string
+  artist: string | null
+  imageUrl: string
+  /** 0…1 – wie gut der Treffer zum Buch passt. */
+  score: number
+}
+
+/** Wo der Lauf gerade steht. */
+export interface CoverSucheStand {
+  laeuft: boolean
+  erledigt: number
+  gesamt: number
+  gesetzt: number
+  offen: number
+  hinweis: string | null
+  beendetAm: string | null
+}
+
+export interface CoverSuche {
+  stand: CoverSucheStand
+  vorschlaege: Record<string, CoverVorschlag[]>
+}
+
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
@@ -103,8 +132,22 @@ export interface MediaClient {
    * kommt die Antwort sofort, der Scan läuft weiter.
    */
   setFolderMode: (folder: string, mode: FolderMode | null) => Promise<void>
-  /** Die Bücher, für die ein Bild hochgeladen wurde. */
-  fetchManualCovers: () => Promise<string[]>
+  /** Die Bücher mit einem eigenen Bild, und woher es kommt. */
+  fetchOwnCovers: () => Promise<Record<string, CoverHerkunft>>
+  /** Startet den Lauf, der fehlende Cover online sucht. */
+  startCoverSearch: () => Promise<'started' | 'already-running'>
+  /** Stand und Vorschläge des Laufs. */
+  fetchCoverSearch: () => Promise<CoverSuche>
+  /** Übernimmt einen Vorschlag. Liefert die neue Adresse des Covers. */
+  applyCoverSuggestion: (bookId: string, imageUrl: string) => Promise<string>
+  /**
+   * Die Adresse, unter der ein Vorschlag zu sehen ist.
+   *
+   * Sie zeigt auf den Medien-Dienst, nicht auf die fremde Quelle: Sonst müsste
+   * die Content-Security-Policy fremde Bildquellen zulassen, und jeder Aufruf
+   * verriete dem Anbieter, wer gerade im Adminbereich sitzt.
+   */
+  suggestionUrl: (bookId: string, imageUrl: string) => string | null
   /** Legt ein Cover von Hand fest. Liefert die neue Adresse. */
   uploadCover: (bookId: string, image: Blob) => Promise<string>
   /** Nimmt es wieder weg; danach gilt wieder, was auf dem NAS liegt. */
@@ -346,6 +389,16 @@ export function createMediaClient(options: {
     return response
   }
 
+  /** Ein GET auf eine Admin-Route, dessen Antwort JSON sein muss. */
+  async function adminJson(path: string): Promise<unknown> {
+    const response = await adminCall(path, { method: 'GET' })
+    try {
+      return await response.json()
+    } catch {
+      throw new MediaRequestError('malformed')
+    }
+  }
+
   async function fetchFolders(): Promise<MediaFolder[]> {
     const response = await adminCall('/admin/struktur', { method: 'GET' })
 
@@ -419,19 +472,60 @@ export function createMediaClient(options: {
     startRescan,
     fetchStatus,
     fetchFolders,
-    fetchManualCovers: async () => {
-      const response = await adminCall('/admin/cover', { method: 'GET' })
+    fetchOwnCovers: async () => {
+      const body = await adminJson('/admin/cover')
+      const covers = (body as { covers?: unknown }).covers
+      if (typeof covers !== 'object' || covers === null) throw new MediaRequestError('malformed')
 
-      let raw: unknown
-      try {
-        raw = await response.json()
-      } catch {
+      const geprueft: Record<string, CoverHerkunft> = {}
+      for (const [bookId, herkunft] of Object.entries(covers as Record<string, unknown>)) {
+        if (herkunft === 'hochgeladen' || herkunft === 'online') geprueft[bookId] = herkunft
+      }
+      return geprueft
+    },
+    startCoverSearch: async () => {
+      const response = await withFreshTicket((ticket) =>
+        doFetch(withTicket('/admin/cover-suche', ticket), { method: 'POST' }),
+      ).catch((error: unknown) => {
+        if (error instanceof MediaRequestError) throw error
+        throw new MediaRequestError('offline')
+      })
+
+      // Der Dienst sucht schon – für den Aufrufer ist das kein Fehler.
+      if (response.status === 409) return 'already-running'
+      const fehler = adminError(response)
+      if (fehler) throw fehler
+      return 'started'
+    },
+    fetchCoverSearch: async () => {
+      const body = (await adminJson('/admin/cover-suche')) as {
+        stand?: unknown
+        vorschlaege?: unknown
+      }
+      const stand = body.stand as CoverSucheStand | undefined
+      if (typeof stand !== 'object' || stand === null || typeof stand.laeuft !== 'boolean') {
         throw new MediaRequestError('malformed')
       }
 
-      const body = raw as { bookIds?: unknown }
-      if (!Array.isArray(body.bookIds)) throw new MediaRequestError('malformed')
-      return body.bookIds.filter((id): id is string => typeof id === 'string')
+      const roh = body.vorschlaege
+      const vorschlaege: Record<string, CoverVorschlag[]> = {}
+      if (typeof roh === 'object' && roh !== null) {
+        for (const [bookId, liste] of Object.entries(roh as Record<string, unknown>)) {
+          if (Array.isArray(liste)) vorschlaege[bookId] = liste as CoverVorschlag[]
+        }
+      }
+      return { stand, vorschlaege }
+    },
+    applyCoverSuggestion: async (bookId, imageUrl) => {
+      const response = await adminCall(`/admin/cover/${bookId}/vorschlag`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bild: imageUrl }),
+      })
+
+      const body = (await response.json()) as { cover?: unknown }
+      if (typeof body.cover !== 'string') throw new MediaRequestError('malformed')
+      return body.cover
     },
     setFolderMode: async (folder, mode) => {
       await adminCall('/admin/struktur', {
@@ -455,6 +549,11 @@ export function createMediaClient(options: {
     },
     removeCover: async (bookId) => {
       await adminCall(`/admin/cover/${bookId}`, { method: 'DELETE' })
+    },
+    suggestionUrl: (bookId, imageUrl) => {
+      const ticket = ownTicket()?.ticket
+      if (ticket === undefined) return null
+      return `${baseUrl}/admin/cover-vorschlag/${encodeURIComponent(bookId)}?bild=${encodeURIComponent(imageUrl)}&t=${encodeURIComponent(ticket)}`
     },
     coverUrl: (coverPath) => {
       const ticket = ownTicket()?.ticket
