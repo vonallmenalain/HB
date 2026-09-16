@@ -40,6 +40,8 @@ const client: MediaClient = {
   ensureTicket: () => Promise.resolve('t'),
   currentTicket: () => 't',
   fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
+  startRescan: () => Promise.resolve('started'),
+  fetchStatus: () => Promise.resolve({ scanning: false, books: 1, schemaVersion: 2 }),
   coverUrl: (path) => `https://nas.example${path}&t=t`,
   audioUrl: (bookId, fileIdx) => `https://nas.example/audio/${bookId}/${String(fileIdx)}?t=t`,
   canonicalAudioUrl: (bookId, fileIdx) =>

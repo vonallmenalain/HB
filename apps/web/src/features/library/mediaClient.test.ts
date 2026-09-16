@@ -198,3 +198,72 @@ describe('Adressen', () => {
     expect(client.coverUrl('/cover/b_1.jpg')).toBeNull()
   })
 })
+
+describe('Neu einlesen anstossen', () => {
+  const healthBody = { ok: true, scanning: false, books: 12, schemaVersion: 2 }
+
+  it('schickt das Ticket an /admin/rescan', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ started: true }, { status: 202 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('started')
+
+    const [url, init] = fetchImpl.mock.calls[1]!
+    expect(url).toBe(`${BASE}/admin/rescan?t=TICKET-1`)
+    expect(init?.method).toBe('POST')
+  })
+
+  it('nimmt einen schon laufenden Scan als Erfolg', async () => {
+    // 409 heisst „liest bereits" – genau das, was der Aufrufer wollte.
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'scan_running' }, { status: 409 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('already-running')
+  })
+
+  it('holt bei abgelaufenem Ticket ein neues und wiederholt', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'ticket_invalid' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ started: true }, { status: 202 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('started')
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
+  })
+
+  it('unterscheidet ein nicht berechtigtes Konto vom Serverfehler', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'not_admin' }, { status: 403 }))
+
+    await expect(makeClient(fetchImpl).startRescan()).rejects.toMatchObject({
+      reason: 'forbidden',
+    })
+  })
+
+  it('liest den Zustand aus /health – ohne Ticket', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(healthBody))
+
+    expect(await makeClient(fetchImpl).fetchStatus()).toEqual({
+      scanning: false,
+      books: 12,
+      schemaVersion: 2,
+    })
+    expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(`${BASE}/health`)
+  })
+
+  it('meldet eine unverständliche Antwort, statt sie zu glauben', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }))
+
+    await expect(makeClient(fetchImpl).fetchStatus()).rejects.toMatchObject({
+      reason: 'malformed',
+    })
+  })
+})

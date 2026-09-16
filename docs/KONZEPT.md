@@ -370,8 +370,15 @@ kennt, findet ihn nicht, und die App merkt sich beim Start die zuletzt gesehene
 Ansicht, sodass man den Titel unter Umständen gar nicht mehr zu Gesicht bekommt.
 Geschützt wird der Bereich durch die PIN, nicht durch das Verstecken der Tür –
 deshalb sagt die App deutlich, solange keine gesetzt ist.
-Enthält: Profile verwalten, Downloads verwalten/löschen, Katalog neu einlesen,
+Enthält: Profile verwalten, Downloads verwalten/löschen, neue Hörbücher suchen,
 Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden.
+
+„Neue Hörbücher suchen" lässt bewusst das NAS seine Ordner lesen und wartet auf
+das Ergebnis, statt nur den Katalog neu zu holen. Der Unterschied ist der
+einzige, der hier zählt: Ein Ordner, der gerade erst aufs NAS kopiert wurde,
+steht im Katalog noch gar nicht drin. Wer nichts drückt, wartet auf den
+selbsttätigen Durchgang des Dienstes – der Knopf spart diese Wartezeit, mehr
+nicht.
 
 **Ein Stockwerk darüber liegt der Adminbereich.** Der Elternmodus ist für alle,
 die das Tablet verwalten; der Adminbereich für das eine Konto, das über Zugänge

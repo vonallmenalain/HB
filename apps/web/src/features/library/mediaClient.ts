@@ -38,12 +38,31 @@ export type MediaError =
   | 'malformed'
   | 'server'
 
+/** Was `/health` über den Dienst auf dem NAS sagt. */
+export interface NasStatus {
+  /** Läuft gerade ein Scan der Ordner? */
+  scanning: boolean
+  books: number
+  schemaVersion: number
+}
+
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
   /** Das zuletzt geholte Ticket, ohne Netzwerk – für `<audio src>`. */
   currentTicket: () => string | null
   fetchCatalog: (etag: string | null) => Promise<CatalogFetch>
+  /**
+   * Lässt den Dienst die Ordner neu einlesen.
+   *
+   * Nicht zu verwechseln mit `fetchCatalog`: Das holt nur, was der Dienst
+   * zuletzt gefunden hat. Ein Ordner, der seither aufs NAS kopiert wurde,
+   * taucht erst nach diesem Aufruf auf – oder wenn der Dienst von selbst
+   * wieder nachsieht, was standardmässig alle sechs Stunden passiert.
+   */
+  startRescan: () => Promise<'started' | 'already-running'>
+  /** Zustand des Dienstes. Braucht kein Ticket – für die Fortschrittsanzeige. */
+  fetchStatus: () => Promise<NasStatus>
   coverUrl: (coverPath: string) => string | null
   audioUrl: (bookId: string, fileIdx: number) => string | null
   /**
@@ -201,11 +220,73 @@ export function createMediaClient(options: {
     }
   }
 
+  /**
+   * Einmal wiederholen, wenn das Ticket abgelaufen war.
+   *
+   * Dasselbe Muster wie in `fetchCatalog`: Ein 401 heisst hier nicht „nicht
+   * erlaubt", sondern „das Ticket ist zu alt" – und dafür gibt es ein neues.
+   */
+  async function withFreshTicket(call: (ticket: string) => Promise<Response>): Promise<Response> {
+    const response = await call(await ensureTicket())
+    if (response.status !== 401) return response
+    forgetTicket()
+    return call(await ensureTicket())
+  }
+
+  async function startRescan(): Promise<'started' | 'already-running'> {
+    let response: Response
+    try {
+      response = await withFreshTicket((ticket) =>
+        doFetch(withTicket('/admin/rescan', ticket), { method: 'POST' }),
+      )
+    } catch (error) {
+      if (error instanceof MediaRequestError) throw error
+      throw new MediaRequestError('offline')
+    }
+
+    // Der Dienst liest schon – für den Aufrufer ist das kein Fehler, sondern
+    // genau das, was er wollte.
+    if (response.status === 409) return 'already-running'
+    if (response.status === 403) throw new MediaRequestError('forbidden')
+    if (response.status === 401) throw new MediaRequestError('unauthorized')
+    if (!response.ok) throw new MediaRequestError('server')
+    return 'started'
+  }
+
+  async function fetchStatus(): Promise<NasStatus> {
+    let response: Response
+    try {
+      response = await doFetch(`${baseUrl}/health`)
+    } catch {
+      throw new MediaRequestError('offline')
+    }
+    if (!response.ok) throw new MediaRequestError('server')
+
+    let raw: unknown
+    try {
+      raw = await response.json()
+    } catch {
+      throw new MediaRequestError('malformed')
+    }
+
+    const body = raw as Partial<Record<keyof NasStatus, unknown>>
+    if (
+      typeof body.scanning !== 'boolean' ||
+      typeof body.books !== 'number' ||
+      typeof body.schemaVersion !== 'number'
+    ) {
+      throw new MediaRequestError('malformed')
+    }
+    return { scanning: body.scanning, books: body.books, schemaVersion: body.schemaVersion }
+  }
+
   return {
     ensureTicket,
     // Auch ein bald ablaufendes Ticket ist brauchbar – der Dienst entscheidet.
     currentTicket: () => stored?.ticket ?? null,
     fetchCatalog,
+    startRescan,
+    fetchStatus,
     coverUrl: (coverPath) => {
       const ticket = stored?.ticket
       return ticket === undefined ? null : withTicket(coverPath, ticket)
