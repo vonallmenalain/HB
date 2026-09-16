@@ -374,6 +374,19 @@ mit:
 docker compose --profile waechter up -d
 ```
 
+> **Nie zwei Wächter nebeneinander.** Watchtower sucht beim Start nach weiteren
+> Instanzen und **stoppt sie**. Wer diesen hier startet, obwohl schon einer für
+> andere Dienste läuft, legt deren Aktualisierung lahm – und merkt es erst
+> Wochen später an einem alten Stand:
+>
+> ```
+> msg="Found multiple running watchtower instances. Cleaning up."
+> msg="Stopping /manager-watchtower (0c9b877b08c4) with SIGTERM"
+> ```
+>
+> Falls das passiert ist: `docker rm -f hb-watchtower`, dann den anderen wieder
+> starten (`docker start <name>`) und stattdessen das Label verwenden.
+
 Er heisst dann `hb-watchtower`, sieht alle `HB_UPDATE_INTERVAL_SECONDS` nach
 (Vorgabe: 300) und fasst nur `hb-media` an, nichts anderes auf dem NAS.
 

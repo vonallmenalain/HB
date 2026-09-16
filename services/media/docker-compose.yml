@@ -85,6 +85,15 @@ services:
   # Nur mit `--label-enable`, ohne Container-Namen und ohne `--scope` nimmt er
   # hb-media mit; sonst hier das Profil starten (docs/QNAP-SETUP.md §9).
   #
+  # Nie zwei Wächter nebeneinander: Watchtower sucht beim Start nach weiteren
+  # Instanzen und stoppt sie. Aus einem zweiten Wächter für hb-media wird so
+  # ein Ausfall der Aktualisierung für alle anderen Dienste auf dem NAS –
+  #
+  #   msg="Found multiple running watchtower instances. Cleaning up."
+  #   msg="Stopping /manager-watchtower (0c9b877b08c4) with SIGTERM"
+  #
+  # und das fällt erst auf, wenn Wochen später irgendwo ein alter Stand läuft.
+  #
   # Was der Wächter kostet, steht in docs/QNAP-SETUP.md §9: Er braucht den
   # Docker-Socket und darf damit alles, was Docker auf dem NAS darf.
   watchtower:
