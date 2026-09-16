@@ -275,6 +275,22 @@ Rand stehen – sie gehört dorthin, solange noch etwas läuft, und ist im Weg,
 wenn niemand mehr hört. Die Stelle geht dabei nicht verloren: Sie steht danach
 wieder oben auf der Startseite unter „Weiterhören".
 
+**Dasselbe Viereck steht auch in der Leiste selbst**, links neben Play/Pause:
+
+```
+ ┌───────────────────────────────┐
+ │ ▢  Der Super-Papagei      ■ ▶ │   ← Titel antippen = Player
+ │    Kapitel 4            64px  │   ← ■ = anhalten und zumachen
+ └───────────────────────────────┘
+```
+
+Wer die Leiste wegbekommen will, musste dafür bisher erst den Player aufmachen
+– einen Bildschirm weit für das, was man gerade sieht. Der Abstand von 16px
+zwischen den beiden Knöpfen ist hier der Preis: Zumachen ist kein Vertippen
+wert, das man sich beim Greifen nach Pause einhandelt. Der Knopf trägt einen
+Rand aus `--color-control`; ohne ihn stünde eine weisse Fläche auf einer
+weissen Leiste.
+
 **Der Fortschrittsbalken war bis M8 bewusst nur Anzeige** – aus Sorge, ein Kind
 verliere beim versehentlichen Wischen seine Stelle. In der Praxis fehlte er:
 Wer eine bestimmte Stelle sucht, tippt sonst minutenlang auf ⏪. Seit M9 lässt
