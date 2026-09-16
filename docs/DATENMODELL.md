@@ -210,6 +210,9 @@ users/{uid}/profiles/{profileId}
   ├─ color              : string        // "#7c3aed"
   ├─ avatar             : string        // Emoji oder Icon-Key, z.B. "fox"
   ├─ allowDownload      : boolean       // Vorgabe false, nur im Elternmodus setzbar
+  ├─ maySwitchProfile   : boolean       // Vorgabe false – Profilwechsel nur über den Elternbereich
+  ├─ ageYears           : number|null   // Alter des Kindes; null heisst „nicht gesetzt"
+  ├─ blockedBooks        : string[]      // einzeln gesperrte Buch-Kennungen
   └─ createdAt          : timestamp
 
 users/{uid}/profiles/{profileId}/progress/{bookId}
@@ -229,6 +232,23 @@ users/{uid}/profiles/{profileId}/favorites/{bookId}
 **Favoriten hängen am Profil, nicht am Konto.** Zwei Geschwister auf demselben
 Tablet haben verschiedene Lieblingsfolgen; ein gemeinsamer Stern wäre für beide
 der falsche.
+
+**Beide Rechte gelten nur, wenn sie ausdrücklich dastehen.** Ein Profil aus einer
+früheren Version hat die Felder nicht – dann liest `parseProfile` die vorsichtige
+Antwort: kein Profilwechsel, kein Alter. Anders herum wäre eine neue Version eine
+stille Freigabe.
+
+**Was ein Kind sehen darf, entscheidet sich aus zwei Richtungen** (`access.ts`):
+`ageYears` beim Profil gegen `minAge` beim Buch, und dazu `blockedBooks` für die
+Ausnahme, für die kein Alter etwas hergibt. Ohne gesetztes Alter bleibt jedes
+Buch mit Altersfreigabe verborgen – wer eine Folge auf „ab 12" setzt, will sie
+vor den Kleinen verbergen und nicht erst noch bei jedem Profil eine Zahl
+nachtragen müssen, damit die Freigabe greift.
+
+Gefiltert wird an **einer** Stelle, im `LibraryProvider`: Er gibt `books`
+(gefiltert) und `allBooks` (der ganze Katalog, für Eltern- und Adminbereich)
+heraus. `bookById` hängt an der gefilterten Liste – sonst liefe ein gesperrtes
+Buch über eine gemerkte Adresse oder über „Weiterhören" doch noch an.
 
 Die Buch-Kennung steht **nur** im Dokumentnamen, nicht noch einmal im Dokument.
 
@@ -302,6 +322,11 @@ selbst wieder.
 ```
 bookTitles/{bookId}
   ├─ title              : string        // von Hand im Adminbereich gesetzt
+  ├─ updatedAt          : string
+  └─ updatedBy          : string
+
+bookAges/{bookId}
+  ├─ minAge             : number        // Altersfreigabe in Jahren; kein Dokument heisst „frei"
   ├─ updatedAt          : string
   └─ updatedBy          : string
 
@@ -381,6 +406,7 @@ match /users/{uid}/{document=**} {
 }
 
 match /bookTitles/{bookId} { allow read: if isAllowed(); allow write: if isAdmin(); }
+match /bookAges/{bookId}   { allow read: if isAllowed(); allow write: if isAdmin(); }
 
 match /listening/{entryId} {
   allow read: if isAdmin();

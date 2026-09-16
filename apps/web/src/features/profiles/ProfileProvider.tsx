@@ -80,7 +80,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
         name: input.name.trim(),
         avatar: input.avatar,
         color: input.color,
+        // Beide Rechte fangen bei „nein" an: Downloads füllen das Tablet, und
+        // der Profilwechsel gehört den Eltern. Freigeben lässt sich beides in
+        // derselben Liste, in der das Profil gerade entstanden ist.
         allowDownload: false,
+        maySwitchProfile: false,
+        ageYears: null,
+        blockedBooks: [],
         createdAt: new Date().toISOString(),
       })
     },
@@ -95,6 +101,13 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
       if (patch.avatar !== undefined) clean.avatar = patch.avatar
       if (patch.color !== undefined) clean.color = patch.color
       if (patch.allowDownload !== undefined) clean.allowDownload = patch.allowDownload
+      if (patch.maySwitchProfile !== undefined) {
+        clean.maySwitchProfile = patch.maySwitchProfile
+      }
+      // `null` ist hier ein Wert und kein „nicht mitgeschickt": Es nimmt das
+      // Alter weg. Deshalb die Prüfung auf `undefined` und nicht auf Wahrheit.
+      if (patch.ageYears !== undefined) clean.ageYears = patch.ageYears
+      if (patch.blockedBooks !== undefined) clean.blockedBooks = [...patch.blockedBooks]
       if (Object.keys(clean).length === 0) return
       await updateDoc(doc(db, 'users', user.uid, 'profiles', id), clean)
     },

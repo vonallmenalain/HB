@@ -1,4 +1,5 @@
 import { type FormEvent, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/features/auth/authContext'
 import { DownloadsSection } from '@/features/downloads/DownloadsSection'
@@ -12,25 +13,27 @@ import { Notice } from '@/ui/Notice'
 import { Screen, ScreenTitle } from '@/ui/Screen'
 import { TextField } from '@/ui/TextField'
 
+import { ProfileCard } from './ProfileCard'
 import { AVATARS, COLORS, checkProfileName } from './profile'
 import { useProfiles } from './profilesContext'
 
 /**
- * Elternbereich: Profile anlegen, Downloads freigeben, abmelden.
+ * Elternbereich: Profile anlegen, festlegen, was jedes Kind darf, abmelden.
  *
- * Noch ohne PIN – die kommt laut Konzept mit M8. Bis dahin ist dieser
- * Bildschirm über einen bewusst unauffälligen Link erreichbar.
+ * Liegt hinter der PIN. Was hier eingestellt wird, wirkt sofort auf allen
+ * Geräten – Alter, gesperrte Hörbücher und der Profilwechsel hängen am Profil
+ * und nicht am Gerät.
  */
 export function ManageProfilesScreen() {
-  const { profiles, create, update, remove } = useProfiles()
+  const { profiles, selected, create, clearSelection } = useProfiles()
   const { state, actions, isAdmin } = useAuth()
+  const navigate = useNavigate()
 
   const [name, setName] = useState('')
   const [avatar, setAvatar] = useState<string>(AVATARS[0])
   const [color, setColor] = useState<string>(COLORS[0])
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
-  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
 
   function onSubmit(event: FormEvent): void {
     event.preventDefault()
@@ -71,64 +74,7 @@ export function ManageProfilesScreen() {
         ) : (
           <ul className="flex flex-col gap-3">
             {profiles.map((profile) => (
-              <li
-                key={profile.id}
-                className="flex flex-col gap-3 rounded-tile bg-surface p-4"
-              >
-                <div className="flex items-center gap-4">
-                  <Avatar avatar={profile.avatar} color={profile.color} size="sm" />
-                  <span className="flex-1 text-xl font-semibold">{profile.name}</span>
-                </div>
-
-                <label className="flex min-h-touch items-center gap-3 rounded-tile bg-surface-sunken px-4">
-                  <input
-                    type="checkbox"
-                    className="size-6 accent-primary"
-                    checked={profile.allowDownload}
-                    onChange={(event) => {
-                      void update(profile.id, { allowDownload: event.target.checked })
-                    }}
-                  />
-                  <span>Darf Hörbücher herunterladen</span>
-                </label>
-
-                {confirmingDelete === profile.id ? (
-                  <div className="flex flex-col gap-2">
-                    <Notice tone="error">
-                      {profile.name} wirklich löschen? Der Hörfortschritt dieses Profils geht
-                      dabei verloren.
-                    </Notice>
-                    <div className="flex gap-2">
-                      <BigButton
-                        onClick={() => {
-                          void remove(profile.id)
-                          setConfirmingDelete(null)
-                        }}
-                      >
-                        Ja, löschen
-                      </BigButton>
-                      <BigButton
-                        variant="secondary"
-                        onClick={() => {
-                          setConfirmingDelete(null)
-                        }}
-                      >
-                        Abbrechen
-                      </BigButton>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    className="min-h-touch self-start rounded-tile px-2 text-ink-soft underline"
-                    onClick={() => {
-                      setConfirmingDelete(profile.id)
-                    }}
-                  >
-                    Profil löschen
-                  </button>
-                )}
-              </li>
+              <ProfileCard key={profile.id} profile={profile} />
             ))}
           </ul>
         )}
@@ -224,9 +170,21 @@ export function ManageProfilesScreen() {
             geben die Listen nur einer einzigen Adresse heraus. */}
         {isAdmin ? <BigLinkButton to="/admin">Adminbereich</BigLinkButton> : null}
 
-        <BigLinkButton to="/profil" variant="secondary">
-          Zurück zur Profilauswahl
-        </BigLinkButton>
+        {/* Erst die Auswahl aufgeben, dann hin: Ein Profil, das nicht wechseln
+            darf, schickt die Weiche in `AppRoutes` sonst sofort wieder auf die
+            Startseite – und der Knopf sähe kaputt aus. Das ist der Weg, der
+            den gesperrten Wechsel öffnet, und er liegt hinter der PIN. */}
+        <BigButton
+          variant="secondary"
+          onClick={() => {
+            clearSelection()
+            void navigate('/profil')
+          }}
+        >
+          {selected === null || selected.maySwitchProfile
+            ? 'Zurück zur Profilauswahl'
+            : 'Anderes Kind auswählen'}
+        </BigButton>
         <BigButton variant="secondary" onClick={() => void actions.signOut()}>
           Abmelden
         </BigButton>

@@ -15,7 +15,9 @@ import { useDownloads } from './downloadsContext'
  */
 export function DownloadsSection() {
   const { records, supported, background, transfer, storage, remove } = useDownloads()
-  const { bookById } = useLibrary()
+  // Ungefiltert: Ein gesperrtes Hörbuch, das auf dem Gerät liegt, muss hier
+  // mit Namen dastehen – sonst lässt es sich nicht wieder wegräumen.
+  const { allBooks } = useLibrary()
 
   if (!supported) return null
 
@@ -37,7 +39,7 @@ export function DownloadsSection() {
         <>
           <ul className="flex flex-col gap-3">
             {geladen.map((record) => {
-              const book = bookById(record.bookId)
+              const book = allBooks.find((entry) => entry.id === record.bookId)
               return (
                 <li
                   key={record.bookId}

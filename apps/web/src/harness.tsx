@@ -33,6 +33,7 @@ import { AppRoutes } from './app/AppRoutes'
 import { AdminContext, type AdminContextValue } from './features/admin/adminContext'
 import { AuthContext, type AuthContextValue } from './features/auth/authContext'
 import { FavoritesContext } from './features/favorites/favoritesContext'
+import { AgesContext } from './features/library/agesContext'
 import { TitlesContext } from './features/library/titlesContext'
 import type { Book } from './features/library/catalog'
 import { SUPPORTED_SCHEMA_VERSION, parseCatalog, sortBooks } from './features/library/catalog'
@@ -47,6 +48,8 @@ import { DownloadProvider } from './features/downloads/DownloadProvider'
 import { ParentProvider } from './features/parents/ParentProvider'
 import { ProgressStore } from './features/progress/ProgressProvider'
 import { parseRemoteProgress, toRemoteDoc } from './features/progress/sync'
+import { visibleBooks } from './features/profiles/access'
+import { type Profile } from './features/profiles/profile'
 import { ProfilesContext, type ProfilesContextValue } from './features/profiles/profilesContext'
 import './index.css'
 
@@ -268,25 +271,18 @@ const demoClient: LibraryContextValue['client'] = {
   forgetTicket: () => undefined,
 }
 
-const profile = {
+const profile: Profile = {
   id: 'p1',
   name: 'Emma',
   avatar: '🦊',
   color: '#6d28d9',
   // In der Vorschau freigegeben, sonst wäre der Download-Knopf nie zu sehen.
   allowDownload: true,
+  // Ebenso der Wechsel: Sonst liesse sich die Profilauswahl hier nicht ansehen.
+  maySwitchProfile: true,
+  ageYears: 8,
+  blockedBooks: [],
   createdAt: '2026-01-01T00:00:00.000Z',
-}
-
-const profiles: ProfilesContextValue = {
-  loading: false,
-  profiles: [profile],
-  selected: profile,
-  select: () => undefined,
-  clearSelection: () => undefined,
-  create: () => Promise.resolve(),
-  update: () => Promise.resolve(),
-  remove: () => Promise.resolve(),
 }
 
 /**
@@ -337,10 +333,13 @@ function Harness() {
   // dieses Tabs – so lässt sich alles ausprobieren, ohne Firebase.
   const [favoriten, setFavoriten] = useState<ReadonlySet<string>>(new Set())
   const [titel, setTitel] = useState<ReadonlyMap<string, string>>(new Map())
+  const [alter, setAlter] = useState<ReadonlyMap<string, number>>(new Map())
+  const [kind, setKind] = useState<Profile>(profile)
   const [offeneAnfrage, setOffeneAnfrage] = useState(true)
   const [library, setLibrary] = useState<LibraryContextValue>(() => ({
     status: mediaBase === null ? 'ready' : 'loading',
     books: mediaBase === null ? demoBooks : [],
+    allBooks: mediaBase === null ? demoBooks : [],
     fromCache: false,
     error: null,
     skipped: 0,
@@ -373,6 +372,7 @@ function Harness() {
       setLibrary({
         status: 'ready',
         books,
+        allBooks: books,
         fromCache: false,
         error: null,
         skipped: parsed.ok ? parsed.skipped : 0,
@@ -409,11 +409,47 @@ function Harness() {
     },
   }
 
-  // Die Titel wirken in der Vorschau sofort – wie in der App, nur ohne Cloud.
+  const profiles: ProfilesContextValue = {
+    loading: false,
+    profiles: [kind],
+    selected: kind,
+    select: () => undefined,
+    clearSelection: () => undefined,
+    create: () => Promise.resolve(),
+    update: (_id, patch) => {
+      setKind((vorher) => ({
+        ...vorher,
+        ...patch,
+        blockedBooks: patch.blockedBooks ? [...patch.blockedBooks] : vorher.blockedBooks,
+      }))
+      return Promise.resolve()
+    },
+    remove: () => Promise.resolve(),
+  }
+
+  const alterWert = {
+    ages: alter,
+    setMinAge: (bookId: string, minAge: number) => {
+      setAlter((vorher) => {
+        const next = new Map(vorher)
+        if (minAge <= 0) next.delete(bookId)
+        else next.set(bookId, minAge)
+        return next
+      })
+      return Promise.resolve()
+    },
+  }
+
+  // Titel und Altersfreigaben wirken in der Vorschau sofort – wie in der App,
+  // nur ohne Cloud. Gefiltert wird hier genauso: Was das Kind nicht sehen darf,
+  // steht in `books` nicht drin, im Eltern- und Adminbereich aber schon.
+  const alleBuecher = tidyBooks(library.books, titel)
+  const sichtbare = visibleBooks(alleBuecher, kind, alter)
   const bibliothek: LibraryContextValue = {
     ...library,
-    books: tidyBooks(library.books, titel),
-    bookById: (id) => tidyBooks(library.books, titel).find((book) => book.id === id),
+    books: sichtbare,
+    allBooks: alleBuecher,
+    bookById: (id) => sichtbare.find((book) => book.id === id),
   }
 
   return (
@@ -425,6 +461,7 @@ function Harness() {
           })}
         >
         <TitlesContext value={titelWert}>
+        <AgesContext value={alterWert}>
         <FavoritesContext value={favoritenWert}>
         <ParentProvider>
           <ProfilesContext value={profiles}>
@@ -443,6 +480,7 @@ function Harness() {
           </ProfilesContext>
         </ParentProvider>
         </FavoritesContext>
+        </AgesContext>
         </TitlesContext>
         </AdminContext>
       </AuthContext>

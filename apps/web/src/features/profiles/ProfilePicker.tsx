@@ -12,6 +12,10 @@ import { useProfiles } from './profilesContext'
  * Profilauswahl – der einzige Bildschirm vor dem Hören.
  *
  * Bewusst ohne Text ausser dem Namen: Ein Kind tippt sein Bild an, mehr nicht.
+ *
+ * Danach ist dieser Bildschirm für das Kind verschwunden, solange sein Profil
+ * nicht wechseln darf – wer ihn wieder braucht, geht durch den Elternbereich
+ * (siehe `ProfileGate` in `AppRoutes`).
  */
 export function ProfilePicker() {
   const { loading, profiles, select } = useProfiles()

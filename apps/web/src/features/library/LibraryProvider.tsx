@@ -1,6 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { useAuth } from '@/features/auth/authContext'
+import { visibleBooks } from '@/features/profiles/access'
+import { useProfiles } from '@/features/profiles/profilesContext'
 import { readMediaBaseUrl } from '@/lib/env'
 
 import { type Book, sortBooks } from './catalog'
@@ -8,6 +10,7 @@ import { loadCachedCatalog, saveCachedCatalog } from './catalogCache'
 import { LibraryContext, type LibraryStatus } from './libraryContext'
 import { type MediaError, createMediaClient } from './mediaClient'
 import { tidyBooks } from './titles'
+import { useAges } from './agesContext'
 import { useTitles } from './titlesContext'
 
 interface State {
@@ -31,6 +34,8 @@ const INITIAL: State = {
 export function LibraryProvider({ children }: { children: ReactNode }) {
   const { state: authState } = useAuth()
   const { titles } = useTitles()
+  const { ages } = useAges()
+  const { selected } = useProfiles()
   const baseUrl = useMemo(() => readMediaBaseUrl(), [])
 
   // Fehlt die Adresse des Medien-Dienstes, steht das schon beim ersten Rendern
@@ -132,20 +137,31 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
    */
   // Sortiert wird erst danach: Die Folgennummer steckt manchmal im Titel und
   // fällt erst beim Aufräumen heraus – vorher sortierte die Reihe nach Text.
-  const books = useMemo(
+  const allBooks = useMemo(
     () => sortBooks(tidyBooks(state.books, titles)),
     [state.books, titles],
   )
+
+  /**
+   * Und erst hier fällt heraus, was dieses Kind nicht sehen soll.
+   *
+   * Eine Stelle für die ganze App: Jeder Bildschirm liest `books`, und keiner
+   * muss von Altersfreigaben wissen. Auch `bookById` hängt daran – sonst liefe
+   * ein gesperrtes Buch über eine gemerkte Adresse (`/buch/…`) oder über
+   * „Weiterhören" doch noch an.
+   */
+  const books = useMemo(() => visibleBooks(allBooks, selected, ages), [allBooks, selected, ages])
 
   const value = useMemo(
     () => ({
       ...state,
       books,
+      allBooks,
       refresh,
       bookById: (id: string) => books.find((book) => book.id === id),
       client,
     }),
-    [state, books, refresh, client],
+    [state, books, allBooks, refresh, client],
   )
 
   return <LibraryContext value={value}>{children}</LibraryContext>

@@ -36,6 +36,33 @@ function RequireProfile({ children }: { children: ReactNode }) {
   return children
 }
 
+/**
+ * Die Profilauswahl – erreichbar, solange noch niemand gewählt hat.
+ *
+ * Auf dem Familientablett wird einmal ausgewählt, wer zuhört, und danach bleibt
+ * es dabei: Ein Kind, das zwischen den Profilen hin- und herspringt, verliert
+ * seine Stellen und findet fremde Bücher unter „Weiterhören". Wer darf, hat im
+ * Elternbereich das Häkchen „Darf das Profil wechseln" – und der Weg dorthin
+ * führt über die PIN.
+ *
+ * Solange kein Profil gewählt ist, steht die Auswahl jedem offen. Anders wäre
+ * ein frisch eingerichtetes Tablett eine Sackgasse: Ohne Auswahl keine
+ * Bibliothek, und ohne Auswahl auch keine Auswahl.
+ */
+function ProfileGate() {
+  const { loading, selected } = useProfiles()
+
+  if (loading) {
+    return (
+      <Screen>
+        <Spinner label="Profile werden geladen" />
+      </Screen>
+    )
+  }
+  if (selected && !selected.maySwitchProfile) return <Navigate to="/" replace />
+  return <ProfilePicker />
+}
+
 export function AppRoutes() {
   useRememberView()
 
@@ -81,7 +108,7 @@ export function AppRoutes() {
           </RequireProfile>
         }
       />
-      <Route path="/profil" element={<ProfilePicker />} />
+      <Route path="/profil" element={<ProfileGate />} />
       <Route path="/profil/bearbeiten" element={<EditProfileScreen />} />
       <Route
         path="/eltern"

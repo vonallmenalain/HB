@@ -10,6 +10,7 @@ import { DownloadProvider } from '@/features/downloads/DownloadProvider'
 import { FavoriteProvider } from '@/features/favorites/FavoriteProvider'
 import { HistoryProvider } from '@/features/history/HistoryProvider'
 import { ParentProvider } from '@/features/parents/ParentProvider'
+import { AgeProvider } from '@/features/library/AgeProvider'
 import { LibraryProvider } from '@/features/library/LibraryProvider'
 import { TitleProvider } from '@/features/library/TitleProvider'
 import { NowPlayingBar } from '@/features/player/NowPlayingBar'
@@ -55,29 +56,32 @@ function AuthGate() {
       )
     case 'ready':
       // Die Reihenfolge ist keine Geschmacksfrage: Die Bibliothek braucht die
-      // von Hand gesetzten Titel, der Player den Aufzeichner, und beide
-      // brauchen das aktive Profil.
+      // von Hand gesetzten Titel und die Altersfreigaben, der Player den
+      // Aufzeichner, und alle brauchen das aktive Profil – die Bibliothek gibt
+      // ja nur heraus, was dieses Kind sehen darf.
       return (
         <ParentProvider>
           <ProfileProvider>
             <AdminProvider>
               <TitleProvider>
-                <LibraryProvider>
-                  <ProgressProvider>
-                    <FavoriteProvider>
-                      <HistoryProvider>
-                        <DownloadProvider>
-                          <PlayerProvider>
-                            <ResetProvider>
-                              <AppRoutes />
-                              <NowPlayingBar />
-                            </ResetProvider>
-                          </PlayerProvider>
-                        </DownloadProvider>
-                      </HistoryProvider>
-                    </FavoriteProvider>
-                  </ProgressProvider>
-                </LibraryProvider>
+                <AgeProvider>
+                  <LibraryProvider>
+                    <ProgressProvider>
+                      <FavoriteProvider>
+                        <HistoryProvider>
+                          <DownloadProvider>
+                            <PlayerProvider>
+                              <ResetProvider>
+                                <AppRoutes />
+                                <NowPlayingBar />
+                              </ResetProvider>
+                            </PlayerProvider>
+                          </DownloadProvider>
+                        </HistoryProvider>
+                      </FavoriteProvider>
+                    </ProgressProvider>
+                  </LibraryProvider>
+                </AgeProvider>
               </TitleProvider>
             </AdminProvider>
           </ProfileProvider>

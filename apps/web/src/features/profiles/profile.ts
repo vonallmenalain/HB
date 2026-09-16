@@ -1,3 +1,5 @@
+import { parseAgeYears } from './access'
+
 /** Ein Kinderprofil innerhalb des Familienkontos. */
 export interface Profile {
   id: string
@@ -9,6 +11,30 @@ export interface Profile {
    * freigegeben – sonst ist das Tablet nach einem Nachmittag voll.
    */
   allowDownload: boolean
+  /**
+   * Darf dieses Profil zu einem anderen wechseln?
+   *
+   * Standardmässig nicht. Auf dem Familientablett wird einmal ausgewählt, wer
+   * zuhört, und danach bleibt es dabei: Ein Kind, das zwischen den Profilen
+   * hin- und herspringt, verliert seine Stellen und findet fremde Bücher unter
+   * „Weiterhören". Der Weg zurück zur Auswahl führt über den Elternbereich und
+   * damit über die PIN.
+   */
+  maySwitchProfile: boolean
+  /**
+   * Alter des Kindes in Jahren, oder null – dann ist keins gesetzt.
+   *
+   * Zusammen mit der Altersfreigabe am Hörbuch entscheidet es, was in der
+   * Bibliothek überhaupt erscheint (siehe `access.ts`).
+   */
+  ageYears: number | null
+  /**
+   * Einzeln gesperrte Hörbücher.
+   *
+   * Für die Ausnahme, für die kein Alter etwas hergibt: eine Folge, die
+   * ausgerechnet diesem Kind Angst macht.
+   */
+  blockedBooks: string[]
   createdAt: string
 }
 
@@ -92,6 +118,14 @@ export function parseProfile(id: string, data: unknown): Profile | null {
     avatar,
     color,
     allowDownload: record.allowDownload === true,
+    // Beide Rechte müssen ausdrücklich dastehen. Ein Profil aus einer früheren
+    // Version hat das Feld nicht – und dann gilt die vorsichtige Antwort, nicht
+    // die bequeme.
+    maySwitchProfile: record.maySwitchProfile === true,
+    ageYears: parseAgeYears(record.ageYears),
+    blockedBooks: Array.isArray(record.blockedBooks)
+      ? record.blockedBooks.filter((id): id is string => typeof id === 'string' && id !== '')
+      : [],
     createdAt: typeof record.createdAt === 'string' ? record.createdAt : '',
   }
 }

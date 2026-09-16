@@ -4,6 +4,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore'
 import { useUser } from '@/features/auth/authContext'
 import { readFirebaseConfig } from '@/lib/env'
 import { getFirebase } from '@/lib/firebase'
+import { readLocal, removeLocal, writeLocal } from '@/lib/localStore'
 
 import { ParentsContext } from './parentsContext'
 import { type StoredPin, makeStoredPin, parseStoredPin, verifyPin } from './pin'
@@ -18,10 +19,24 @@ import { type StoredPin, makeStoredPin, parseStoredPin, verifyPin } from './pin'
 export const FRESH_SIGN_IN_MS = 5 * 60_000
 
 /**
+ * Auf welchen Geräten die PIN als erledigt gilt.
+ *
+ * Nach Konto getrennt: Ein anderes Konto auf demselben Gerät erbt das nicht.
+ */
+const rememberKey = (uid: string): string => `hb.parents.unlocked.${uid}`
+
+/**
  * Der Elternbereich und sein Schloss.
  *
- * Aufgesperrt wird für die Dauer der Sitzung, nicht dauerhaft: Wer den
- * Elternbereich verlässt, findet ihn beim nächsten Mal wieder zu.
+ * Aufgesperrt wird für die Dauer der Sitzung: Wer die App schliesst, findet den
+ * Elternbereich beim nächsten Start wieder zu.
+ *
+ * Es sei denn, jemand hat beim Eingeben „Auf diesem Gerät merken" gewählt. Das
+ * ist der Unterschied zwischen dem eigenen Telefon und dem Kindertablett: Auf
+ * dem eigenen Gerät ist die PIN ein Hindernis ohne Zweck, auf dem Tablett ist
+ * sie der ganze Zweck. Deshalb entscheidet es niemand im Voraus für beide
+ * Geräte, sondern jedes Gerät für sich – und ein Knopf im Elternbereich nimmt
+ * es wieder zurück.
  */
 export function ParentProvider({
   children,
@@ -36,6 +51,7 @@ export function ParentProvider({
 
   const [stored, setStored] = useState<{ uid: string; pin: StoredPin | null } | null>(null)
   const [unlocked, setUnlocked] = useState(false)
+  const [remembered, setRemembered] = useState(() => readLocal(rememberKey(user.uid)) === 'ja')
 
   useEffect(() => {
     let cancelled = false
@@ -78,20 +94,32 @@ export function ParentProvider({
     return !Number.isNaN(ms) && now() - ms < FRESH_SIGN_IN_MS
   }, [user, now])
 
-  const locked = !loading && pin !== null && !unlocked && !freshSignIn
+  const locked = !loading && pin !== null && !unlocked && !remembered && !freshSignIn
 
   const unlock = useCallback(
-    async (eingabe: string) => {
+    async (eingabe: string, remember = false) => {
       const passt = await verifyPin(eingabe, pin)
-      if (passt) setUnlocked(true)
-      return passt
+      if (!passt) return false
+
+      setUnlocked(true)
+      if (remember) {
+        setRemembered(true)
+        writeLocal(rememberKey(user.uid), 'ja')
+      }
+      return true
     },
-    [pin],
+    [pin, user.uid],
   )
 
   const lock = useCallback(() => {
     setUnlocked(false)
   }, [])
+
+  const forgetOnThisDevice = useCallback(() => {
+    setRemembered(false)
+    setUnlocked(false)
+    removeLocal(rememberKey(user.uid))
+  }, [user.uid])
 
   const speichern = useCallback(
     async (next: StoredPin | null) => {
@@ -117,7 +145,11 @@ export function ParentProvider({
   const removePin = useCallback(async () => {
     await speichern(null)
     setUnlocked(true)
-  }, [speichern])
+    // Ohne PIN gibt es nichts zu merken. Bliebe der Vermerk liegen, stünde der
+    // Elternbereich nach einer neu gesetzten PIN auf diesem Gerät weiter offen.
+    setRemembered(false)
+    removeLocal(rememberKey(user.uid))
+  }, [speichern, user.uid])
 
   const value = useMemo(
     () => ({
@@ -126,10 +158,12 @@ export function ParentProvider({
       locked,
       unlock,
       lock,
+      remembered: remembered && pin !== null,
+      forgetOnThisDevice,
       setPin,
       removePin,
     }),
-    [loading, pin, locked, unlock, lock, setPin, removePin],
+    [loading, pin, locked, unlock, lock, remembered, forgetOnThisDevice, setPin, removePin],
   )
 
   return <ParentsContext value={value}>{children}</ParentsContext>

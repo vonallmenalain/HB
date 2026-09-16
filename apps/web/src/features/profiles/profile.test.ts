@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AVATARS,
   COLORS,
+  type Profile,
   avatarFallback,
   checkProfileName,
   parseProfile,
@@ -57,6 +58,9 @@ describe('parseProfile', () => {
         avatar: '🦊',
         color: '#0369a1',
         allowDownload: true,
+        maySwitchProfile: true,
+        ageYears: 8,
+        blockedBooks: ['b_1'],
         createdAt: '2026-01-01T00:00:00.000Z',
       }),
     ).toEqual({
@@ -65,8 +69,33 @@ describe('parseProfile', () => {
       avatar: '🦊',
       color: '#0369a1',
       allowDownload: true,
+      maySwitchProfile: true,
+      ageYears: 8,
+      blockedBooks: ['b_1'],
       createdAt: '2026-01-01T00:00:00.000Z',
     })
+  })
+
+  it('liest ein Dokument aus der Zeit vor den Rechten vorsichtig', () => {
+    // So sieht jedes Profil aus, das vor dieser Version angelegt wurde: ohne
+    // die drei Felder. Beide Rechte müssen ausdrücklich dastehen, sonst gilt
+    // die vorsichtige Antwort – der Profilwechsel bleibt zu, und bis ein Alter
+    // eingetragen ist, ist alles mit Altersfreigabe verborgen.
+    const alt = parseProfile('p1', { name: 'Emma' })
+    expect(alt?.maySwitchProfile).toBe(false)
+    expect(alt?.ageYears).toBeNull()
+    expect(alt?.blockedBooks).toEqual([])
+  })
+
+  it('weist unsinnige Alter und Sperren zurück', () => {
+    expect(parseProfile('p1', { name: 'Emma', ageYears: 0 })?.ageYears).toBeNull()
+    expect(parseProfile('p1', { name: 'Emma', ageYears: 99 })?.ageYears).toBeNull()
+    expect(parseProfile('p1', { name: 'Emma', ageYears: '8' })?.ageYears).toBeNull()
+    expect(parseProfile('p1', { name: 'Emma', ageYears: 8.4 })?.ageYears).toBe(8)
+    expect(
+      parseProfile('p1', { name: 'Emma', blockedBooks: ['b_1', 7, '', null] })?.blockedBooks,
+    ).toEqual(['b_1'])
+    expect(parseProfile('p1', { name: 'Emma', blockedBooks: 'b_1' })?.blockedBooks).toEqual([])
   })
 
   it('verwirft Dokumente ohne brauchbaren Namen', () => {
@@ -99,27 +128,46 @@ describe('parseProfile', () => {
   })
 })
 
+/**
+ * Ein Profil mit allem, was die Sortierung nicht interessiert.
+ *
+ * Die Felder einzeln in jedes Literal zu schreiben hiesse, sie bei jedem neuen
+ * Recht in sechs Zeilen nachzutragen – und die Sortierung liest ohnehin nur
+ * Kennung, Name und Zeitpunkt.
+ */
+function profil(werte: Pick<Profile, 'id' | 'name' | 'createdAt'>): Profile {
+  return {
+    avatar: '🐻',
+    color: '#000000',
+    allowDownload: false,
+    maySwitchProfile: false,
+    ageYears: null,
+    blockedBooks: [],
+    ...werte,
+  }
+}
+
 describe('sortProfiles', () => {
   it('sortiert nach Anlagezeitpunkt', () => {
     const profiles = [
-      { id: 'b', name: 'Ben', avatar: '🐻', color: '#000000', allowDownload: false, createdAt: '2026-02-01' },
-      { id: 'a', name: 'Emma', avatar: '🦊', color: '#000000', allowDownload: false, createdAt: '2026-01-01' },
+      profil({ id: 'b', name: 'Ben', createdAt: '2026-02-01' }),
+      profil({ id: 'a', name: 'Emma', createdAt: '2026-01-01' }),
     ]
     expect(sortProfiles(profiles).map((p) => p.id)).toEqual(['a', 'b'])
   })
 
   it('fällt bei gleichem Zeitpunkt auf den Namen zurück', () => {
     const profiles = [
-      { id: 'b', name: 'Ben', avatar: '🐻', color: '#000000', allowDownload: false, createdAt: '' },
-      { id: 'a', name: 'Anna', avatar: '🦊', color: '#000000', allowDownload: false, createdAt: '' },
+      profil({ id: 'b', name: 'Ben', createdAt: '' }),
+      profil({ id: 'a', name: 'Anna', createdAt: '' }),
     ]
     expect(sortProfiles(profiles).map((p) => p.name)).toEqual(['Anna', 'Ben'])
   })
 
   it('verändert die Eingabe nicht', () => {
     const profiles = [
-      { id: 'b', name: 'Ben', avatar: '🐻', color: '#000000', allowDownload: false, createdAt: '2026-02-01' },
-      { id: 'a', name: 'Anna', avatar: '🦊', color: '#000000', allowDownload: false, createdAt: '2026-01-01' },
+      profil({ id: 'b', name: 'Ben', createdAt: '2026-02-01' }),
+      profil({ id: 'a', name: 'Anna', createdAt: '2026-01-01' }),
     ]
     sortProfiles(profiles)
     expect(profiles[0]?.id).toBe('b')

@@ -12,6 +12,7 @@ import {
   FavoritesContext,
   type FavoritesContextValue,
 } from '@/features/favorites/favoritesContext'
+import { AgesContext, type AgesContextValue } from '@/features/library/agesContext'
 import { TitlesContext, type TitlesContextValue } from '@/features/library/titlesContext'
 import type { DownloadRecord } from '@/features/downloads/downloads'
 import {
@@ -42,6 +43,11 @@ export function makeProfile(overrides: Partial<Profile> = {}): Profile {
     avatar: '🦊',
     color: '#6d28d9',
     allowDownload: false,
+    // In Tests darf gewechselt werden, sonst müsste jeder Test, der die
+    // Profilauswahl anfasst, das Häkchen erst setzen. In der App ist es aus.
+    maySwitchProfile: true,
+    ageYears: null,
+    blockedBooks: [],
     createdAt: '2026-01-01T00:00:00.000Z',
     ...overrides,
   }
@@ -92,6 +98,9 @@ export function makeLibraryValue(
   return {
     status: 'ready',
     books,
+    // Ohne eigene Angabe ist der ganze Katalog auch das, was das Kind sieht:
+    // Die Filterung sitzt im `LibraryProvider`, nicht in diesem Wert.
+    allBooks: overrides.allBooks ?? books,
     fromCache: false,
     error: null,
     skipped: 0,
@@ -245,6 +254,8 @@ export function makeParentsValue(
     locked: false,
     unlock: vi.fn().mockResolvedValue(true),
     lock: vi.fn(),
+    remembered: false,
+    forgetOnThisDevice: vi.fn(),
     setPin: vi.fn().mockResolvedValue(undefined),
     removePin: vi.fn().mockResolvedValue(undefined),
     ...overrides,
@@ -273,6 +284,14 @@ export function makeTitlesValue(
   }
 }
 
+export function makeAgesValue(overrides: Partial<AgesContextValue> = {}): AgesContextValue {
+  return {
+    ages: new Map(),
+    setMinAge: vi.fn().mockResolvedValue(undefined),
+    ...overrides,
+  }
+}
+
 export function renderWithProfiles(
   ui: ReactElement,
   value: ProfilesContextValue,
@@ -287,6 +306,7 @@ export function renderWithProfiles(
     parents = makeParentsValue(),
     favorites = makeFavoritesValue(),
     titles = makeTitlesValue(),
+    ages = makeAgesValue(),
     reset = makeResetValue(),
   }: {
     route?: string
@@ -299,6 +319,7 @@ export function renderWithProfiles(
     parents?: ParentsContextValue
     favorites?: FavoritesContextValue
     titles?: TitlesContextValue
+    ages?: AgesContextValue
     reset?: ResetContextValue
   } = {},
 ) {
@@ -310,6 +331,7 @@ export function renderWithProfiles(
           <ResetContext value={reset}>
           <AdminContext value={admin}>
             <TitlesContext value={titles}>
+              <AgesContext value={ages}>
               <ProfilesContext value={value}>
                 <LibraryContext value={library}>
                   <ProgressContext value={progress}>
@@ -321,6 +343,7 @@ export function renderWithProfiles(
                   </ProgressContext>
                 </LibraryContext>
               </ProfilesContext>
+              </AgesContext>
             </TitlesContext>
           </AdminContext>
           </ResetContext>
