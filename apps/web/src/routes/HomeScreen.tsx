@@ -26,7 +26,7 @@ import { Spinner } from '@/ui/Spinner'
 export function HomeScreen() {
   const { selected } = useProfiles()
   const { status, books, bookById } = useLibrary()
-  const { entries } = useProgress()
+  const { entries, reset } = useProgress()
   const { ids: favoriten } = useFavorites()
 
   const zuletzt = pickRecent([...entries.values()], (id) => bookById(id) !== undefined, 5)
@@ -86,7 +86,13 @@ export function HomeScreen() {
 
       {weiter && weiterBuch ? (
         <div className="pb-8">
-          <ContinueTile book={weiterBuch} progress={weiter} />
+          <ContinueTile
+            book={weiterBuch}
+            progress={weiter}
+            onRemove={() => {
+              reset(weiterBuch.id)
+            }}
+          />
         </div>
       ) : null}
 
@@ -100,7 +106,16 @@ export function HomeScreen() {
         />
       ) : null}
 
-      <BookShelf title="Zuletzt gehört" books={weitereAngefangene} />
+      {/* Nur hier steht ein Kreuz an den Kacheln: „Zuletzt gehört" ist eine
+          Liste, die das Kind selbst gefüllt hat – Gemerktes nimmt der Stern
+          zurück, und Vorschläge kommen und gehen ohnehin von allein. */}
+      <BookShelf
+        title="Zuletzt gehört"
+        books={weitereAngefangene}
+        onRemove={(book) => {
+          reset(book.id)
+        }}
+      />
       <BookShelf title="Gemerkt" books={gemerkt} />
       <BookShelf title="Vielleicht auch etwas für dich" books={vorschlaege} />
 

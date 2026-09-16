@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { type Book } from '@/features/library/catalog'
 import { useLibrary } from '@/features/library/libraryContext'
 import { type Progress, progressRatio } from '@/features/progress/progress'
+import { RemoveFromShelf } from '@/features/progress/RemoveFromShelf'
 import { formatRemaining } from '@/lib/format'
 import { BookCover } from '@/ui/BookCover'
 import { ProgressBar } from '@/ui/ProgressBar'
@@ -15,7 +16,16 @@ import { usePlayer } from './playerContext'
  * Das wichtigste Element der ganzen App: Ein Kind öffnet die App und tippt
  * einmal – mehr soll zwischen ihm und seinem Hörbuch nicht stehen.
  */
-export function ContinueTile({ book, progress }: { book: Book; progress: Progress }) {
+export function ContinueTile({
+  book,
+  progress,
+  onRemove,
+}: {
+  book: Book
+  progress: Progress
+  /** Nimmt das Buch von der Startseite. Ohne das bleibt die Kachel wie bisher. */
+  onRemove?: () => void
+}) {
   const { client } = useLibrary()
   const player = usePlayer()
   const navigate = useNavigate()
@@ -23,7 +33,7 @@ export function ContinueTile({ book, progress }: { book: Book; progress: Progres
   const cover = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
   const remaining = Math.max(0, book.durationSec - progress.positionSec)
 
-  return (
+  const kachel = (
     <button
       type="button"
       onClick={() => {
@@ -54,5 +64,19 @@ export function ContinueTile({ book, progress }: { book: Book; progress: Progres
         <span className="text-ink-soft">{formatRemaining(remaining)}</span>
       </div>
     </button>
+  )
+
+  if (!onRemove) return kachel
+
+  // Ein Knopf im Knopf geht nicht – das Kreuz liegt daneben und darüber.
+  return (
+    <div className="relative">
+      {kachel}
+      <RemoveFromShelf
+        title={book.title}
+        onRemove={onRemove}
+        className="absolute right-3 top-3"
+      />
+    </div>
   )
 }

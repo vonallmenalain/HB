@@ -43,6 +43,28 @@ export function makeProgress(
   }
 }
 
+/**
+ * Ein Fortschritt „wie neu": Anfang, nichts gehört.
+ *
+ * Bewusst ein Eintrag und kein Löschen. Der Abgleich zwischen Geräten kennt
+ * nur „der jüngere Stand gewinnt" – ein gelöschtes Dokument sagt gar nichts,
+ * und das zweite Tablet schöbe seinen alten Stand gleich wieder hoch. Ein
+ * Eintrag von jetzt gewinnt dagegen überall, und weil er auf 0 steht, zählt
+ * das Buch nirgends mehr als angefangen.
+ */
+export function blankProgress(bookId: string, now: () => Date = () => new Date()): Progress {
+  return {
+    bookId,
+    positionSec: 0,
+    fileIdx: 0,
+    offsetSec: 0,
+    filesHash: '',
+    durationSec: 0,
+    finished: false,
+    updatedAt: now().toISOString(),
+  }
+}
+
 export interface Resume {
   positionSec: number
   /** Kam die Stelle aus der exakten Angabe oder aus der globalen Sekunde? */

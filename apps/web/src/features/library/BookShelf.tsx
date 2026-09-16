@@ -12,10 +12,13 @@ export function BookShelf({
   title,
   books,
   action,
+  onRemove,
 }: {
   title: string
   books: readonly Book[]
   action?: ReactNode
+  /** Gesetzt, wenn die Kacheln ein Kreuz zum Wegnehmen tragen sollen. */
+  onRemove?: (book: Book) => void
 }) {
   if (books.length === 0) return null
 
@@ -25,7 +28,14 @@ export function BookShelf({
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3">
         {books.map((book) => (
           <li key={book.id}>
-            <BookTile book={book} />
+            <BookTile
+              book={book}
+              {...(onRemove && {
+                onRemove: () => {
+                  onRemove(book)
+                },
+              })}
+            />
           </li>
         ))}
       </ul>

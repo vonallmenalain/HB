@@ -371,7 +371,7 @@ Ansicht, sodass man den Titel unter Umständen gar nicht mehr zu Gesicht bekommt
 Geschützt wird der Bereich durch die PIN, nicht durch das Verstecken der Tür –
 deshalb sagt die App deutlich, solange keine gesetzt ist.
 Enthält: Profile verwalten, Downloads verwalten/löschen, neue Hörbücher suchen,
-Diagnose (ist das NAS erreichbar?), PIN setzen, Abmelden.
+Diagnose (ist das NAS erreichbar?), PIN setzen, alles zurücksetzen, Abmelden.
 
 „Neue Hörbücher suchen" lässt bewusst das NAS seine Ordner lesen und wartet auf
 das Ergebnis, statt nur den Katalog neu zu holen. Der Unterschied ist der

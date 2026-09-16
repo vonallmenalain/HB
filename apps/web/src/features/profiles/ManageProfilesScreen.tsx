@@ -4,6 +4,7 @@ import { useAuth } from '@/features/auth/authContext'
 import { DownloadsSection } from '@/features/downloads/DownloadsSection'
 import { LibrarySection } from '@/features/parents/LibrarySection'
 import { PinSection } from '@/features/parents/PinSection'
+import { ResetSection } from '@/features/parents/ResetSection'
 import { SyncNotice } from '@/features/progress/SyncNotice'
 import { Avatar } from '@/ui/Avatar'
 import { BigButton, BigLinkButton } from '@/ui/BigButton'
@@ -209,6 +210,8 @@ export function ManageProfilesScreen() {
       <DownloadsSection />
 
       <PinSection />
+
+      <ResetSection />
 
       <section className="flex flex-col gap-4 pt-8">
         <h2 className="text-2xl font-bold">Konto</h2>

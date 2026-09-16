@@ -291,6 +291,25 @@ eigenen UID anfängt. Zwei Geräte desselben Kindes schreiben damit in dasselbe
 Dokument, und `increment()` zählt richtig zusammen, statt sich gegenseitig zu
 überschreiben.
 
+### Alles zurücksetzen
+
+Der Elternbereich kann den Stand aller Profile auf Anfang bringen – gedacht für
+den Moment nach dem Ausprobieren. Drei Datenorte, drei verschiedene Wege:
+
+| Was | Wie | Warum so |
+|---|---|---|
+| Hörfortschritt | **überschrieben**, nicht gelöscht: ein Eintrag von jetzt mit `positionSec: 0` | Der Abgleich kennt nur „der jüngere Stand gewinnt". Ein gelöschtes Dokument sagt gar nichts – das zweite Tablet schöbe seinen alten Stand gleich wieder hoch |
+| Favoriten | gelöscht | Liegen nur in Firestore; es gibt keinen lokalen Stand, der sie zurückholen könnte |
+| Hörhistorie | gelöscht, nur als Administrator | Die Regeln lassen sonst niemanden sie auch nur lesen |
+
+Die Vorschläge auf der Startseite haben keinen eigenen Speicher – sie werden bei
+jedem Öffnen aus dem Hörfortschritt gerechnet und sind damit automatisch mit
+zurückgesetzt.
+
+Dieselbe Mechanik im Kleinen steht den Kindern zur Verfügung: Das Kreuz an einer
+Kachel unter „Weiterhören" oder „Zuletzt gehört" schreibt genau einen solchen
+Null-Eintrag. Zwei Tipps sind nötig – der erste fragt, der zweite nimmt weg.
+
 ### Sicherheitsregeln
 
 Die vollständigen Regeln liegen als Vorlage in
