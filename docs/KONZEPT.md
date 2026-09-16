@@ -195,10 +195,10 @@ was ein Kind sonst noch sucht.
  │ │  ◕ Kapitel 4 · noch 18 Min│ │
  │ └───────────────────────────┘ │
  │                               │
- │ Zuletzt gehört                │
- │ ┌─────┐ ┌─────┐               │
- │ │Cover│ │Cover│               │
- │ └─────┘ └─────┘               │
+ │ Weiterhören                   │   ← alles andere, was angefangen ist;
+ │ ┌─────┐ ┌─────┐ ┌─────┐       │      Kreuz an der Kachel nimmt es weg
+ │ │Cover│ │Cover│ │Cover│       │
+ │ └─────┘ └─────┘ └─────┘       │
  │                               │
  │ Gemerkt                    ★  │
  │ ┌─────┐ ┌─────┐               │
@@ -348,7 +348,7 @@ Zeile und zeigt dort nebenbei, in welchem Kapitel man gerade ist.
 | Zustand merken | Letztes Profil und letzte Ansicht überleben den App-Neustart |
 
 **Die eine Ausnahme beim Destruktiven** ist das Kreuz an den Kacheln unter
-„Weiterhören" und „Zuletzt gehört". Gemeint war mit der Regel, dass ein Kind
+„Weiterhören". Gemeint war mit der Regel, dass ein Kind
 nichts kaputt machen kann: kein gelöschtes Profil, keine Abmeldung, keine
 Einstellung, die niemand zurückdreht. Hier geht nichts verloren ausser der
 Stelle im Buch – das Hörbuch selbst liegt weiter auf dem NAS und steht zwei

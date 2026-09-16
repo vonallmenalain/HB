@@ -54,8 +54,8 @@ export function ResetSection() {
 
       <p className="text-ink-soft">
         Setzt den Hörfortschritt aller Profile auf Anfang und löscht die gemerkten
-        Hörbücher und die Hörhistorie. „Weiterhören" und „Zuletzt gehört" sind danach
-        leer, die Vorschläge fangen wieder bei null an. Die Hörbücher selbst bleiben
+        Hörbücher und die Hörhistorie. „Weiterhören" und „Gemerkt" sind danach leer,
+        die Vorschläge fangen wieder bei null an. Die Hörbücher selbst bleiben
         unangetastet – sie liegen auf dem NAS.
       </p>
 

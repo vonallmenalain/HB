@@ -1,6 +1,6 @@
 import { SUPPORTED_SCHEMA_VERSION } from '@/features/library/catalog'
 import { libraryErrorMessage } from '@/features/library/errors'
-import { buildSeries } from '@/features/library/grouping'
+import { countSeries } from '@/features/library/grouping'
 import { useLibrary } from '@/features/library/libraryContext'
 import type { MediaError } from '@/features/library/mediaClient'
 import { BigButton } from '@/ui/BigButton'
@@ -86,8 +86,8 @@ export function LibrarySection() {
 
       {status === 'ready' && books.length > 0 && !dienstZuAlt ? (
         <Notice>
-          {buildSeries(books).length} Reihen. Wie sie heissen, steht in den Ordnernamen
-          auf dem NAS.
+          {countSeries(books)} Reihen. Wie sie heissen, steht in den Ordnernamen auf dem
+          NAS. Hörbücher, die in keiner Reihe liegen, stehen einzeln im Raster.
         </Notice>
       ) : null}
 

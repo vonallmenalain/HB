@@ -157,6 +157,11 @@ const cover = (hue: number) =>
  * Beispieltitel, absichtlich so krumm wie auf einem echten NAS: Reihenname im
  * Ordnernamen, Nummern mit und ohne Leerzeichen, ein Unterordner. So zeigt die
  * Vorschau, was das Aufräumen der Titel tatsächlich tut.
+ *
+ * Die letzten drei liegen in keiner Reihe – ein Einzelbuch und zwei Sprachkurse,
+ * wie sie als eigener Ordner im Stamm liegen. Sie gehören in die Vorschau, weil
+ * sie in der Übersicht als gewöhnliche Kachel zwischen den Reihen stehen und
+ * nicht in einem Sammelfach.
  */
 const TITLES: [string, string | null, string | null][] = [
   ['Die drei ??? Kids - 01 - Der Super-Papagei', 'Die drei ??? Kids', null],
@@ -165,6 +170,8 @@ const TITLES: [string, string | null, string | null][] = [
   ['Hexerei in der Schule', 'Bibi Blocksberg', null],
   ['Der Weihnachtsmann in der Klemme', null, null],
   ['Die Olchis - 01 - Ein Fall für die Olchis', 'Die Olchis', null],
+  ['Englisch', null, null],
+  ['Französisch', null, null],
 ]
 
 const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
@@ -178,9 +185,18 @@ const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
   narrator: null,
   durationSec: 3600 + i * 900,
   cover: i === 4 ? null : `/cover/b_${String(i)}.jpg`,
-  coverColor: ['#6d28d9', '#0369a1', '#047857', '#b45309', '#be123c', '#4338ca'][i]!,
+  coverColor: [
+    '#6d28d9',
+    '#0369a1',
+    '#047857',
+    '#b45309',
+    '#be123c',
+    '#4338ca',
+    '#0f766e',
+    '#7c2d12',
+  ][i]!,
   tags: [],
-  addedAt: `2026-0${String(i + 1)}-01T00:00:00.000Z`,
+  addedAt: `2026-${String(i + 1).padStart(2, '0')}-01T00:00:00.000Z`,
   filesHash: 'x',
   files: [
     { idx: 0, durationSec: 1800, bytes: 1, mime: 'audio/mpeg' },

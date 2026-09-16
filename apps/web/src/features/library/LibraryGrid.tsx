@@ -12,6 +12,10 @@ import { TILE_GRID } from './grid'
  * Steht auf der Startseite und unter „Alle Hörbücher": Beide zeigen dasselbe,
  * und zweimal dasselbe abzutippen hiesse, dass es beim nächsten Mal nur an
  * einer Stelle geändert wird.
+ *
+ * Reihen und einzelne Hörbücher stehen dabei nebeneinander im selben Raster,
+ * alphabetisch. Ein Buch ohne Reihe wird deshalb nicht weggeräumt, sondern ist
+ * genau dort, wo man es sucht.
  */
 export function LibraryGrid({
   books,
@@ -55,9 +59,10 @@ export function LibraryGrid({
     <ul className={`${TILE_GRID} pb-6`}>
       {buildSeries(books).map((entry) => (
         <li key={entry.slug}>
-          {/* Eine „Reihe" mit einem einzigen Hörbuch ist keine Reihe. Sie führt
-              direkt zum Buch, statt einen Tap für eine Liste mit einem Eintrag
-              zu kosten. */}
+          {/* Ein Eintrag mit einem einzigen Hörbuch ist keine Reihe – ein Buch
+              ohne Reihe oder eine Reihe, von der bisher eine Folge da ist. Er
+              führt direkt zum Buch, statt einen Tap für eine Liste mit einem
+              Eintrag zu kosten. */}
           {entry.books.length === 1 ? (
             <BookTile book={entry.books[0]!} />
           ) : (

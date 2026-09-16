@@ -5,15 +5,16 @@
  * – man scrollt an allem vorbei, was man sucht. „Alle Hörbücher“ zeigt deshalb
  * erst die Reihen und danach die Folgen einer Reihe, darin nach Unterordnern
  * gruppiert.
+ *
+ * Ein Hörbuch, das zu keiner Reihe gehört, ist davon ausgenommen: Es steht als
+ * eigene Kachel zwischen den Reihen.
  */
 import { type Book } from './catalog'
 
-/** Reihe für Bücher, die direkt im Stammordner liegen. */
-export const OHNE_REIHE = 'Einzelne Hörbücher'
-
-export function seriesName(book: Book): string {
+/** Die Reihe eines Buchs, oder null – dann steht es für sich. */
+export function seriesName(book: Book): string | null {
   const name = book.series?.trim() ?? ''
-  return name === '' ? OHNE_REIHE : name
+  return name === '' ? null : name
 }
 
 /**
@@ -42,50 +43,91 @@ export interface Series {
 }
 
 /**
- * Fasst die Bücher zu Reihen zusammen.
+ * Fasst die Bücher zu Reihen zusammen – ein Eintrag je Kachel der Übersicht.
+ *
+ * Ein Buch ohne Reihe bildet seinen eigenen Eintrag mit genau einem Buch und
+ * erscheint damit als gewöhnliche Buchkachel, alphabetisch zwischen den Reihen.
+ * Früher lagen diese Bücher zusammen in einem Fach „Einzelne Hörbücher": Wer
+ * „Die unendliche Geschichte" suchte, musste erst wissen, dass sie in der
+ * Restekiste liegt, und dann noch einen Tap dafür bezahlen. Etwas gemeinsam
+ * haben die Bücher darin ohnehin nicht – ausser dass ihr Ordner eine Ebene
+ * höher liegt als bei den anderen.
  *
  * Kollidieren zwei Namen im Kürzel (etwa „Mini-Fälle“ und „Mini Fälle“), gewinnt
  * der erste und der zweite bekommt eine Ziffer angehängt – sonst zeigte eine
  * Adresse zwei verschiedene Reihen.
  */
 export function buildSeries(books: readonly Book[]): Series[] {
-  const byName = new Map<string, Book[]>()
+  // Die Liste führt die Reihenfolge, die Map findet die Reihe wieder: Ein Buch
+  // ohne Reihe steht in der Liste, gehört aber in keine Map – sonst fielen zwei
+  // gleichnamige Einzelbücher zusammen.
+  const eintraege: { name: string; books: Book[] }[] = []
+  const nachReihe = new Map<string, Book[]>()
+
   for (const book of books) {
     const name = seriesName(book)
-    const list = byName.get(name)
-    if (list) list.push(book)
-    else byName.set(name, [book])
+    if (name === null) {
+      eintraege.push({ name: book.title, books: [book] })
+      continue
+    }
+
+    const vorhanden = nachReihe.get(name)
+    if (vorhanden) {
+      vorhanden.push(book)
+      continue
+    }
+    const neu = [book]
+    nachReihe.set(name, neu)
+    eintraege.push({ name, books: neu })
   }
 
   const slugs = new Set<string>()
   const series: Series[] = []
 
-  for (const [name, gruppe] of byName) {
-    let slug = seriesSlug(name)
-    for (let suffix = 2; slugs.has(slug); suffix += 1) slug = `${seriesSlug(name)}-${String(suffix)}`
+  // Erst sortieren, dann Kürzel vergeben: Sonst hinge das „-2" an der Reihe,
+  // die im Katalog zufällig später kommt – und damit an einer anderen, sobald
+  // ein Buch dazukommt.
+  for (const eintrag of [...eintraege].sort((a, b) => a.name.localeCompare(b.name, 'de'))) {
+    let slug = seriesSlug(eintrag.name)
+    for (let suffix = 2; slugs.has(slug); suffix += 1) {
+      slug = `${seriesSlug(eintrag.name)}-${String(suffix)}`
+    }
     slugs.add(slug)
 
     // Ein Cover ist besser als eine Buchstabenkachel – also das erste Buch der
     // Reihe nehmen, das eins hat.
-    const cover = gruppe.find((book) => book.cover !== null) ?? gruppe[0]!
-    series.push({ slug, name, books: gruppe, cover })
+    const cover = eintrag.books.find((book) => book.cover !== null) ?? eintrag.books[0]!
+    series.push({ slug, name: eintrag.name, books: eintrag.books, cover })
   }
 
-  // Einzelne Hörbücher ans Ende: Sie sind eine Restekiste, keine Reihe.
-  return series.sort((a, b) => {
-    if ((a.name === OHNE_REIHE) !== (b.name === OHNE_REIHE)) return a.name === OHNE_REIHE ? 1 : -1
-    return a.name.localeCompare(b.name, 'de')
-  })
+  return series
+}
+
+/** Wie viele echte Reihen die Bibliothek hat – Einzelbücher zählen nicht mit. */
+export function countSeries(books: readonly Book[]): number {
+  const namen = new Set<string>()
+  for (const book of books) {
+    const name = seriesName(book)
+    if (name !== null) namen.add(name)
+  }
+  return namen.size
 }
 
 export function findSeries(books: readonly Book[], slug: string): Series | null {
   return buildSeries(books).find((series) => series.slug === slug) ?? null
 }
 
-/** Die Reihe, in der ein Buch steht – für den Weg zurück von der Buchseite. */
+/**
+ * Die Reihe, in der ein Buch steht – für den Weg zurück von der Buchseite.
+ *
+ * Gesucht wird über die Zugehörigkeit, nicht über den Namen: Ein Einzelbuch
+ * trägt seinen Titel als Namen, und der kann derselbe sein wie der einer Reihe.
+ */
 export function seriesOf(books: readonly Book[], book: Book): Series | null {
-  const name = seriesName(book)
-  return buildSeries(books).find((series) => series.name === name) ?? null
+  return (
+    buildSeries(books).find((series) => series.books.some((entry) => entry.id === book.id)) ??
+    null
+  )
 }
 
 export interface BookGroup {

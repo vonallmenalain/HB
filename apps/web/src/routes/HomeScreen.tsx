@@ -18,10 +18,15 @@ import { Spinner } from '@/ui/Spinner'
 /**
  * Die Startseite.
  *
- * Von oben nach unten: wer hier hört, wo es weitergeht, was gemerkt ist, was
- * dazu passt – und ganz unten die ganze Bibliothek, Reihe für Reihe. Die
- * Reihenfolge ist die Antwort auf „was will ein Kind, das die App öffnet":
- * weiterhören, fast immer.
+ * Von oben nach unten: wer hier hört, wo es weitergeht, was sonst noch
+ * angefangen ist, was gemerkt ist, was dazu passt – und ganz unten die ganze
+ * Bibliothek, Reihe für Reihe. Die Reihenfolge ist die Antwort auf „was will
+ * ein Kind, das die App öffnet": weiterhören, fast immer.
+ *
+ * Deshalb steht „Weiterhören" zweimal da: einmal gross für das zuletzt gehörte
+ * Buch – ein Tap, und es läuft – und einmal als Abschnitt für alles andere, das
+ * angefangen ist. Ein zweiter Name dafür („Zuletzt gehört") sagte dasselbe mit
+ * anderen Worten und liess offen, was beim Antippen passiert.
  *
  * Unten stand früher ein Ausschnitt mit den sechs neuesten Folgen und darunter
  * ein Knopf in die Bibliothek. Am ersten Tag – ohne Weiterhören, ohne
@@ -35,7 +40,9 @@ export function HomeScreen() {
   const { entries, reset } = useProgress()
   const { ids: favoriten } = useFavorites()
 
-  const zuletzt = pickRecent([...entries.values()], (id) => bookById(id) !== undefined, 5)
+  // Ohne Obergrenze im Aufruf: Wie viele Kacheln „Weiterhören" verträgt, steht
+  // bei der Liste selbst (`CONTINUE_LIMIT`) und nicht hier.
+  const zuletzt = pickRecent([...entries.values()], (id) => bookById(id) !== undefined)
   const weiter = zuletzt[0] ?? null
   const weiterBuch = weiter ? bookById(weiter.bookId) : undefined
 
@@ -104,11 +111,15 @@ export function HomeScreen() {
         />
       ) : null}
 
-      {/* Nur hier steht ein Kreuz an den Kacheln: „Zuletzt gehört" ist eine
-          Liste, die das Kind selbst gefüllt hat – Gemerktes nimmt der Stern
-          zurück, und Vorschläge kommen und gehen ohnehin von allein. */}
+      {/* Alles, was oben nicht die grosse Kachel geworden ist – dieselbe Liste,
+          derselbe Name: Was angefangen ist, steht unter „Weiterhören", egal ob
+          gross oben oder klein darunter.
+
+          Nur hier steht ein Kreuz an den Kacheln: Diese Liste hat das Kind
+          selbst gefüllt – Gemerktes nimmt der Stern zurück, und Vorschläge
+          kommen und gehen ohnehin von allein. */}
       <BookShelf
-        title="Zuletzt gehört"
+        title="Weiterhören"
         books={weitereAngefangene}
         onRemove={(book) => {
           reset(book.id)
