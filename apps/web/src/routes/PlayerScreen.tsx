@@ -82,11 +82,13 @@ export function PlayerScreen() {
         durationSec={book.durationSec}
         onSeek={player.seekTo}
         label="Stelle im Hörbuch"
+        footer={
+          <div className="flex justify-between pb-8 tabular-nums text-ink-soft">
+            <span>{formatTime(player.positionSec)}</span>
+            <span>{formatCountdown(remaining)}</span>
+          </div>
+        }
       />
-      <div className="flex justify-between pb-8 tabular-nums text-ink-soft">
-        <span>{formatTime(player.positionSec)}</span>
-        <span>{formatCountdown(remaining)}</span>
-      </div>
 
       {/*
         Zwei Zeilen statt einer: Fünf Knöpfe nebeneinander bräuchten 368px plus
