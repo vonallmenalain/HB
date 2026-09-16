@@ -54,9 +54,19 @@ export function parseAgeYears(raw: unknown): number | null {
   return gerundet
 }
 
-/** `0` → „ohne Altersfreigabe“, `12` → „ab 12 Jahren“. */
+/** `0` → „Ohne Altersfreigabe“, `12` → „Ab 12 Jahren“. */
 export function ageLabel(minAge: number): string {
   return minAge <= 0 ? 'Ohne Altersfreigabe' : `Ab ${String(minAge)} Jahren`
+}
+
+/**
+ * Dasselbe mitten im Satz: „… stehen jetzt ohne Altersfreigabe".
+ *
+ * Nicht mit `toLowerCase()` aus {@link ageLabel} gebildet: Daraus würde
+ * „ab 12 jahren", und Jahre sind ein Hauptwort.
+ */
+export function ageLabelInSentence(minAge: number): string {
+  return minAge <= 0 ? 'ohne Altersfreigabe' : `ab ${String(minAge)} Jahren`
 }
 
 export function minAgeOf(ages: BookAges, bookId: string): number {

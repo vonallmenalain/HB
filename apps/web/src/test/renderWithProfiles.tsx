@@ -288,6 +288,7 @@ export function makeAgesValue(overrides: Partial<AgesContextValue> = {}): AgesCo
   return {
     ages: new Map(),
     setMinAge: vi.fn().mockResolvedValue(undefined),
+    setMinAges: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   }
 }

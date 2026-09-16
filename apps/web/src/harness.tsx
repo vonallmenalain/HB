@@ -177,7 +177,20 @@ const TITLES: [string, string | null, string | null][] = [
   ['Französisch', null, null],
 ]
 
-const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
+/**
+ * Eine lange Reihe, damit sich die Altersfreigabe im Adminbereich ansehen
+ * lässt: Der interessante Fall dort sind zweihundert Folgen, nicht drei.
+ */
+const LANGE_REIHE: [string, string | null, string | null][] = Array.from(
+  { length: 60 },
+  (_, i) => [
+    `Die drei ??? - ${String(i + 1).padStart(3, '0')} - Fall ${String(i + 1)}`,
+    'Die drei ???',
+    null,
+  ],
+)
+
+const rohBooks: Book[] = [...TITLES, ...LANGE_REIHE].map(([folderName, series, group], i) => ({
   id: `b_${String(i)}`,
   title: folderName,
   folderName,
@@ -188,6 +201,7 @@ const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
   narrator: null,
   durationSec: 3600 + i * 900,
   cover: i === 4 ? null : `/cover/b_${String(i)}.jpg`,
+  // Zyklisch, damit die Liste auch für eine lange Reihe reicht.
   coverColor: [
     '#6d28d9',
     '#0369a1',
@@ -197,9 +211,9 @@ const rohBooks: Book[] = TITLES.map(([folderName, series, group], i) => ({
     '#4338ca',
     '#0f766e',
     '#7c2d12',
-  ][i]!,
+  ][i % 8]!,
   tags: [],
-  addedAt: `2026-${String(i + 1).padStart(2, '0')}-01T00:00:00.000Z`,
+  addedAt: `2026-${String((i % 12) + 1).padStart(2, '0')}-01T00:00:00.000Z`,
   filesHash: 'x',
   files: [
     { idx: 0, durationSec: 1800, bytes: 1, mime: 'audio/mpeg' },
@@ -427,17 +441,22 @@ function Harness() {
     remove: () => Promise.resolve(),
   }
 
-  const alterWert = {
-    ages: alter,
-    setMinAge: (bookId: string, minAge: number) => {
-      setAlter((vorher) => {
-        const next = new Map(vorher)
+  const setzeAlter = (bookIds: readonly string[], minAge: number): Promise<void> => {
+    setAlter((vorher) => {
+      const next = new Map(vorher)
+      for (const bookId of bookIds) {
         if (minAge <= 0) next.delete(bookId)
         else next.set(bookId, minAge)
-        return next
-      })
-      return Promise.resolve()
-    },
+      }
+      return next
+    })
+    return Promise.resolve()
+  }
+
+  const alterWert = {
+    ages: alter,
+    setMinAge: (bookId: string, minAge: number) => setzeAlter([bookId], minAge),
+    setMinAges: setzeAlter,
   }
 
   // Titel und Altersfreigaben wirken in der Vorschau sofort – wie in der App,
