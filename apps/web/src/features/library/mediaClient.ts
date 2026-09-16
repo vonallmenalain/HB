@@ -17,6 +17,14 @@ const REFRESH_MARGIN_MS = 10 * 60 * 1000
 interface StoredTicket {
   ticket: string
   expiresAt: number
+  /**
+   * Konto, für das der Dienst das Ticket ausgestellt hat.
+   *
+   * Ohne diese Angabe überlebt ein Ticket den Kontowechsel: Es liegt acht
+   * Stunden im Browser, der Dienst liest die UID aus dem Ticket – und wer sich
+   * danach anmeldet, erbt die Rechte des vorherigen Kontos.
+   */
+  uid: string
 }
 
 export type CatalogFetch =
@@ -44,6 +52,14 @@ export interface NasStatus {
   scanning: boolean
   books: number
   schemaVersion: number
+  /**
+   * Zeitpunkt des Katalogs, den der Dienst gerade ausliefert.
+   *
+   * Der einzige Beleg dafür, dass ein Scan wirklich durchgelaufen ist: Ein
+   * gescheiterter lässt den bisherigen Katalog stehen – und damit auch diesen
+   * Zeitpunkt. `null`, wenn ein älterer Dienst ihn nicht mitschickt.
+   */
+  scannedAt: string | null
 }
 
 export interface MediaClient {
@@ -90,8 +106,16 @@ function readStoredTicket(): StoredTicket | null {
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as Partial<StoredTicket>
-    if (typeof parsed.ticket !== 'string' || typeof parsed.expiresAt !== 'number') return null
-    return { ticket: parsed.ticket, expiresAt: parsed.expiresAt }
+    if (
+      typeof parsed.ticket !== 'string' ||
+      typeof parsed.expiresAt !== 'number' ||
+      // Ältere Stände kannten die UID noch nicht. Dann lieber ein neues Ticket
+      // holen als eines benutzen, dessen Konto niemand kennt.
+      typeof parsed.uid !== 'string'
+    ) {
+      return null
+    }
+    return { ticket: parsed.ticket, expiresAt: parsed.expiresAt, uid: parsed.uid }
   } catch {
     return null
   }
@@ -100,15 +124,28 @@ function readStoredTicket(): StoredTicket | null {
 export function createMediaClient(options: {
   baseUrl: string
   getIdToken: () => Promise<string | null>
+  /** UID des angemeldeten Kontos, oder null. Bindet das Ticket an dieses Konto. */
+  accountId: () => string | null
   fetchImpl?: typeof fetch
   now?: () => number
 }): MediaClient {
-  const { baseUrl, getIdToken } = options
+  const { baseUrl, getIdToken, accountId } = options
   const doFetch = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
   const now = options.now ?? Date.now
 
   let stored: StoredTicket | null = readStoredTicket()
   let inFlight: Promise<string> | null = null
+
+  /**
+   * Das gespeicherte Ticket, sofern es dem angemeldeten Konto gehört.
+   *
+   * Ein fremdes Ticket ist hier kein „fast gültiges" – es ist keines. Nach
+   * einer Abmeldung gehört es niemandem mehr.
+   */
+  function ownTicket(): StoredTicket | null {
+    const uid = accountId()
+    return stored !== null && uid !== null && stored.uid === uid ? stored : null
+  }
 
   function isFresh(ticket: StoredTicket | null): ticket is StoredTicket {
     return ticket !== null && ticket.expiresAt - now() > REFRESH_MARGIN_MS
@@ -120,8 +157,9 @@ export function createMediaClient(options: {
   }
 
   async function requestTicket(): Promise<string> {
+    const uid = accountId()
     const idToken = await getIdToken()
-    if (idToken === null) throw new MediaRequestError('not-signed-in')
+    if (idToken === null || uid === null) throw new MediaRequestError('not-signed-in')
 
     let response: Response
     try {
@@ -141,13 +179,14 @@ export function createMediaClient(options: {
       throw new MediaRequestError('malformed')
     }
 
-    stored = { ticket: body.ticket, expiresAt: Date.parse(body.expiresAt) }
+    stored = { ticket: body.ticket, expiresAt: Date.parse(body.expiresAt), uid }
     writeLocal(TICKET_KEY, JSON.stringify(stored))
     return stored.ticket
   }
 
   async function ensureTicket(): Promise<string> {
-    if (isFresh(stored)) return stored.ticket
+    const eigenes = ownTicket()
+    if (isFresh(eigenes)) return eigenes.ticket
     // Mehrere gleichzeitige Aufrufe teilen sich eine Anfrage.
     inFlight ??= requestTicket().finally(() => {
       inFlight = null
@@ -277,22 +316,27 @@ export function createMediaClient(options: {
     ) {
       throw new MediaRequestError('malformed')
     }
-    return { scanning: body.scanning, books: body.books, schemaVersion: body.schemaVersion }
+    return {
+      scanning: body.scanning,
+      books: body.books,
+      schemaVersion: body.schemaVersion,
+      scannedAt: typeof body.scannedAt === 'string' ? body.scannedAt : null,
+    }
   }
 
   return {
     ensureTicket,
     // Auch ein bald ablaufendes Ticket ist brauchbar – der Dienst entscheidet.
-    currentTicket: () => stored?.ticket ?? null,
+    currentTicket: () => ownTicket()?.ticket ?? null,
     fetchCatalog,
     startRescan,
     fetchStatus,
     coverUrl: (coverPath) => {
-      const ticket = stored?.ticket
+      const ticket = ownTicket()?.ticket
       return ticket === undefined ? null : withTicket(coverPath, ticket)
     },
     audioUrl: (bookId, fileIdx) => {
-      const ticket = stored?.ticket
+      const ticket = ownTicket()?.ticket
       return ticket === undefined
         ? null
         : withTicket(`/audio/${bookId}/${String(fileIdx)}`, ticket)

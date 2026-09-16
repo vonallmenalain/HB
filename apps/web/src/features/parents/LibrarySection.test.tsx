@@ -29,12 +29,24 @@ function makeClient(verlauf: NasStatus[], overrides: Partial<MediaClient> = {}):
   } as MediaClient
 }
 
-const status = (overrides: Partial<NasStatus> = {}): NasStatus => ({
-  scanning: false,
-  books: 10,
-  schemaVersion: 2,
-  ...overrides,
-})
+/**
+ * Jeder Aufruf steht für einen anderen Zeitpunkt.
+ *
+ * Genau wie beim echten Dienst: Ein durchgelaufener Scan hinterlässt einen
+ * neuen Katalog-Zeitstempel. Bleibt er gleich, hat der Scan nichts hinterlassen
+ * – und das soll die App auch so sagen.
+ */
+let uhr = 0
+const status = (overrides: Partial<NasStatus> = {}): NasStatus => {
+  uhr += 1
+  return {
+    scanning: false,
+    books: 10,
+    schemaVersion: 2,
+    scannedAt: `2026-02-01T10:0${String(uhr)}:00.000Z`,
+    ...overrides,
+  }
+}
 
 function zeigen(overrides: Partial<LibraryContextValue> = {}) {
   const value = makeLibraryValue({ books: [makeBook()], ...overrides })
@@ -135,12 +147,26 @@ describe('Neue Hörbücher suchen', () => {
   })
 
   it('sagt es auch, wenn nichts dazugekommen ist', async () => {
-    const client = makeClient([status({ books: 10 })])
+    const client = makeClient([status({ books: 10 }), status({ books: 10 })])
     zeigen({ client })
 
     await suchen()
 
     expect(screen.getByText(/nichts Neues gefunden/)).toBeInTheDocument()
+  })
+
+  it('behauptet nicht „fertig", wenn der Scan nichts hinterlassen hat', async () => {
+    // Scheitert der Scan auf dem NAS, steht `scanning` wieder auf false und
+    // der alte Katalog bleibt stehen. Ohne diesen Blick auf den Zeitstempel
+    // läse man „nichts Neues gefunden" und suchte den Fehler beim Ordner.
+    const stehengeblieben = status({ books: 10 })
+    const client = makeClient([stehengeblieben, { ...stehengeblieben }])
+    const value = zeigen({ client, refresh: vi.fn() })
+
+    await suchen()
+
+    expect(screen.getByRole('alert')).toHaveTextContent('nicht abgeschlossen')
+    expect(value.refresh).not.toHaveBeenCalled()
   })
 
   it('zeigt bei fehlender Berechtigung auf die richtige Variable', async () => {

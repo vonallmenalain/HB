@@ -86,11 +86,12 @@ describe('Katalog-Vertrag', () => {
     const { createMediaClient } = await import('./mediaClient')
     window.localStorage.setItem(
       'hb.mediaTicket',
-      JSON.stringify({ ticket: 'T', expiresAt: Date.now() + 3_600_000 }),
+      JSON.stringify({ ticket: 'T', expiresAt: Date.now() + 3_600_000, uid: 'u1' }),
     )
     const client = createMediaClient({
       baseUrl: 'https://media.example.com',
       getIdToken: () => Promise.resolve(null),
+      accountId: () => 'u1',
     })
 
     expect(client.coverUrl('/cover/b_1.jpg?v=abcd1234')).toBe(

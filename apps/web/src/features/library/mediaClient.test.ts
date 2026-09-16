@@ -37,13 +37,30 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function makeClient(fetchImpl: typeof fetch, idToken: string | null = 'ID-TOKEN') {
+function makeClient(
+  fetchImpl: typeof fetch,
+  idToken: string | null = 'ID-TOKEN',
+  accountId: string | null = 'u1',
+) {
   return createMediaClient({
     baseUrl: BASE,
     getIdToken: () => Promise.resolve(idToken),
+    accountId: () => accountId,
     fetchImpl,
     now: () => NOW,
   })
+}
+
+/** Ein Ticket, wie es ein früherer Besuch hinterlassen hätte. */
+function speichere(ticket: string, uid: string | null, hoursValid = 8): void {
+  window.localStorage.setItem(
+    'hb.mediaTicket',
+    JSON.stringify({
+      ticket,
+      expiresAt: NOW + hoursValid * 3600_000,
+      ...(uid === null ? {} : { uid }),
+    }),
+  )
 }
 
 describe('Ticket holen', () => {
@@ -199,8 +216,49 @@ describe('Adressen', () => {
   })
 })
 
+describe('Ticket und Konto', () => {
+  it('benutzt ein gespeichertes Ticket weiter, solange dasselbe Konto angemeldet ist', async () => {
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>()
+
+    expect(await makeClient(fetchImpl, 'ID-TOKEN', 'u1').ensureTicket()).toBe('ALT')
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('holt nach einem Kontowechsel ein neues Ticket', async () => {
+    // Sonst erbt das zweite Konto bis zu acht Stunden lang die Rechte des
+    // ersten – der Dienst liest die UID aus dem Ticket, nicht aus der Anmeldung.
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+
+    expect(await makeClient(fetchImpl, 'ID-TOKEN', 'u2').ensureTicket()).toBe('TICKET-1')
+  })
+
+  it('gibt ohne angemeldetes Konto keine Adresse mit fremdem Ticket heraus', () => {
+    speichere('ALT', 'u1')
+    const client = makeClient(vi.fn<typeof fetch>(), null, null)
+
+    expect(client.currentTicket()).toBeNull()
+    expect(client.audioUrl('b_1', 0)).toBeNull()
+    expect(client.coverUrl('/cover/b_1.jpg')).toBeNull()
+  })
+
+  it('verwirft ein Ticket aus einem älteren Stand ohne Konto-Angabe', async () => {
+    speichere('ALT', null)
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+
+    expect(await makeClient(fetchImpl).ensureTicket()).toBe('TICKET-1')
+  })
+})
+
 describe('Neu einlesen anstossen', () => {
-  const healthBody = { ok: true, scanning: false, books: 12, schemaVersion: 2 }
+  const healthBody = {
+    ok: true,
+    scanning: false,
+    books: 12,
+    schemaVersion: 2,
+    scannedAt: '2026-02-01T10:00:00.000Z',
+  }
 
   it('schickt das Ticket an /admin/rescan', async () => {
     const fetchImpl = vi
@@ -255,6 +313,7 @@ describe('Neu einlesen anstossen', () => {
       scanning: false,
       books: 12,
       schemaVersion: 2,
+      scannedAt: '2026-02-01T10:00:00.000Z',
     })
     expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(`${BASE}/health`)
   })

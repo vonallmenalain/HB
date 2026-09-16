@@ -32,6 +32,8 @@ function rescanMessage(state: RescanState): string | null {
       return state.neu === 1
         ? 'Fertig – 1 neues Hörbuch ist dazugekommen.'
         : `Fertig – ${String(state.neu)} neue Hörbücher sind dazugekommen.`
+    case 'incomplete':
+      return 'Das NAS hat das Einlesen nicht abgeschlossen – der Katalog ist unverändert. Woran es lag, steht im Protokoll des Containers.'
     case 'still-running':
       return 'Das Einlesen dauert länger als gewöhnlich. Es läuft weiter; die neuen Hörbücher erscheinen von allein.'
     case 'failed':
@@ -97,7 +99,7 @@ export function LibrarySection() {
       ) : null}
 
       {rescanMessage(rescan) !== null ? (
-        <Notice tone={rescan.kind === 'failed' ? 'error' : 'info'}>
+        <Notice tone={rescan.kind === 'failed' || rescan.kind === 'incomplete' ? 'error' : 'info'}>
           {rescanMessage(rescan)}
         </Notice>
       ) : null}

@@ -4,6 +4,7 @@ import {
   type MediaClient,
   type MediaError,
   MediaRequestError,
+  type NasStatus,
 } from '@/features/library/mediaClient'
 
 /** Abstand zwischen zwei Blicken auf `/health`, solange ein Scan läuft. */
@@ -26,6 +27,8 @@ export type RescanState =
   | { kind: 'running' }
   | { kind: 'done'; neu: number; gesamt: number }
   | { kind: 'still-running' }
+  /** Der Scan endete, ohne einen neuen Katalog zu hinterlassen. */
+  | { kind: 'incomplete' }
   | { kind: 'failed'; reason: MediaError }
 
 function reasonOf(error: unknown): MediaError {
@@ -73,9 +76,9 @@ export function useRescan(
     setState({ kind: 'running' })
 
     void (async () => {
-      let vorher: number
+      let vorher: NasStatus
       try {
-        vorher = (await client.fetchStatus()).books
+        vorher = await client.fetchStatus()
         await client.startRescan()
       } catch (error) {
         if (lebt.current) setState({ kind: 'failed', reason: reasonOf(error) })
@@ -89,12 +92,9 @@ export function useRescan(
         await sleep(PROBE_INTERVAL_MS)
         if (!lebt.current) return
 
-        let scanning: boolean
-        let books: number
+        let jetzt: NasStatus
         try {
-          const status = await client.fetchStatus()
-          scanning = status.scanning
-          books = status.books
+          jetzt = await client.fetchStatus()
           fehlversuche = 0
         } catch (error) {
           // Ein einzelner Aussetzer während eines langen Scans ist normal –
@@ -105,11 +105,28 @@ export function useRescan(
           return
         }
 
-        if (scanning) continue
+        if (jetzt.scanning) continue
+
+        // Ein gescheiterter Scan endet genauso still wie ein erfolgreicher:
+        // `scanning` steht wieder auf false, nur der Katalog ist der alte. Wer
+        // dann „Fertig" liest, sucht den fehlenden Ordner an der falschen
+        // Stelle – deshalb zählt nur ein neuer Zeitstempel als Erfolg.
+        if (
+          vorher.scannedAt !== null &&
+          jetzt.scannedAt !== null &&
+          jetzt.scannedAt === vorher.scannedAt
+        ) {
+          if (lebt.current) setState({ kind: 'incomplete' })
+          return
+        }
 
         refresh()
         if (lebt.current) {
-          setState({ kind: 'done', neu: Math.max(books - vorher, 0), gesamt: books })
+          setState({
+            kind: 'done',
+            neu: Math.max(jetzt.books - vorher.books, 0),
+            gesamt: jetzt.books,
+          })
         }
         return
       }
