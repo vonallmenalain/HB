@@ -268,8 +268,8 @@ Anfangsbuchstaben – nie ein leeres graues Rechteck.
  │      Der Super-Papagei        │
  │          Kapitel 4            │
  │                               │
- │  ███████●░░░░░░░░░░░░░░░░░░░  │   ← tippen oder ziehen = spulen
- │  12:04                -18:22  │
+ │  🔒  ███████░░░░░░░░░░░░░░░░  │   ← Riegel auf = spulen, sonst nur Anzeige
+ │      12:04            -18:22  │
  │                               │
  │  |<    -30s    >    +30s   >| │
  │  64px   64px  112px  64px     │
@@ -304,12 +304,28 @@ Wer eine bestimmte Stelle sucht, tippt sonst minutenlang auf ⏪. Seit M9 lässt
 sich hineintippen und ziehen; die ±30-Sekunden-Knöpfe bleiben genau so, wie sie
 waren.
 
-Die ursprüngliche Sorge bleibt berechtigt und wird anders beantwortet als durch
-Weglassen: Der Fortschritt wird laufend gesichert, ein Sprung ist mit demselben
-Balken sofort rückgängig zu machen, und die Fläche zum Ziehen ist ein volles
-Touch-Ziel hoch – man trifft sie absichtlich, nicht im Vorbeiwischen. Technisch
-ist es ein `input[type=range]`: Tastatur und Vorleseprogramm können damit
-umgehen, ohne dass dafür etwas nachgebaut werden müsste.
+Die ursprüngliche Sorge bleibt berechtigt, und die erste Antwort darauf war
+falsch. Sie lautete: Die Fläche zum Ziehen ist ein volles Touch-Ziel hoch, man
+trifft sie also absichtlich und nicht im Vorbeiwischen. Im Gebrauch stimmt genau
+das nicht – ein Touch-Ziel über die ganze Breite streift jeder, der das Gerät in
+der Hand hält, und bei einem Hörbuch von zehn Stunden ist die Stelle danach weg:
+Der Fortschritt wird ja laufend gesichert, und gesichert wird dann die falsche.
+
+**Deshalb liegt der Balken hinter einem Riegel.** Gesperrt zeigt er nur an – die
+Füllung bleibt voll ablesbar, es fehlt der Griff. Ein Tap auf den Riegel gibt
+ihn frei; danach bleibt er offen, solange man ihn bedient, und schliesst sich
+nach zwanzig Sekunden ohne Bedienung von selbst. Ohne dieses Zufallen wäre die
+Sperre nach dem ersten Mal für immer weg.
+
+Zwei Schritte statt einem sind hier kein Umweg, sondern der Zweck: Spulen ist
+eine Absicht, kein Nebenprodukt des Haltens. Die ±30-Sekunden-Knöpfe bleiben
+frei bedienbar – sie kosten im schlimmsten Fall dreissig Sekunden, nicht die
+Stelle.
+
+Technisch ist es ein `input[type=range]` mit `disabled`: Tastatur und
+Vorleseprogramm können damit umgehen, ohne dass dafür etwas nachgebaut werden
+müsste. Der Tap auf den Riegel setzt den Tastaturfokus auf den Balken – sonst
+führte mit der Tastatur kein Weg dorthin.
 
 **Warum zwei Bedienzeilen statt einer:** Fünf Knöpfe nebeneinander brauchen
 368 px, plus die oben geforderten 16 px Abstand zwischen tappbaren Elementen

@@ -91,13 +91,38 @@ describe('Player', () => {
     expect(balken).toHaveAttribute('aria-valuetext', '15:00 von 30:00')
   })
 
-  it('springt beim Loslassen an die gezogene Stelle', () => {
+  it('lässt sich nicht bedienen, bevor der Riegel offen ist', async () => {
+    // Der Balken ist ein Touch-Ziel über die ganze Breite. Wer den Player in
+    // der Hand hält, streift ihn – und bei zehn Stunden Hörbuch weiss danach
+    // niemand mehr, wo er war.
     const seekTo = vi.fn()
+    const user = userEvent.setup()
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/player/b_1',
       library: makeLibraryValue({ books: [BOOK] }),
       player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800, seekTo }),
     })
+
+    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
+    expect(balken).toBeDisabled()
+
+    await user.click(balken)
+    expect(seekTo).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Spulen freigeben' }))
+    expect(balken).toBeEnabled()
+  })
+
+  it('springt beim Loslassen an die gezogene Stelle', async () => {
+    const seekTo = vi.fn()
+    const user = userEvent.setup()
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [BOOK] }),
+      player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800, seekTo }),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Spulen freigeben' }))
 
     const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
     fireEvent.change(balken, { target: { value: '1200' } })
@@ -108,6 +133,7 @@ describe('Player', () => {
     fireEvent.pointerUp(balken)
     expect(seekTo).toHaveBeenCalledWith(1200)
   })
+
 })
 
 describe('Weiterhören-Kachel', () => {
