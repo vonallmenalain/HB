@@ -72,18 +72,17 @@ services:
   # Holt neue Images von selbst und startet hb-media damit neu – für ein NAS,
   # auf dem noch kein Wächter läuft.
   #
-  # Im Profil `waechter`, weil ein zweiter Wächter neben einem bestehenden
-  # nichts besser macht: Er bräuchte noch einmal den Docker-Socket, und beide
-  # würden dasselbe Image ziehen. Wo schon einer läuft, genügt meist das Label
-  # an hb-media weiter oben – „meist", weil ein Wächter auch auf bestimmte
-  # Container oder einen Scope eingeschränkt sein kann und das Label dann nicht
-  # hilft. Was er wirklich beobachtet, verraten seine Argumente:
+  # Im Profil `waechter`, weil er nur dort hingehört, wo noch gar kein Wächter
+  # läuft. Wo einer läuft, erfasst er hb-media meist ohnehin – ohne Filter
+  # nimmt Watchtower alle Container mit, und mit `--label-enable` greift das
+  # Label oben. Ob er es tut, verraten Argumente und Umgebung zusammen:
   #
   #   docker ps --filter ancestor=containrrr/watchtower --format '{{.Names}}'
-  #   docker inspect <name> --format '{{join .Config.Cmd " "}}'
+  #   docker inspect <name> --format 'CMD: {{join .Config.Cmd " "}}
+  #   ENV: {{join .Config.Env " "}}'
   #
-  # Nur mit `--label-enable`, ohne Container-Namen und ohne `--scope` nimmt er
-  # hb-media mit; sonst hier das Profil starten (docs/QNAP-SETUP.md §9).
+  # Erfasst er hb-media nicht (eigene Namensliste, `--scope`), gehört das dort
+  # geradegerückt und nicht hier (docs/QNAP-SETUP.md §9).
   #
   # Nie zwei Wächter nebeneinander: Watchtower sucht beim Start nach weiteren
   # Instanzen und stoppt sie. Aus einem zweiten Wächter für hb-media wird so
