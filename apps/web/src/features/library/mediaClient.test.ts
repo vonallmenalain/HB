@@ -37,13 +37,30 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-function makeClient(fetchImpl: typeof fetch, idToken: string | null = 'ID-TOKEN') {
+function makeClient(
+  fetchImpl: typeof fetch,
+  idToken: string | null = 'ID-TOKEN',
+  accountId: string | null = 'u1',
+) {
   return createMediaClient({
     baseUrl: BASE,
     getIdToken: () => Promise.resolve(idToken),
+    accountId: () => accountId,
     fetchImpl,
     now: () => NOW,
   })
+}
+
+/** Ein Ticket, wie es ein früherer Besuch hinterlassen hätte. */
+function speichere(ticket: string, uid: string | null, hoursValid = 8): void {
+  window.localStorage.setItem(
+    'hb.mediaTicket',
+    JSON.stringify({
+      ticket,
+      expiresAt: NOW + hoursValid * 3600_000,
+      ...(uid === null ? {} : { uid }),
+    }),
+  )
 }
 
 describe('Ticket holen', () => {
@@ -196,5 +213,116 @@ describe('Adressen', () => {
     const client = makeClient(vi.fn<typeof fetch>())
     expect(client.audioUrl('b_1', 0)).toBeNull()
     expect(client.coverUrl('/cover/b_1.jpg')).toBeNull()
+  })
+})
+
+describe('Ticket und Konto', () => {
+  it('benutzt ein gespeichertes Ticket weiter, solange dasselbe Konto angemeldet ist', async () => {
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>()
+
+    expect(await makeClient(fetchImpl, 'ID-TOKEN', 'u1').ensureTicket()).toBe('ALT')
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('holt nach einem Kontowechsel ein neues Ticket', async () => {
+    // Sonst erbt das zweite Konto bis zu acht Stunden lang die Rechte des
+    // ersten – der Dienst liest die UID aus dem Ticket, nicht aus der Anmeldung.
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+
+    expect(await makeClient(fetchImpl, 'ID-TOKEN', 'u2').ensureTicket()).toBe('TICKET-1')
+  })
+
+  it('gibt ohne angemeldetes Konto keine Adresse mit fremdem Ticket heraus', () => {
+    speichere('ALT', 'u1')
+    const client = makeClient(vi.fn<typeof fetch>(), null, null)
+
+    expect(client.currentTicket()).toBeNull()
+    expect(client.audioUrl('b_1', 0)).toBeNull()
+    expect(client.coverUrl('/cover/b_1.jpg')).toBeNull()
+  })
+
+  it('verwirft ein Ticket aus einem älteren Stand ohne Konto-Angabe', async () => {
+    speichere('ALT', null)
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+
+    expect(await makeClient(fetchImpl).ensureTicket()).toBe('TICKET-1')
+  })
+})
+
+describe('Neu einlesen anstossen', () => {
+  const healthBody = {
+    ok: true,
+    scanning: false,
+    books: 12,
+    schemaVersion: 2,
+    scannedAt: '2026-02-01T10:00:00.000Z',
+  }
+
+  it('schickt das Ticket an /admin/rescan', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ started: true }, { status: 202 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('started')
+
+    const [url, init] = fetchImpl.mock.calls[1]!
+    expect(url).toBe(`${BASE}/admin/rescan?t=TICKET-1`)
+    expect(init?.method).toBe('POST')
+  })
+
+  it('nimmt einen schon laufenden Scan als Erfolg', async () => {
+    // 409 heisst „liest bereits" – genau das, was der Aufrufer wollte.
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'scan_running' }, { status: 409 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('already-running')
+  })
+
+  it('holt bei abgelaufenem Ticket ein neues und wiederholt', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'ticket_invalid' }, { status: 401 }))
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ started: true }, { status: 202 }))
+
+    expect(await makeClient(fetchImpl).startRescan()).toBe('started')
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
+  })
+
+  it('unterscheidet ein nicht berechtigtes Konto vom Serverfehler', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'not_admin' }, { status: 403 }))
+
+    await expect(makeClient(fetchImpl).startRescan()).rejects.toMatchObject({
+      reason: 'forbidden',
+    })
+  })
+
+  it('liest den Zustand aus /health – ohne Ticket', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(healthBody))
+
+    expect(await makeClient(fetchImpl).fetchStatus()).toEqual({
+      scanning: false,
+      books: 12,
+      schemaVersion: 2,
+      scannedAt: '2026-02-01T10:00:00.000Z',
+    })
+    expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(`${BASE}/health`)
+  })
+
+  it('meldet eine unverständliche Antwort, statt sie zu glauben', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ok: true }))
+
+    await expect(makeClient(fetchImpl).fetchStatus()).rejects.toMatchObject({
+      reason: 'malformed',
+    })
   })
 })

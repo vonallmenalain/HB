@@ -204,6 +204,14 @@ const demoClient: LibraryContextValue['client'] = {
   ensureTicket: () => Promise.resolve('t'),
   currentTicket: () => 't',
   fetchCatalog: () => Promise.resolve({ status: 'not-modified' as const }),
+  startRescan: () => Promise.resolve('started' as const),
+  fetchStatus: () =>
+    Promise.resolve({
+      scanning: false,
+      books: demoBooks.length,
+      schemaVersion: 2,
+      scannedAt: new Date().toISOString(),
+    }),
   coverUrl: (path) => cover(Number(/b_(\d+)/.exec(path)?.[1] ?? 0) * 55),
   audioUrl: () => null,
   canonicalAudioUrl: () => '',
@@ -300,10 +308,11 @@ function Harness() {
     const client = createMediaClient({
       baseUrl: mediaBase,
       getIdToken: () => Promise.resolve(null),
+      accountId: () => 'harness',
     })
     window.localStorage.setItem(
       'hb.mediaTicket',
-      JSON.stringify({ ticket, expiresAt: Date.now() + 3_600_000 }),
+      JSON.stringify({ ticket, expiresAt: Date.now() + 3_600_000, uid: 'harness' }),
     )
 
     void (async () => {

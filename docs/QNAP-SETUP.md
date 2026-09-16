@@ -47,6 +47,14 @@ Was der Scanner daraus macht, steht in
 
 Der Dienst schreibt **nie** in diesen Ordner – er wird read-only eingehängt.
 
+**Später eine Reihe dazulegen.** Ordner aufs NAS kopieren, fertig – am Container
+ist nichts zu tun. Der Dienst sieht von selbst nach, standardmässig alle sechs
+Stunden (`HB_RESCAN_INTERVAL_MINUTES`). Wer nicht warten will, drückt im
+Elternbereich der App auf **Neue Hörbücher suchen**: Das stösst denselben
+Durchgang sofort an und sagt danach, wie viele dazugekommen sind. Nur beim
+allerersten Mal dauert es länger – jede neue Datei wird einmal ganz gelesen, um
+ihre Spieldauer zu bestimmen, danach steht das Ergebnis im Cache.
+
 ---
 
 ## 2. Geheimnis erzeugen
@@ -353,7 +361,8 @@ HB_IMAGE=ghcr.io/vonallmenalain/hb-media:1a2b3c4
 | `403` bei `/auth/session` | UID steht nicht in `HB_ALLOWED_UIDS` |
 | App zeigt Bücher, spielt aber nichts | Medien-Host fehlt in der CSP in `netlify.toml` |
 | Tunnel erreichbar, aber CORS-Fehler | `HB_ALLOWED_ORIGINS` stimmt nicht mit der App-Adresse überein |
-| Neue Bücher erscheinen nicht | `HB_RESCAN_INTERVAL_MINUTES` steht auf `0`, oder der Scan läuft noch (`/health` zeigt `scanning: true`) |
+| Neue Bücher erscheinen nicht | Im Elternbereich **Neue Hörbücher suchen** drücken. Bleibt es dabei: `HB_RESCAN_INTERVAL_MINUTES` steht auf `0`, oder der Scan läuft noch (`/health` zeigt `scanning: true`) |
+| **Neue Hörbücher suchen** meldet „darf das Einlesen nicht anstossen" | In `HB_ADMIN_UIDS` steht eine UID-Liste, in der dieses Konto fehlt – ergänzen oder die Variable leer lassen |
 
 Logs ansehen:
 

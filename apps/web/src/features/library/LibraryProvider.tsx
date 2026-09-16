@@ -47,6 +47,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
       baseUrl,
       getIdToken: async () =>
         authState.status === 'ready' ? await authState.user.getIdToken() : null,
+      accountId: () => (authState.status === 'ready' ? authState.user.uid : null),
     })
   }, [baseUrl, authState])
 

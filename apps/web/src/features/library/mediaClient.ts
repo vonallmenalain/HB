@@ -17,6 +17,14 @@ const REFRESH_MARGIN_MS = 10 * 60 * 1000
 interface StoredTicket {
   ticket: string
   expiresAt: number
+  /**
+   * Konto, für das der Dienst das Ticket ausgestellt hat.
+   *
+   * Ohne diese Angabe überlebt ein Ticket den Kontowechsel: Es liegt acht
+   * Stunden im Browser, der Dienst liest die UID aus dem Ticket – und wer sich
+   * danach anmeldet, erbt die Rechte des vorherigen Kontos.
+   */
+  uid: string
 }
 
 export type CatalogFetch =
@@ -38,12 +46,39 @@ export type MediaError =
   | 'malformed'
   | 'server'
 
+/** Was `/health` über den Dienst auf dem NAS sagt. */
+export interface NasStatus {
+  /** Läuft gerade ein Scan der Ordner? */
+  scanning: boolean
+  books: number
+  schemaVersion: number
+  /**
+   * Zeitpunkt des Katalogs, den der Dienst gerade ausliefert.
+   *
+   * Der einzige Beleg dafür, dass ein Scan wirklich durchgelaufen ist: Ein
+   * gescheiterter lässt den bisherigen Katalog stehen – und damit auch diesen
+   * Zeitpunkt. `null`, wenn ein älterer Dienst ihn nicht mitschickt.
+   */
+  scannedAt: string | null
+}
+
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
   /** Das zuletzt geholte Ticket, ohne Netzwerk – für `<audio src>`. */
   currentTicket: () => string | null
   fetchCatalog: (etag: string | null) => Promise<CatalogFetch>
+  /**
+   * Lässt den Dienst die Ordner neu einlesen.
+   *
+   * Nicht zu verwechseln mit `fetchCatalog`: Das holt nur, was der Dienst
+   * zuletzt gefunden hat. Ein Ordner, der seither aufs NAS kopiert wurde,
+   * taucht erst nach diesem Aufruf auf – oder wenn der Dienst von selbst
+   * wieder nachsieht, was standardmässig alle sechs Stunden passiert.
+   */
+  startRescan: () => Promise<'started' | 'already-running'>
+  /** Zustand des Dienstes. Braucht kein Ticket – für die Fortschrittsanzeige. */
+  fetchStatus: () => Promise<NasStatus>
   coverUrl: (coverPath: string) => string | null
   audioUrl: (bookId: string, fileIdx: number) => string | null
   /**
@@ -71,8 +106,16 @@ function readStoredTicket(): StoredTicket | null {
   if (raw === null) return null
   try {
     const parsed = JSON.parse(raw) as Partial<StoredTicket>
-    if (typeof parsed.ticket !== 'string' || typeof parsed.expiresAt !== 'number') return null
-    return { ticket: parsed.ticket, expiresAt: parsed.expiresAt }
+    if (
+      typeof parsed.ticket !== 'string' ||
+      typeof parsed.expiresAt !== 'number' ||
+      // Ältere Stände kannten die UID noch nicht. Dann lieber ein neues Ticket
+      // holen als eines benutzen, dessen Konto niemand kennt.
+      typeof parsed.uid !== 'string'
+    ) {
+      return null
+    }
+    return { ticket: parsed.ticket, expiresAt: parsed.expiresAt, uid: parsed.uid }
   } catch {
     return null
   }
@@ -81,15 +124,28 @@ function readStoredTicket(): StoredTicket | null {
 export function createMediaClient(options: {
   baseUrl: string
   getIdToken: () => Promise<string | null>
+  /** UID des angemeldeten Kontos, oder null. Bindet das Ticket an dieses Konto. */
+  accountId: () => string | null
   fetchImpl?: typeof fetch
   now?: () => number
 }): MediaClient {
-  const { baseUrl, getIdToken } = options
+  const { baseUrl, getIdToken, accountId } = options
   const doFetch = options.fetchImpl ?? globalThis.fetch.bind(globalThis)
   const now = options.now ?? Date.now
 
   let stored: StoredTicket | null = readStoredTicket()
   let inFlight: Promise<string> | null = null
+
+  /**
+   * Das gespeicherte Ticket, sofern es dem angemeldeten Konto gehört.
+   *
+   * Ein fremdes Ticket ist hier kein „fast gültiges" – es ist keines. Nach
+   * einer Abmeldung gehört es niemandem mehr.
+   */
+  function ownTicket(): StoredTicket | null {
+    const uid = accountId()
+    return stored !== null && uid !== null && stored.uid === uid ? stored : null
+  }
 
   function isFresh(ticket: StoredTicket | null): ticket is StoredTicket {
     return ticket !== null && ticket.expiresAt - now() > REFRESH_MARGIN_MS
@@ -101,8 +157,9 @@ export function createMediaClient(options: {
   }
 
   async function requestTicket(): Promise<string> {
+    const uid = accountId()
     const idToken = await getIdToken()
-    if (idToken === null) throw new MediaRequestError('not-signed-in')
+    if (idToken === null || uid === null) throw new MediaRequestError('not-signed-in')
 
     let response: Response
     try {
@@ -122,13 +179,14 @@ export function createMediaClient(options: {
       throw new MediaRequestError('malformed')
     }
 
-    stored = { ticket: body.ticket, expiresAt: Date.parse(body.expiresAt) }
+    stored = { ticket: body.ticket, expiresAt: Date.parse(body.expiresAt), uid }
     writeLocal(TICKET_KEY, JSON.stringify(stored))
     return stored.ticket
   }
 
   async function ensureTicket(): Promise<string> {
-    if (isFresh(stored)) return stored.ticket
+    const eigenes = ownTicket()
+    if (isFresh(eigenes)) return eigenes.ticket
     // Mehrere gleichzeitige Aufrufe teilen sich eine Anfrage.
     inFlight ??= requestTicket().finally(() => {
       inFlight = null
@@ -201,17 +259,84 @@ export function createMediaClient(options: {
     }
   }
 
+  /**
+   * Einmal wiederholen, wenn das Ticket abgelaufen war.
+   *
+   * Dasselbe Muster wie in `fetchCatalog`: Ein 401 heisst hier nicht „nicht
+   * erlaubt", sondern „das Ticket ist zu alt" – und dafür gibt es ein neues.
+   */
+  async function withFreshTicket(call: (ticket: string) => Promise<Response>): Promise<Response> {
+    const response = await call(await ensureTicket())
+    if (response.status !== 401) return response
+    forgetTicket()
+    return call(await ensureTicket())
+  }
+
+  async function startRescan(): Promise<'started' | 'already-running'> {
+    let response: Response
+    try {
+      response = await withFreshTicket((ticket) =>
+        doFetch(withTicket('/admin/rescan', ticket), { method: 'POST' }),
+      )
+    } catch (error) {
+      if (error instanceof MediaRequestError) throw error
+      throw new MediaRequestError('offline')
+    }
+
+    // Der Dienst liest schon – für den Aufrufer ist das kein Fehler, sondern
+    // genau das, was er wollte.
+    if (response.status === 409) return 'already-running'
+    if (response.status === 403) throw new MediaRequestError('forbidden')
+    if (response.status === 401) throw new MediaRequestError('unauthorized')
+    if (!response.ok) throw new MediaRequestError('server')
+    return 'started'
+  }
+
+  async function fetchStatus(): Promise<NasStatus> {
+    let response: Response
+    try {
+      response = await doFetch(`${baseUrl}/health`)
+    } catch {
+      throw new MediaRequestError('offline')
+    }
+    if (!response.ok) throw new MediaRequestError('server')
+
+    let raw: unknown
+    try {
+      raw = await response.json()
+    } catch {
+      throw new MediaRequestError('malformed')
+    }
+
+    const body = raw as Partial<Record<keyof NasStatus, unknown>>
+    if (
+      typeof body.scanning !== 'boolean' ||
+      typeof body.books !== 'number' ||
+      typeof body.schemaVersion !== 'number'
+    ) {
+      throw new MediaRequestError('malformed')
+    }
+    return {
+      scanning: body.scanning,
+      books: body.books,
+      schemaVersion: body.schemaVersion,
+      scannedAt: typeof body.scannedAt === 'string' ? body.scannedAt : null,
+    }
+  }
+
   return {
     ensureTicket,
     // Auch ein bald ablaufendes Ticket ist brauchbar – der Dienst entscheidet.
-    currentTicket: () => stored?.ticket ?? null,
+    currentTicket: () => ownTicket()?.ticket ?? null,
     fetchCatalog,
+    startRescan,
+    fetchStatus,
     coverUrl: (coverPath) => {
-      const ticket = stored?.ticket
+      const ticket = ownTicket()?.ticket
       return ticket === undefined ? null : withTicket(coverPath, ticket)
     },
     audioUrl: (bookId, fileIdx) => {
-      const ticket = stored?.ticket
+      const ticket = ownTicket()?.ticket
       return ticket === undefined
         ? null
         : withTicket(`/audio/${bookId}/${String(fileIdx)}`, ticket)
