@@ -72,12 +72,26 @@ services:
   # Holt neue Images von selbst und startet hb-media damit neu – für ein NAS,
   # auf dem noch kein Wächter läuft.
   #
-  # Im Profil `waechter`, weil ein zweiter Wächter neben einem bestehenden
-  # nichts besser macht: Er bräuchte noch einmal den Docker-Socket, und beide
-  # würden dasselbe Image ziehen. Wo schon einer läuft, genügt das Label an
-  # hb-media weiter oben. Welcher Fall zutrifft, verrät:
+  # Im Profil `waechter`, weil er nur dort hingehört, wo noch gar kein Wächter
+  # läuft. Wo einer läuft, erfasst er hb-media meist ohnehin – ohne Filter
+  # nimmt Watchtower alle Container mit, und mit `--label-enable` greift das
+  # Label oben. Ob er es tut, verraten Argumente und Umgebung zusammen:
   #
-  #   docker ps --filter ancestor=containrrr/watchtower
+  #   docker ps --filter ancestor=containrrr/watchtower --format '{{.Names}}'
+  #   docker inspect <name> --format 'CMD: {{join .Config.Cmd " "}}
+  #   ENV: {{join .Config.Env " "}}'
+  #
+  # Erfasst er hb-media nicht (eigene Namensliste, `--scope`), gehört das dort
+  # geradegerückt und nicht hier (docs/QNAP-SETUP.md §9).
+  #
+  # Nie zwei Wächter nebeneinander: Watchtower sucht beim Start nach weiteren
+  # Instanzen und stoppt sie. Aus einem zweiten Wächter für hb-media wird so
+  # ein Ausfall der Aktualisierung für alle anderen Dienste auf dem NAS –
+  #
+  #   msg="Found multiple running watchtower instances. Cleaning up."
+  #   msg="Stopping /manager-watchtower (0c9b877b08c4) with SIGTERM"
+  #
+  # und das fällt erst auf, wenn Wochen später irgendwo ein alter Stand läuft.
   #
   # Was der Wächter kostet, steht in docs/QNAP-SETUP.md §9: Er braucht den
   # Docker-Socket und darf damit alles, was Docker auf dem NAS darf.

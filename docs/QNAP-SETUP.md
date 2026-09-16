@@ -319,34 +319,79 @@ steht auch in der Zusammenfassung des GitHub-Laufs. `schemaVersion` sagt,
 welche Katalogform der Dienst liefert; die App zeigt im Elternbereich eine
 Warnung, solange dort noch `1` steht.
 
-**Welcher Wächter das ist, hängt vom NAS ab.** Ein Blick sagt es:
+**Welcher Wächter das ist, hängt vom NAS ab.** Erst die Frage, ob überhaupt
+einer läuft:
 
 ```bash
-docker ps --filter ancestor=containrrr/watchtower
+docker ps --filter ancestor=containrrr/watchtower --format '{{.Names}}'
 ```
 
-*Läuft dort schon einer* – etwa für andere Dienste auf demselben NAS –, dann
-genügt das Label, das `hb-media` in der `docker-compose.yml` trägt:
+**Kommt ein Name zurück**, lautet die einzige Frage: *Erfasst er `hb-media`?*
+Wie er das tut, ist gleichgültig – ein Wächter ohne Filter nimmt ohnehin alles
+mit. Seine Einstellungen können in den Argumenten **oder** in
+Umgebungsvariablen stehen, deshalb beides ansehen:
+
+```bash
+docker inspect manager-watchtower --format 'CMD: {{join .Config.Cmd " "}}
+ENV: {{join .Config.Env " "}}'
+# CMD: --interval 300 --label-enable --cleanup
+```
+
+| Was dort steht | Wen er erfasst | Und `hb-media`? |
+|---|---|---|
+| Container-Namen als Argumente | genau diese | nur, wenn `hb-media` dabeisteht |
+| `--label-enable` bzw. `WATCHTOWER_LABEL_ENABLE=true` | alle mit dem Label `…watchtower.enable=true` | ja – `hb-media` trägt es |
+| weder Namen noch `--label-enable` | **alle** laufenden Container | ja |
+| zusätzlich `--scope X` bzw. `WATCHTOWER_SCOPE=X` | nur mit `…watchtower.scope=X` | nein, solange `hb-media` das Scope-Label nicht trägt |
+
+Das Label, auf das sich die zweite Zeile bezieht, bringt `hb-media` aus der
+`docker-compose.yml` mit:
 
 ```yaml
 labels:
   com.centurylinklabs.watchtower.enable: 'true'
 ```
 
-Ein Wächter mit `--label-enable` fasst genau die Container an, die es tragen.
-Ein zweiter wäre nur ein zweites Programm mit Docker-Socket, das dasselbe
-Image zieht. Ob er das Label sieht:
-
 ```bash
 docker inspect hb-media --format '{{index .Config.Labels "com.centurylinklabs.watchtower.enable"}}'
 # true
 ```
 
-*Läuft keiner*, bringt die `docker-compose.yml` einen mit:
+**Erfasst er ihn, ist nichts weiter zu tun.** Kein zweiter Wächter – er wäre
+nicht nur ein zweites Programm mit Docker-Socket, er würde den ersten stoppen
+(Kasten unten).
+
+**Erfasst er ihn nicht**, gehört das beim bestehenden Wächter geradegerückt:
+`hb-media` in seine Namensliste aufnehmen, oder ihm das passende Scope-Label
+mitgeben – je nachdem, was die Tabelle oben ergeben hat.
+
+Die Gegenprobe, die nicht lügt, steht im Protokoll des Wächters: Er schreibt
+nach jedem Durchgang, wie viele Container er angesehen hat. Die Zahl muss nach
+dem Start von `hb-media` um eins höher sein als vorher.
+
+```bash
+docker logs --tail 20 manager-watchtower | grep -i scanned
+# … msg="Session done" Failed=0 Scanned=4 Updated=0
+```
+
+**Läuft gar keiner**, bringt die `docker-compose.yml` einen mit:
 
 ```bash
 docker compose --profile waechter up -d
 ```
+
+> **Nie zwei Wächter nebeneinander.** Watchtower sucht beim Start nach weiteren
+> Instanzen und **stoppt sie**. Wer diesen hier startet, obwohl schon einer für
+> andere Dienste läuft, legt deren Aktualisierung lahm – und merkt es erst
+> Wochen später an einem alten Stand:
+>
+> ```
+> msg="Found multiple running watchtower instances. Cleaning up."
+> msg="Stopping /manager-watchtower (0c9b877b08c4) with SIGTERM"
+> ```
+>
+> Falls das passiert ist: `docker rm -f hb-watchtower`, dann den anderen wieder
+> starten (`docker start <name>`) und stattdessen das Label verwenden.
 
 Er heisst dann `hb-watchtower`, sieht alle `HB_UPDATE_INTERVAL_SECONDS` nach
 (Vorgabe: 300) und fasst nur `hb-media` an, nichts anderes auf dem NAS.
@@ -398,7 +443,7 @@ indem man `HB_IMAGE` wieder leert.
 | Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
 | `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port. Steht in der `.env` `HB_HOST_PORT` gar nicht oder nur leer (`HB_HOST_PORT=`), greift die Vorgabe – Zeile auf `HB_HOST_PORT=18080` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
-| Änderungen kommen nicht von selbst an | Sieht überhaupt ein Wächter hin? `docker ps --filter ancestor=containrrr/watchtower` zeigt es. Läuft einer für andere Dienste, muss `hb-media` das Label `com.centurylinklabs.watchtower.enable=true` tragen (`docker inspect hb-media --format '{{.Config.Labels}}'`); läuft keiner, fehlt `docker compose --profile waechter up -d` |
+| Änderungen kommen nicht von selbst an | Zuerst: Sieht überhaupt ein Wächter hin (`docker ps --filter ancestor=containrrr/watchtower`)? Läuft keiner, fehlt `docker compose --profile waechter up -d`. Läuft einer, sagt die Zahl hinter `Scanned=` in seinem Protokoll, wie viele Container er ansieht – ist `hb-media` nicht dabei, erfasst ihn seine Auswahl nicht (Argumente **und** Umgebung ansehen, §9) |
 | Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` (nur, wenn der Tunnel vorher lief) |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
