@@ -156,7 +156,8 @@ er keine Zugangsdaten, nur Internet-Zugriff. Das spart eine ganze Schicht.
   (nur wenn        │
    mehrere         ├→ Buch → Player
    Profile)        │
-                   └→ Bibliothek (Reihen) → Reihe (Folgen) → Buch → Player
+                   └→ Reihe (Folgen) → Buch → Player
+                      ↑ steht unten auf der Startseite
 ```
 
 Kein Hamburger-Menü, keine Tabs, keine Modals, kein Suchfeld auf der Kinderseite.
@@ -167,6 +168,14 @@ Neun Reihen mit zusammen mehreren hundert Folgen waren als ein einziges Raster
 unbenutzbar – man scrollte an allem vorbei, was man suchte. Alles, was regelmässig
 gehört wird, steht dafür jetzt auf der Startseite und ist von dort aus einen Tap
 entfernt: Weiterhören, Gemerktes, Vorschläge.
+
+**Die Reihenübersicht steht dabei unten auf der Startseite selbst.** Vorher
+standen dort die sechs neuesten Folgen und darunter ein Knopf „Alle Hörbücher".
+Am ersten Tag – ohne Weiterhören, ohne Gemerktes, ohne Vorschläge – war die
+Startseite damit eine fast leere Seite mit einem Knopf, obwohl zehn Reihen
+bereitstanden. Scrollen kostet nichts und zeigt etwas; ein Tap auf einen Knopf
+kostet einen Bildschirmwechsel und zeigt dasselbe. Die Seite `/bibliothek`
+bleibt: Sie ist der Weg zurück aus einer Reihe und die gemerkte letzte Ansicht.
 
 ### 5.2 Startbildschirm
 
@@ -200,11 +209,9 @@ was ein Kind sonst noch sucht.
  │ └─────┘ └─────┘ └─────┘       │
  │                               │
  │ Alle Hörbücher                │
- │ ┌─────┐ ┌─────┐               │
- │ └─────┘ └─────┘               │
- │ ┌───────────────────────────┐ │
- │ │      Alle Hörbücher       │ │   ← in die Reihenübersicht
- │ └───────────────────────────┘ │
+ │ ┌─────┐ ┌─────┐ ┌─────┐       │   ← alle Reihen, nicht nur ein
+ │ │Reihe│ │Reihe│ │Buch │       │      Ausschnitt; weiterscrollen
+ │ └─────┘ └─────┘ └─────┘       │      statt weitertippen
  └───────────────────────────────┘
 ```
 

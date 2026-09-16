@@ -263,14 +263,43 @@ describe('Buchseite', () => {
 })
 
 describe('Startbildschirm', () => {
-  it('zeigt die zuletzt dazugekommenen Bücher zuerst', () => {
+  it('zeigt die ganze Sammlung als Reihen', () => {
+    // Früher standen hier die sechs neuesten Folgen und darunter ein Knopf in
+    // die Bibliothek. Am ersten Tag war das eine fast leere Seite mit einem
+    // Knopf – jetzt steht die Sammlung selbst da.
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/',
       library: makeLibraryValue({ books: BOOKS }),
     })
 
-    const links = screen.getAllByRole('link', { name: /Papagei|Phantomsee/ })
-    // b_2 ist neuer und steht deshalb vorn.
-    expect(links[0]).toHaveAttribute('href', '/buch/b_2')
+    expect(screen.getByRole('link', { name: /Die drei \?\?\?/ })).toHaveAttribute(
+      'href',
+      `/bibliothek/${seriesSlug('Die drei ???')}`,
+    )
+  })
+
+  it('kommt ohne den Knopf in die Bibliothek aus', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({ books: BOOKS }),
+    })
+
+    expect(screen.queryByRole('link', { name: 'Alle Hörbücher' })).not.toBeInTheDocument()
+  })
+
+  it('zeigt ein einzelnes Hörbuch ohne Reihe direkt', () => {
+    // Eine „Reihe" mit einem Eintrag ist keine Reihe – sie kostete sonst einen
+    // Tap für eine Liste mit einem einzigen Buch.
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/',
+      library: makeLibraryValue({
+        books: [makeBook({ id: 'b_9', title: 'Einzelstück', series: null })],
+      }),
+    })
+
+    expect(screen.getByRole('link', { name: /Einzelstück/ })).toHaveAttribute(
+      'href',
+      '/buch/b_9',
+    )
   })
 })

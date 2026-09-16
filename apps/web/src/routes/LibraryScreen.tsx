@@ -5,10 +5,7 @@ import { EmptyState } from '@/ui/EmptyState'
 import { Notice } from '@/ui/Notice'
 import { Screen, ScreenTitle } from '@/ui/Screen'
 import { Spinner } from '@/ui/Spinner'
-import { BookTile } from '@/features/library/BookTile'
-import { SeriesTile } from '@/features/library/SeriesTile'
-import { SUPPORTED_SCHEMA_VERSION } from '@/features/library/catalog'
-import { buildSeries } from '@/features/library/grouping'
+import { LibraryGrid } from '@/features/library/LibraryGrid'
 import { useLibrary } from '@/features/library/libraryContext'
 import { libraryErrorMessage } from '@/features/library/errors'
 
@@ -74,17 +71,6 @@ export function LibraryScreen() {
     )
   }
 
-  /**
-   * Ein zu alter Medien-Dienst kennt die Reihen nicht.
-   *
-   * Er liefert als „Reihe" den Ordner direkt über dem Hörbuch – bei tieferen
-   * Ablagen ist das die Folge selbst, und die Übersicht bestünde aus hunderten
-   * Reihen mit je einem Eintrag. Dann lieber die schlichte Liste wie früher,
-   * bis der Dienst auf dem NAS erneuert ist.
-   */
-  const reihenBekannt = schemaVersion === null || schemaVersion >= SUPPORTED_SCHEMA_VERSION
-  const series = buildSeries(books)
-
   return (
     <Screen>
       <ZurStartseite />
@@ -101,39 +87,7 @@ export function LibraryScreen() {
         </div>
       ) : null}
 
-      {reihenBekannt ? (
-        <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
-          {series.map((entry) => (
-            <li key={entry.slug}>
-              {/* Eine „Reihe" mit einem einzigen Hörbuch ist keine Reihe. Sie
-                  führt direkt zum Buch, statt einen Tap für eine Liste mit
-                  einem Eintrag zu kosten. */}
-              {entry.books.length === 1 ? (
-                <BookTile book={entry.books[0]!} />
-              ) : (
-                <SeriesTile series={entry} />
-              )}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <>
-          <div className="pb-4">
-            <Notice>
-              Der Medien-Dienst auf dem NAS kennt die Reihen noch nicht – bis er erneuert
-              ist, stehen hier alle Hörbücher untereinander. Woran es liegt, steht im
-              Elternbereich.
-            </Notice>
-          </div>
-          <ul className="grid grid-cols-2 gap-4 pb-6 sm:grid-cols-3">
-            {books.map((book) => (
-              <li key={book.id}>
-                <BookTile book={book} />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+      <LibraryGrid books={books} schemaVersion={schemaVersion} />
     </Screen>
   )
 }
