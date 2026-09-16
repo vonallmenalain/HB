@@ -74,10 +74,16 @@ services:
   #
   # Im Profil `waechter`, weil ein zweiter Wächter neben einem bestehenden
   # nichts besser macht: Er bräuchte noch einmal den Docker-Socket, und beide
-  # würden dasselbe Image ziehen. Wo schon einer läuft, genügt das Label an
-  # hb-media weiter oben. Welcher Fall zutrifft, verrät:
+  # würden dasselbe Image ziehen. Wo schon einer läuft, genügt meist das Label
+  # an hb-media weiter oben – „meist", weil ein Wächter auch auf bestimmte
+  # Container oder einen Scope eingeschränkt sein kann und das Label dann nicht
+  # hilft. Was er wirklich beobachtet, verraten seine Argumente:
   #
-  #   docker ps --filter ancestor=containrrr/watchtower
+  #   docker ps --filter ancestor=containrrr/watchtower --format '{{.Names}}'
+  #   docker inspect <name> --format '{{join .Config.Cmd " "}}'
+  #
+  # Nur mit `--label-enable`, ohne Container-Namen und ohne `--scope` nimmt er
+  # hb-media mit; sonst hier das Profil starten (docs/QNAP-SETUP.md §9).
   #
   # Was der Wächter kostet, steht in docs/QNAP-SETUP.md §9: Er braucht den
   # Docker-Socket und darf damit alles, was Docker auf dem NAS darf.

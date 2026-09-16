@@ -319,30 +319,56 @@ steht auch in der Zusammenfassung des GitHub-Laufs. `schemaVersion` sagt,
 welche Katalogform der Dienst liefert; die App zeigt im Elternbereich eine
 Warnung, solange dort noch `1` steht.
 
-**Welcher Wächter das ist, hängt vom NAS ab.** Ein Blick sagt es:
+**Welcher Wächter das ist, hängt vom NAS ab.** Erst die Frage, ob überhaupt
+einer läuft:
 
 ```bash
-docker ps --filter ancestor=containrrr/watchtower
+docker ps --filter ancestor=containrrr/watchtower --format '{{.Names}}'
 ```
 
-*Läuft dort schon einer* – etwa für andere Dienste auf demselben NAS –, dann
-genügt das Label, das `hb-media` in der `docker-compose.yml` trägt:
+Kommt ein Name zurück, ist die zweite Frage die wichtigere: **Was** beobachtet
+er? Dass er läuft, heisst noch nicht, dass er `hb-media` mitnimmt.
+
+```bash
+docker inspect manager-watchtower --format '{{join .Config.Cmd " "}}'
+# --interval 300 --label-enable --cleanup
+```
+
+Er nimmt `hb-media` mit, wenn dort **alle drei** Punkte zutreffen:
+
+| | |
+|---|---|
+| `--label-enable` steht dabei | Sonst ist ihm das Label gleichgültig: Er aktualisiert dann alles – oder eben nach eigenen Regeln |
+| **kein** Container-Name als Argument | Stehen am Ende Namen (`… --cleanup manager-api share-backend`), beobachtet er genau die und sonst nichts |
+| **kein** `--scope …` | Mit Scope müsste `hb-media` zusätzlich `com.centurylinklabs.watchtower.scope` mit demselben Wert tragen |
+
+Trifft alles zu, genügt das Label, das `hb-media` in der `docker-compose.yml`
+trägt:
 
 ```yaml
 labels:
   com.centurylinklabs.watchtower.enable: 'true'
 ```
 
-Ein Wächter mit `--label-enable` fasst genau die Container an, die es tragen.
-Ein zweiter wäre nur ein zweites Programm mit Docker-Socket, das dasselbe
-Image zieht. Ob er das Label sieht:
-
 ```bash
 docker inspect hb-media --format '{{index .Config.Labels "com.centurylinklabs.watchtower.enable"}}'
 # true
 ```
 
-*Läuft keiner*, bringt die `docker-compose.yml` einen mit:
+Ein zweiter Wächter wäre dann nur ein zweites Programm mit Docker-Socket, das
+dasselbe Image zieht.
+
+Die Gegenprobe, die nicht lügt, steht im Protokoll des Wächters: Er schreibt
+nach jedem Durchgang, wie viele Container er angesehen hat. Die Zahl muss nach
+dem Start von `hb-media` um eins höher sein als vorher.
+
+```bash
+docker logs --tail 20 manager-watchtower | grep -i scanned
+# … msg="Session done" Failed=0 Scanned=4 Updated=0
+```
+
+*Läuft keiner – oder passt er nicht*, bringt die `docker-compose.yml` einen
+mit:
 
 ```bash
 docker compose --profile waechter up -d
@@ -398,7 +424,7 @@ indem man `HB_IMAGE` wieder leert.
 | Nach dem Update läuft weiter der alte Stand | `docker compose pull` vergessen; `curl …/health` zeigt unter `version`, was wirklich läuft |
 | `bind: address already in use` auf `8080` | Die QTS-Weboberfläche belegt den Port. Steht in der `.env` `HB_HOST_PORT` gar nicht oder nur leer (`HB_HOST_PORT=`), greift die Vorgabe – Zeile auf `HB_HOST_PORT=18080` setzen |
 | `hb-tunnel` startet immer wieder neu | Mit `--profile tunnel` gestartet, aber `CLOUDFLARE_TUNNEL_TOKEN` ist leer |
-| Änderungen kommen nicht von selbst an | Sieht überhaupt ein Wächter hin? `docker ps --filter ancestor=containrrr/watchtower` zeigt es. Läuft einer für andere Dienste, muss `hb-media` das Label `com.centurylinklabs.watchtower.enable=true` tragen (`docker inspect hb-media --format '{{.Config.Labels}}'`); läuft keiner, fehlt `docker compose --profile waechter up -d` |
+| Änderungen kommen nicht von selbst an | Zuerst: Sieht überhaupt ein Wächter hin (`docker ps --filter ancestor=containrrr/watchtower`)? Dann: Nimmt er `hb-media` mit? Seine Argumente (`docker inspect <name> --format '{{join .Config.Cmd " "}}'`) müssen `--label-enable` enthalten, ohne Container-Namen und ohne `--scope` – sonst hilft das Label nicht, und es braucht `docker compose --profile waechter up -d`. Die Zahl hinter `Scanned=` im Protokoll des Wächters sagt, ob er den Dienst wirklich ansieht |
 | Die App ist nach einem Neustart nicht mehr erreichbar, `hb-media` läuft aber | Nach `docker compose down` fehlt der Tunnel – einmal `docker compose --profile tunnel up -d` (nur, wenn der Tunnel vorher lief) |
 | Container startet nicht, Log nennt Variablen | `.env` unvollständig – das Log listet alle fehlenden auf |
 | `"books": 0` | `HB_LIBRARY_PATH` falsch, oder keine Audiodateien in Buchordnern |
