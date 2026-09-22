@@ -127,6 +127,38 @@ describe('Ticket holen', () => {
   })
 })
 
+describe('Ticket ersetzen', () => {
+  // Der Player braucht das, wenn der Dienst ein Ticket abweist, das nach
+  // eigener Rechnung noch gilt – etwa nach einem neuen Geheimnis auf dem NAS.
+  it('holt ein neues, auch wenn das gespeicherte noch gilt', async () => {
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+    const client = makeClient(fetchImpl)
+
+    expect(await client.renewTicket()).toBe('TICKET-1')
+    expect(client.audioUrl('b_1', 0)).toBe(`${BASE}/audio/b_1/0?t=TICKET-1`)
+  })
+
+  it('behält das alte, wenn kein neues zu bekommen ist', async () => {
+    speichere('ALT', 'u1')
+    const fetchImpl = vi.fn<typeof fetch>().mockRejectedValue(new TypeError('failed'))
+    const client = makeClient(fetchImpl)
+
+    await expect(client.renewTicket()).rejects.toMatchObject({ reason: 'offline' })
+    // Ohne Netz ist ein altes Ticket besser als keines: Cover und Downloads
+    // hängen ebenfalls daran.
+    expect(client.audioUrl('b_1', 0)).toBe(`${BASE}/audio/b_1/0?t=ALT`)
+  })
+
+  it('teilt sich die Anfrage mit einem gleichzeitigen Erneuern', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse(ticketBody()))
+    const client = makeClient(fetchImpl)
+
+    await Promise.all([client.ensureTicket(), client.renewTicket()])
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Katalog holen', () => {
   it('liefert den geprüften Katalog samt ETag', async () => {
     const fetchImpl = vi

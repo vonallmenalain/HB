@@ -629,6 +629,39 @@ Das kostet nichts und hält die Tür offen: Kämen später M4B-Dateien mit
 eingebetteten Kapiteln dazu, wären das mehrere `chapters` auf einer `file` – der
 Player-Code bliebe unverändert, nur der Scanner bekäme einen zweiten Zweig.
 
+### 6.5 Abbrüche: abgelaufenes Ticket, Netz weg
+
+Jede Audio-Adresse trägt das Media-Ticket (§9.2), und das läuft nach acht
+Stunden ab. Eine installierte App bleibt aber tagelang offen, und geholt wurde
+das Ticket nur beim Start. War es abgelaufen, wies der Dienst die nächste
+Anfrage mit **401** ab – beim nächsten Kapitel, nach dem Spulen oder wenn nach
+einer Pause der Puffer leer lief. Das Hörbuch verstummte „aus dem Nichts", und
+kein Tippen brachte es zurück: Ein `<audio>`, das aufgegeben hat, spielt auf
+`play()` hin nicht wieder, es muss neu geladen werden. Erst ein Neustart der App
+holte ein neues Ticket.
+
+Seitdem gilt:
+
+- **Die Engine erholt sich selbst.** Nach einem Abbruch holt sie ein frisches
+  Ticket und lädt an derselben Stelle neu; lief vorher etwas, läuft es weiter.
+  Wiederholt wird mit wachsendem Abstand (sofort, 1, 3, 8, 15 s), danach meldet
+  der Player den Fehler.
+- **Auch ohne Fehlermeldung.** Mitten in einer Datei meldet Chrome ein 401
+  nicht: Es wiederholt die Anfrage eine halbe Minute lang still, und die Anzeige
+  sagt „spielt". Ein Wächter erkennt das – wartet das Element 8 s auf Daten,
+  ohne dass etwas ankommt, gilt das als Abbruch. Kommen Daten, ist es nur ein
+  langsames Netz.
+- **Abspielen hilft immer.** Nach einem Abbruch lädt der Knopf neu, statt nur
+  `play()` zu rufen.
+- **Das Ticket bleibt frisch.** Solange ein Buch offen ist, sieht der Player
+  beim Zurückkehren in die App und alle fünf Minuten nach; der Medien-Client
+  erneuert zehn Minuten vor Ablauf. Weitergehört wird dann mit der neuen
+  Adresse – der häufigste Fall (über Nacht im Hintergrund, am Morgen
+  „Weiterhören") kommt so gar nicht erst zum Abbruch.
+
+Heruntergeladene Bücher betrifft das nicht: Sie laufen aus dem Cache, ohne
+Ticket.
+
 ---
 
 ## 7. Fortschritt und Wiederaufnahme

@@ -14,7 +14,7 @@ import { useLibrary } from '@/features/library/libraryContext'
 import { makeProgress, resolveResume } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 
-import { getEngine, setAudioUrlResolver } from './engine'
+import { getEngine, setAccessRenewal, setAudioUrlResolver } from './engine'
 import {
   SKIP_SECONDS,
   setMediaHandlers,
@@ -27,6 +27,14 @@ import { type SleepMode } from './sleepTimer'
 
 /** Abstand, in dem der Fortschritt während der Wiedergabe gesichert wird. */
 const PERSIST_INTERVAL_MS = 5000
+
+/**
+ * Abstand, in dem nachgesehen wird, ob das Ticket bald abläuft.
+ *
+ * Kürzer als die zehn Minuten, die der Medien-Client vor Ablauf erneuert –
+ * so liegt immer ein gültiges bereit, solange die App läuft.
+ */
+export const TICKET_CHECK_MS = 5 * 60 * 1000
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
   const { client } = useLibrary()
@@ -46,6 +54,16 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         offlineUrl(bookId, fileIdx) ?? client?.audioUrl(bookId, fileIdx) ?? null,
     )
   }, [client, offlineUrl])
+
+  // Bricht die Wiedergabe ab, holt die Engine hierüber ein frisches Ticket,
+  // bevor sie an derselben Stelle neu lädt.
+  useEffect(() => {
+    setAccessRenewal(async (force) => {
+      if (!client) return
+      await (force ? client.renewTicket() : client.ensureTicket())
+    })
+  }, [client])
+
   const snapshot = useSyncExternalStore(
     engine?.subscribe ?? (() => () => undefined),
     engine?.snapshot ?? (() => null),
@@ -84,6 +102,35 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (book) historyRef.current.started(book)
   }, [book])
+
+  /**
+   * Das Ticket rechtzeitig erneuern, solange ein Buch offen ist.
+   *
+   * Es steckt in jeder Audio-Adresse und läuft nach acht Stunden ab – eine
+   * installierte App bleibt aber tagelang offen, und geholt wurde es bisher
+   * nur beim Start. Danach verstummte das Hörbuch mitten im Satz. Jetzt kommt
+   * ein neues beim Zurückkehren in die App und in festen Abständen; das
+   * nächste Kapitel und das Weiterhören nach einer Pause laufen damit schon
+   * mit dem neuen. Ohne Netz bleibt es beim alten – dann hilft sich die
+   * Engine beim nächsten Abbruch selbst.
+   */
+  useEffect(() => {
+    if (!client || !book) return
+    const erneuern = (): void => {
+      void client.ensureTicket().catch(() => undefined)
+    }
+    const beiRueckkehr = (): void => {
+      if (document.visibilityState === 'visible') erneuern()
+    }
+
+    erneuern()
+    const timer = setInterval(erneuern, TICKET_CHECK_MS)
+    document.addEventListener('visibilitychange', beiRueckkehr)
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', beiRueckkehr)
+    }
+  }, [client, book])
 
   /**
    * Gehörte Sekunden aus dem Fortschritt, nicht aus dem Takt.

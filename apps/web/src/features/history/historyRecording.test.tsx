@@ -37,6 +37,7 @@ function setSnapshot(patch: Partial<PlayerSnapshot>): void {
 
 vi.mock('@/features/player/engine', () => ({
   setAudioUrlResolver: vi.fn(),
+  setAccessRenewal: vi.fn(),
   getEngine: () => ({
     subscribe: (listener: () => void) => {
       listeners.add(listener)

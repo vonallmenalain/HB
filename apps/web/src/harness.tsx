@@ -235,6 +235,7 @@ const demoBooks = sortBooks(rohBooks.map((book) => tidyBook(book)))
 
 const demoClient: LibraryContextValue['client'] = {
   ensureTicket: () => Promise.resolve('t'),
+  renewTicket: () => Promise.resolve('t'),
   currentTicket: () => 't',
   fetchCatalog: () => Promise.resolve({ status: 'not-modified' as const }),
   startRescan: () => Promise.resolve('started' as const),

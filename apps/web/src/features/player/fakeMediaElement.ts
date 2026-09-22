@@ -12,7 +12,19 @@ export interface FakeMediaElement extends MediaElement {
   emitLoadedMetadata: (duration?: number) => void
   /** Simuliert das Ende der laufenden Datei. */
   emitEnded: () => void
+  /**
+   * Simuliert einen Abbruch – wie Chrome: erst `error`, dann `pause`.
+   *
+   * Das `pause` gehört dazu, weil es genau das ist, was ein Player nicht für
+   * einen Wunsch zum Anhalten halten darf.
+   */
   emitError: () => void
+  /** Simuliert, dass der Puffer leer ist und auf Daten gewartet wird. */
+  emitWaiting: () => void
+  /** Simuliert, dass Daten eintreffen. */
+  emitProgress: () => void
+  /** Simuliert, dass es nach dem Warten weitergeht. */
+  emitPlaying: () => void
   /** Simuliert fortschreitende Wiedergabe. */
   advanceTo: (seconds: number) => void
   playCalls: number
@@ -50,6 +62,8 @@ export function createFakeMediaElement(
     },
     load: () => {
       element.loadCalls += 1
+      // Wie im Browser: Neu laden hält an, ohne ein `pause` zu feuern.
+      element.paused = true
       element.currentTime = 0
       element.duration = Number.NaN
     },
@@ -70,11 +84,28 @@ export function createFakeMediaElement(
       // Ein echtes `ended` kommt erst, wenn die Datei durchgelaufen ist – die
       // Position steht dann am Ende, nicht dort, wo sie zuletzt war.
       if (Number.isFinite(element.duration)) element.currentTime = element.duration
-      element.paused = true
+      // Und wie im Browser geht ihm ein `pause` voraus.
+      if (!element.paused) {
+        element.paused = true
+        fire('pause')
+      }
       fire('ended')
     },
     emitError: () => {
       fire('error')
+      if (!element.paused) {
+        element.paused = true
+        fire('pause')
+      }
+    },
+    emitWaiting: () => {
+      fire('waiting')
+    },
+    emitProgress: () => {
+      fire('progress')
+    },
+    emitPlaying: () => {
+      fire('playing')
     },
     advanceTo: (seconds) => {
       element.currentTime = seconds

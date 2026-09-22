@@ -109,6 +109,14 @@ export interface CoverSuche {
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
+  /**
+   * Holt ein neues Ticket, auch wenn das gespeicherte nach eigener Rechnung
+   * noch gilt – für den Fall, dass der Dienst es trotzdem abweist.
+   *
+   * Das alte bleibt liegen, bis das neue da ist: Scheitert die Anfrage, ist
+   * nichts verloren.
+   */
+  renewTicket: () => Promise<string>
   /** Das zuletzt geholte Ticket, ohne Netzwerk – für `<audio src>`. */
   currentTicket: () => string | null
   fetchCatalog: (etag: string | null) => Promise<CatalogFetch>
@@ -259,14 +267,18 @@ export function createMediaClient(options: {
     return stored.ticket
   }
 
-  async function ensureTicket(): Promise<string> {
-    const eigenes = ownTicket()
-    if (isFresh(eigenes)) return eigenes.ticket
-    // Mehrere gleichzeitige Aufrufe teilen sich eine Anfrage.
+  /** Mehrere gleichzeitige Aufrufe teilen sich eine Anfrage. */
+  function sharedRequest(): Promise<string> {
     inFlight ??= requestTicket().finally(() => {
       inFlight = null
     })
     return inFlight
+  }
+
+  async function ensureTicket(): Promise<string> {
+    const eigenes = ownTicket()
+    if (isFresh(eigenes)) return eigenes.ticket
+    return sharedRequest()
   }
 
   const withTicket = (path: string, ticket: string): string =>
@@ -468,6 +480,7 @@ export function createMediaClient(options: {
 
   return {
     ensureTicket,
+    renewTicket: sharedRequest,
     // Auch ein bald ablaufendes Ticket ist brauchbar – der Dienst entscheidet.
     currentTicket: () => ownTicket()?.ticket ?? null,
     fetchCatalog,
