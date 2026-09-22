@@ -38,6 +38,7 @@ const BUCH = makeBook({
 
 const client: MediaClient = {
   ensureTicket: () => Promise.resolve('t'),
+  renewTicket: () => Promise.resolve('t'),
   currentTicket: () => 't',
   fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
   startRescan: () => Promise.resolve('started'),

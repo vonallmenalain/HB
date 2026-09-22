@@ -1,9 +1,15 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { type Book } from '@/features/library/catalog'
 import { makeBook } from '@/test/renderWithProfiles'
 
-import { type AudioEngine, createAudioEngine } from './audioEngine'
+import {
+  type AudioEngine,
+  RENEW_TIMEOUT_MS,
+  RETRY_DELAYS_MS,
+  STALL_TIMEOUT_MS,
+  createAudioEngine,
+} from './audioEngine'
 import { type FakeMediaElement, createFakeMediaElement } from './fakeMediaElement'
 
 /** Drei Dateien zu 600, 700 und 500 Sekunden; Kapitel entsprechen den Dateien. */
@@ -226,21 +232,368 @@ describe('Abspielen und Anhalten', () => {
   })
 })
 
-describe('Fehler', () => {
-  it('meldet einen Ladefehler', () => {
-    engine.open(BOOK, 0)
+describe('Springen während des Ladens', () => {
+  it('springt an das neue Ziel, nicht an das beim Öffnen', () => {
+    // Vorher gewann das alte Ziel, sobald die Metadaten kamen.
+    engine.open(BOOK, 100)
+    engine.seekTo(300)
+
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(300)
+    expect(engine.snapshot().positionSec).toBe(300)
+  })
+
+  it('springt beim Anhalten nicht an den Dateianfang', () => {
+    engine.open(BOOK, 700)
+    engine.pause()
+
+    expect(engine.snapshot().positionSec).toBe(700)
+  })
+})
+
+/**
+ * Abbruch und Wiederaufnahme.
+ *
+ * Jede Medienadresse trägt ein Ticket, das nach acht Stunden abläuft – eine
+ * installierte App bleibt aber tagelang offen. Lief es ab, verstummte das
+ * Hörbuch „aus dem Nichts", und kein Tippen brachte es zurück: Das Element
+ * hatte aufgegeben, und die Engine lud nie neu. Erst ein Neustart der App
+ * holte ein neues Ticket. Die Fälle hier sind im echten Chromium gegen den
+ * Medien-Dienst nachgestellt.
+ */
+describe('Abbruch und Wiederaufnahme', () => {
+  /** Das Ticket in der Adresse – die Tests lassen es ablaufen und erneuern es. */
+  let ticket: string | null = 'alt'
+  const renewAccess = vi.fn<(force: boolean) => Promise<void>>()
+  const adresse = (fileIdx: number, t: string): string =>
+    `https://media.test/audio/b_1/${String(fileIdx)}?t=${t}`
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    ticket = 'alt'
+    renewAccess.mockReset()
+    renewAccess.mockImplementation((force) => {
+      ticket = force ? 'erzwungen' : 'frisch'
+      return Promise.resolve()
+    })
+    element = createFakeMediaElement()
+    engine = createAudioEngine({
+      element,
+      audioUrl: (bookId, fileIdx) =>
+        ticket === null ? null : `https://media.test/audio/${bookId}/${String(fileIdx)}?t=${ticket}`,
+      renewAccess,
+    })
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  /** Öffnet das Buch an einer Stelle und lässt es laufen, wie nach dem ersten Tippen. */
+  async function hoeren(position: number): Promise<void> {
+    engine.open(BOOK, position)
+    element.emitLoadedMetadata(position < 600 ? 600 : 700)
+    await engine.play()
+  }
+
+  /** Lässt geplante Wiederholungen laufen, samt dem Warten auf das Ticket. */
+  async function warten(ms = 0): Promise<void> {
+    await vi.advanceTimersByTimeAsync(ms)
+  }
+
+  it('lädt nach einem Abbruch mit frischem Ticket an derselben Stelle neu', async () => {
+    await hoeren(600)
+    element.advanceTo(100)
+
+    element.emitError()
+    await warten()
+
+    expect(renewAccess).toHaveBeenCalledWith(false)
+    expect(element.src).toBe(adresse(1, 'frisch'))
+    element.emitLoadedMetadata(700)
+    expect(element.currentTime).toBe(100)
+    expect(engine.snapshot().positionSec).toBe(700)
+    expect(engine.snapshot().playing).toBe(true)
+    expect(element.paused).toBe(false)
+  })
+
+  it('hält das „pause" nach dem Fehler nicht für Anhalten', async () => {
+    // Chrome schickt es hinterher. Wer es ernst nimmt, lädt zwar neu – aber
+    // spielt nicht weiter, und das Kind steht wieder vor Stille.
+    await hoeren(0)
+    element.emitError()
+
+    expect(engine.snapshot().playing).toBe(true)
+    expect(engine.snapshot().loading).toBe(true)
+    expect(engine.snapshot().error).toBe(false)
+  })
+
+  it('geht am Kapitelwechsel mit frischem Ticket weiter', async () => {
+    // Der erste nachgestellte Fall: Das Ticket läuft während eines Kapitels
+    // ab, und die nächste Datei wird mit dem alten angefragt.
+    await hoeren(0)
+    element.emitEnded()
+    expect(element.src).toBe(adresse(1, 'alt'))
+
+    element.emitError()
+    await warten()
+
+    expect(element.src).toBe(adresse(1, 'frisch'))
+    element.emitLoadedMetadata(700)
+    expect(element.currentTime).toBe(0)
+    expect(engine.snapshot().positionSec).toBe(600)
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('setzt nach einem Abbruch beim Laden am Ziel an, nicht am Dateianfang', async () => {
+    engine.open(BOOK, 700)
+    await engine.play()
+
+    element.emitError()
+    await warten()
+
+    element.emitLoadedMetadata(700)
+    expect(element.currentTime).toBe(100)
+    expect(engine.snapshot().positionSec).toBe(700)
+  })
+
+  it('erkennt einen Hänger ohne Fehlermeldung und lädt neu', async () => {
+    // Der zweite nachgestellte Fall: Mitten in der Datei wiederholt Chrome
+    // die abgewiesene Anfrage eine halbe Minute lang still, statt einen
+    // Fehler zu melden – die Anzeige sagt „spielt", zu hören ist nichts.
+    await hoeren(0)
+    element.advanceTo(140)
+    element.emitWaiting()
+
+    await warten(STALL_TIMEOUT_MS - 1)
+    expect(element.src).toBe(adresse(0, 'alt'))
+
+    // Der Wächter schlägt an; die Wiederholung folgt unmittelbar danach.
+    await warten(10)
+    expect(element.src).toBe(adresse(0, 'frisch'))
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(140)
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('lässt ein langsames Netz in Ruhe, solange Daten ankommen', async () => {
+    await hoeren(0)
+    element.advanceTo(140)
+    const loads = element.loadCalls
+
+    element.emitWaiting()
+    for (let i = 0; i < 4; i += 1) {
+      await warten(STALL_TIMEOUT_MS - 1000)
+      element.emitProgress()
+    }
+    element.emitPlaying()
+    await warten(STALL_TIMEOUT_MS * 2)
+
+    expect(element.loadCalls).toBe(loads)
+    expect(renewAccess).not.toHaveBeenCalled()
+  })
+
+  it('wartet nicht auf Daten, wenn niemand zuhört', async () => {
+    await hoeren(0)
+    engine.pause()
+    const loads = element.loadCalls
+
+    element.emitWaiting()
+    await warten(STALL_TIMEOUT_MS * 2)
+
+    expect(element.loadCalls).toBe(loads)
+  })
+
+  it('gibt nach mehreren Fehlschlägen auf und meldet den Fehler', async () => {
+    await hoeren(0)
+    element.advanceTo(50)
+
+    for (const delay of RETRY_DELAYS_MS) {
+      element.emitError()
+      expect(engine.snapshot().error).toBe(false)
+      await warten(delay)
+    }
     element.emitError()
 
     expect(engine.snapshot().error).toBe(true)
+    expect(engine.snapshot().playing).toBe(false)
     expect(engine.snapshot().loading).toBe(false)
+    expect(engine.snapshot().positionSec).toBe(50)
+    // Erst ein gewöhnliches Ticket, danach auch ein scheinbar gültiges ersetzt.
+    expect(renewAccess.mock.calls.map(([force]) => force)).toEqual([
+      false,
+      true,
+      true,
+      true,
+      true,
+    ])
   })
 
-  it('meldet einen Fehler, wenn keine Adresse gebaut werden kann', () => {
-    // Passiert, solange kein Media-Ticket da ist.
-    const ohneTicket = createAudioEngine({ element, audioUrl: () => null })
-    ohneTicket.open(BOOK, 0)
+  it('versucht es nach dem Aufgeben beim Abspielen sofort von vorn', async () => {
+    await hoeren(0)
+    element.advanceTo(50)
+    for (const delay of RETRY_DELAYS_MS) {
+      element.emitError()
+      await warten(delay)
+    }
+    element.emitError()
+    const loads = element.loadCalls
 
-    expect(ohneTicket.snapshot().error).toBe(true)
+    await engine.play()
+
+    expect(element.loadCalls).toBe(loads + 1)
+    expect(engine.snapshot().error).toBe(false)
+    expect(engine.snapshot().playing).toBe(true)
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(50)
+  })
+
+  it('lädt nach einem Abbruch in der Pause erst beim nächsten Abspielen neu', async () => {
+    await hoeren(0)
+    element.advanceTo(50)
+    engine.pause()
+    const loads = element.loadCalls
+
+    element.emitError()
+    await warten(60_000)
+    // Niemand hört zu: kein Neuladen, keine Fehlermeldung.
+    expect(element.loadCalls).toBe(loads)
+    expect(engine.snapshot().error).toBe(false)
+
+    await engine.play()
+    expect(element.loadCalls).toBe(loads + 1)
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(50)
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('spielt nach Anhalten während der Erholung nicht von selbst weiter', async () => {
+    await hoeren(0)
+    element.advanceTo(50)
+    element.emitError()
+    engine.pause()
+    const loads = element.loadCalls
+
+    await warten(60_000)
+    expect(element.loadCalls).toBe(loads)
+    expect(engine.snapshot().playing).toBe(false)
+    expect(engine.snapshot().loading).toBe(false)
+
+    await engine.play()
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(50)
+  })
+
+  it('springt nach einem Abbruch dorthin, wohin getippt wurde', async () => {
+    await hoeren(0)
+    element.advanceTo(50)
+    element.emitError()
+
+    engine.seekTo(1400)
+    await warten(60_000)
+
+    expect(element.src).toBe(adresse(2, 'alt'))
+    element.emitLoadedMetadata(500)
+    expect(element.currentTime).toBe(100)
+  })
+
+  it('nimmt beim Weiterhören die neue Adresse, wenn das Ticket erneuert wurde', async () => {
+    // Der dritte nachgestellte Fall: angehalten, Ticket abgelaufen,
+    // weitergehört – mit der alten Adresse lief der Puffer noch eine halbe
+    // Minute, dann war Stille.
+    await hoeren(0)
+    element.advanceTo(100)
+    engine.pause()
+
+    ticket = 'neu'
+    await engine.play()
+
+    expect(element.src).toBe(adresse(0, 'neu'))
+    element.emitLoadedMetadata(600)
+    expect(element.currentTime).toBe(100)
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('lädt beim Weiterhören nicht neu, solange die Adresse gleich bleibt', async () => {
+    await hoeren(0)
+    element.advanceTo(100)
+    engine.pause()
+    const loads = element.loadCalls
+
+    await engine.play()
+
+    expect(element.loadCalls).toBe(loads)
+    expect(engine.snapshot().playing).toBe(true)
+  })
+
+  it('holt ein Ticket, wenn beim Start noch keines da ist', async () => {
+    ticket = null
+    engine.open(BOOK, 0)
+    await engine.play()
+
+    await warten()
+
+    expect(element.src).toBe(adresse(0, 'frisch'))
+    expect(engine.snapshot().error).toBe(false)
+  })
+
+  it('meldet den Fehler, wenn sich keine Adresse bauen lässt', async () => {
+    // Kein Ticket und keines zu bekommen – etwa ohne Netz und ohne Download.
+    ticket = null
+    renewAccess.mockRejectedValue(new Error('offline'))
+    engine.open(BOOK, 0)
+    await engine.play()
+
+    await warten(60_000)
+
+    expect(engine.snapshot().error).toBe(true)
+    expect(engine.snapshot().playing).toBe(false)
+  })
+
+  it('wartet nicht ewig auf ein neues Ticket', async () => {
+    renewAccess.mockImplementation(() => new Promise(() => undefined))
+    await hoeren(0)
+    const loads = element.loadCalls
+
+    element.emitError()
+    await warten()
+    expect(element.loadCalls).toBe(loads)
+
+    await warten(RENEW_TIMEOUT_MS)
+    expect(element.loadCalls).toBe(loads + 1)
+  })
+
+  it('bricht eine geplante Wiederholung beim Stoppen ab', async () => {
+    await hoeren(0)
+    element.emitError()
+    engine.stop()
+    const loads = element.loadCalls
+
+    await warten(60_000)
+
+    expect(element.loadCalls).toBe(loads)
+    expect(element.src).toBe('')
+    expect(engine.snapshot().book).toBeNull()
+  })
+
+  it('fängt bei einem neuen Buch mit frischen Versuchen an', async () => {
+    await hoeren(0)
+    for (const delay of RETRY_DELAYS_MS) {
+      element.emitError()
+      await warten(delay)
+    }
+    element.emitError()
+    expect(engine.snapshot().error).toBe(true)
+
+    engine.open(BOOK, 900)
+    await engine.play()
+    expect(engine.snapshot().error).toBe(false)
+    element.emitError()
+    await warten()
+
+    expect(engine.snapshot().error).toBe(false)
+    element.emitLoadedMetadata(700)
+    expect(element.currentTime).toBe(300)
   })
 })
 

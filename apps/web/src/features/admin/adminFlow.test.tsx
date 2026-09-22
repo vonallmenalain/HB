@@ -185,6 +185,7 @@ describe('Adminbereich', () => {
 function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
   return {
     ensureTicket: () => Promise.resolve('t'),
+    renewTicket: () => Promise.resolve('t'),
     currentTicket: () => 't',
     fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
     startRescan: () => Promise.resolve('started'),
