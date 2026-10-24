@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { AppRoutes } from '@/app/AppRoutes'
+import type { LibraryContextValue } from '@/features/library/libraryContext'
 import {
   makeBook,
   makeLibraryValue,
@@ -133,7 +134,66 @@ describe('Player', () => {
     fireEvent.pointerUp(balken)
     expect(seekTo).toHaveBeenCalledWith(1200)
   })
+})
 
+describe('Cover im Player', () => {
+  const MIT_BILD = { ...BOOK, cover: '/cover/b_1.jpg' }
+  // Vom Medien-Dienst braucht das Cover nur die Adresse.
+  const client = {
+    coverUrl: (path: string) => `https://nas.example${path}`,
+  } as unknown as LibraryContextValue['client']
+
+  it('zeigt das Bild nach einem Tipp über den ganzen Bildschirm, das Kreuz schliesst', async () => {
+    const user = userEvent.setup()
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [MIT_BILD], client }),
+      player: makePlayerValue({ book: MIT_BILD }),
+    })
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    const cover = screen.getByRole('button', { name: 'Bild gross anzeigen' })
+    await user.click(cover)
+
+    const gross = screen.getByRole('dialog', { name: 'Bild: Der Super-Papagei' })
+    expect(gross.querySelector('img')).toHaveAttribute('src', 'https://nas.example/cover/b_1.jpg')
+    // Das Kreuz bekommt den Fokus – sonst fände es ein Vorleseprogramm nicht.
+    const kreuz = screen.getByRole('button', { name: 'Bild schliessen' })
+    expect(kreuz).toHaveFocus()
+
+    // Ein Tipp aufs Bild selbst schliesst nicht: Kinder tippen auf das, was
+    // sie gerade ansehen.
+    await user.click(gross.querySelector('img')!)
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(kreuz)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(cover).toHaveFocus()
+  })
+
+  it('schliesst auch mit Escape', async () => {
+    const user = userEvent.setup()
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [MIT_BILD], client }),
+      player: makePlayerValue({ book: MIT_BILD }),
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Bild gross anzeigen' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('bietet ohne Bild nichts zum Vergrössern an', () => {
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [BOOK] }),
+      player: makePlayerValue({ book: BOOK }),
+    })
+
+    expect(screen.queryByRole('button', { name: 'Bild gross anzeigen' })).not.toBeInTheDocument()
+  })
 })
 
 describe('Weiterhören-Kachel', () => {

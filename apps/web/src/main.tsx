@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 
 import { App } from './app/App'
+import { preventPinchZoom } from './lib/noZoom'
 import { registerServiceWorker } from './lib/pwa'
 import './index.css'
 
@@ -15,3 +16,4 @@ createRoot(container).render(
 )
 
 registerServiceWorker()
+preventPinchZoom()

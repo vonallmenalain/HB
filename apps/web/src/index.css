@@ -1,6 +1,16 @@
 @import 'tailwindcss';
 
 /*
+ * Querformat für den Player: Cover links, Knöpfe rechts.
+ *
+ * Nicht `orientation: landscape` – das träfe schon ein fast quadratisches
+ * Browserfenster, in dem Cover und Knöpfe untereinander besser aussehen. Erst
+ * ab einem deutlich breiteren als hohen Bildschirm fehlt die Höhe dafür. Die
+ * Mindestbreite hält Handys im Hochformat mit eingeblendeter Tastatur heraus.
+ */
+@custom-variant quer (@media (min-aspect-ratio: 6/5) and (min-width: 34rem));
+
+/*
  * Design-Tokens. Die Werte setzen die verbindlichen Regeln aus
  * docs/KONZEPT.md §5.5 um: grosse Touch-Ziele, grosse Schrift, hoher Kontrast.
  */
@@ -75,6 +85,14 @@
   html {
     /* Verhindert, dass Android beim Drehen die Schrift skaliert. */
     -webkit-text-size-adjust: 100%;
+    /*
+     * Schieben ja, Zoomen nein. Mit zwei Fingern auf dem Tablet gezoomt, ragte
+     * der Player über den Rand, und ein Kind fand nicht mehr zurück. Gilt für
+     * jedes Element darunter, auch für die Knöpfe mit `manipulation`: Erlaubt
+     * ist nur, was alle Vorfahren erlauben. Der Rest steht in index.html und
+     * lib/noZoom.ts.
+     */
+    touch-action: pan-x pan-y;
   }
 
   body {
@@ -107,6 +125,55 @@
  * auch ein Kind, ohne dass er die halbe Seite einnimmt.
  */
 @layer components {
+  /*
+   * Der Player passt immer auf den Bildschirm – gescrollt wird dort nie.
+   *
+   * Auf Tablets und den meisten Handys reicht der Platz für die Grössen aus
+   * KONZEPT §5.5. Wo er nicht reicht – Handy quer, ein kleines Fire-Tablet,
+   * geteilter Bildschirm –, war bisher der Play-Knopf unter dem Rand
+   * verschwunden. Ein Knopf, den man nicht sieht, ist kleiner als jeder, den
+   * man sieht. Deshalb schrumpfen hier die Touch-Grössen mit der Höhe des
+   * Bildschirms, aber nie über die Werte aus dem Konzept hinaus.
+   *
+   * Dieselben Token, nur enger: `size-touch` und `.seek` lesen sie, also
+   * schrumpft alles im Player gemeinsam – Riegel, Balken und Kopfzeile
+   * eingeschlossen.
+   *
+   * Im Hochformat teilen sich Cover und Knöpfe die Höhe, darum schrumpfen die
+   * Knöpfe dort früher. Im Querformat steht das Cover daneben.
+   */
+  .player {
+    --spacing-touch: min(4rem, 10dvh);
+    --spacing-touch-lg: min(7rem, 17dvh);
+    --player-gap: min(1rem, 2.25dvh);
+
+    @variant quer {
+      --spacing-touch: min(4rem, 11dvh);
+      --spacing-touch-lg: min(7rem, 19dvh);
+      --player-gap: min(1rem, 2.5dvh);
+    }
+  }
+
+  /*
+   * Das Cover nimmt, was übrig bleibt: so breit oder so hoch wie die freie
+   * Fläche, je nachdem, was zuerst endet – quadratisch bleibt es immer.
+   */
+  .player-cover-area {
+    container-type: size;
+  }
+
+  .player-cover {
+    /* Ohne Container-Einheiten (iOS 15) eine Schätzung, die nicht überläuft. */
+    width: min(100%, 30rem, 36dvh);
+    aspect-ratio: 1;
+  }
+
+  @supports (width: 1cqmin) {
+    .player-cover {
+      width: min(100cqmin, 30rem);
+    }
+  }
+
   .seek {
     -webkit-appearance: none;
     appearance: none;

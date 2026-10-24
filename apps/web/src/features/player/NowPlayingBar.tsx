@@ -1,5 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 
+import { PauseIcon, PlayIcon, StopIcon } from '@/ui/PlayerIcons'
+
 import { usePlayer } from './playerContext'
 
 /**
@@ -65,18 +67,22 @@ export function NowPlayingBar() {
           type="button"
           aria-label="Anhalten und schliessen"
           onClick={player.stop}
-          className="flex size-touch shrink-0 items-center justify-center rounded-full border-2 border-control bg-surface text-3xl text-ink transition-transform active:scale-95 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex size-touch shrink-0 items-center justify-center rounded-full border-2 border-control bg-surface text-ink transition-transform active:scale-95 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <span aria-hidden="true">■</span>
+          <span aria-hidden="true" className="size-1/2">
+            <StopIcon />
+          </span>
         </button>
 
         <button
           type="button"
           aria-label={player.playing ? 'Pause' : 'Weiterhören'}
           onClick={player.toggle}
-          className="flex size-touch shrink-0 items-center justify-center rounded-full bg-primary text-3xl text-on-primary transition-transform active:scale-95 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          className="flex size-touch shrink-0 items-center justify-center rounded-full bg-primary text-on-primary transition-transform active:scale-95 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent"
         >
-          <span aria-hidden="true">{player.playing ? '⏸' : '▶'}</span>
+          <span aria-hidden="true" className="size-1/2">
+            {player.playing ? <PauseIcon /> : <PlayIcon />}
+          </span>
         </button>
       </div>
     </div>

@@ -5,7 +5,12 @@ import type { ReactNode } from 'react'
  *
  * Die Grössen sind nicht frei gewählt: 112px für Play/Pause und 64px für die
  * übrigen stehen so im Konzept (§5.5). Ein Kind trifft damit auch im Halbdunkel
- * und ohne hinzusehen.
+ * und ohne hinzusehen. Nur wo der Bildschirm dafür zu niedrig ist, gibt der
+ * Player sie nach – siehe `.player` in index.css.
+ *
+ * Das Symbol ist ein SVG aus `PlayerIcons` und bekommt die Hälfte des Knopfs.
+ * In Prozent statt in Pixeln, damit es mitwächst und mitschrumpft und dabei
+ * genau in der Mitte bleibt.
  */
 export function PlayerButton({
   label,
@@ -21,8 +26,8 @@ export function PlayerButton({
   children: ReactNode
 }) {
   const sizes = {
-    md: 'size-touch text-3xl bg-surface text-ink',
-    lg: 'size-touch-lg text-5xl bg-primary text-on-primary',
+    md: 'size-touch bg-surface text-ink',
+    lg: 'size-touch-lg bg-primary text-on-primary',
   } as const
 
   return (
@@ -33,7 +38,9 @@ export function PlayerButton({
       disabled={disabled}
       className={`flex shrink-0 items-center justify-center rounded-full transition-transform active:scale-95 disabled:opacity-40 focus-visible:outline-4 focus-visible:outline-offset-2 focus-visible:outline-accent ${sizes[size]}`}
     >
-      <span aria-hidden="true">{children}</span>
+      <span aria-hidden="true" className="size-1/2">
+        {children}
+      </span>
     </button>
   )
 }

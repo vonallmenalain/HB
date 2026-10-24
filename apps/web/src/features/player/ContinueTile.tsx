@@ -6,6 +6,7 @@ import { type Progress, progressRatio } from '@/features/progress/progress'
 import { RemoveFromShelf } from '@/features/progress/RemoveFromShelf'
 import { formatRemaining } from '@/lib/format'
 import { BookCover } from '@/ui/BookCover'
+import { PlayIcon } from '@/ui/PlayerIcons'
 import { ProgressBar } from '@/ui/ProgressBar'
 
 import { usePlayer } from './playerContext'
@@ -49,9 +50,11 @@ export function ContinueTile({
       <div className="flex items-center gap-4">
         <span
           aria-hidden="true"
-          className="flex size-touch shrink-0 items-center justify-center rounded-full bg-primary text-4xl text-on-primary"
+          className="flex size-touch shrink-0 items-center justify-center rounded-full bg-primary text-on-primary"
         >
-          ▶
+          <span className="size-1/2">
+            <PlayIcon />
+          </span>
         </span>
         <span className="flex min-w-0 flex-col">
           <span className="text-2xl font-bold">Weiterhören</span>
