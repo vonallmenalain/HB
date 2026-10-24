@@ -1,14 +1,21 @@
+import { useLocation } from 'react-router-dom'
+
 import { BigButton } from '@/ui/BigButton'
 import { usePwaUpdate } from '@/lib/pwa'
 
 /**
  * Meldet eine neue Version, statt selbsttätig neu zu laden. Ab M5 bekommt diese
  * Leiste zusätzlich die Bedingung, dass gerade nichts abgespielt wird.
+ *
+ * Im Player wartet sie: Dort läge sie über dem Stopp-Knopf. Sobald man den
+ * Player verlässt, ist sie wieder da – die neue Version läuft ja nicht weg.
  */
 export function UpdateBar() {
   const { needRefresh, update } = usePwaUpdate()
+  const location = useLocation()
 
   if (!needRefresh) return null
+  if (location.pathname.startsWith('/player/')) return null
 
   return (
     <div className="sticky bottom-0 z-10 px-4 pb-2">

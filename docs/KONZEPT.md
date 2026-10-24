@@ -298,6 +298,33 @@ wert, das man sich beim Greifen nach Pause einhandelt. Der Knopf trägt einen
 Rand aus `--color-control`; ohne ihn stünde eine weisse Fläche auf einer
 weissen Leiste.
 
+**Der Player passt immer auf den Bildschirm.** Gescrollt und gezoomt wird
+dort nie – auf dem Tablet im Querformat lag der Play-Knopf früher unter dem
+Rand, und gezoomt fand ein Kind nicht mehr zurück. Platz macht das Cover: Es
+bekommt, was die Knöpfe übrig lassen. Ist der Bildschirm deutlich breiter als
+hoch, steht es neben den Knöpfen statt darüber:
+
+```
+ ┌─────────────────────────────────────────────┐
+ │ ←                                     Timer │
+ │  ┌───────────────┐      Der Super-Papagei   │
+ │  │               │  🔒  ██████░░░░░░░░░░░░  │
+ │  │     COVER     │  |<     Kapitel 4     >| │
+ │  │               │     -30s    >    +30s   │
+ │  └───────────────┘             ■            │
+ └─────────────────────────────────────────────┘
+```
+
+Reicht selbst das nicht – Handy quer, kleines Fire-Tablet, geteilter
+Bildschirm –, geben im Player die Grössen aus §5.5 nach und schrumpfen mit der
+Höhe des Bildschirms. Das ist die zweite Ausnahme von den Regeln dort, und sie
+gilt nur, wo sonst ein Knopf aus dem Bild fiele: Ein Knopf, den man nicht
+sieht, ist kleiner als jeder, den man sieht.
+
+**Ein Tipp aufs Cover zeigt es gross**, über den ganzen Bildschirm. Zu geht es
+über das Kreuz oben rechts, nicht über einen Tipp aufs Bild – Kinder tippen auf
+das, was sie ansehen.
+
 **Der Fortschrittsbalken war bis M8 bewusst nur Anzeige** – aus Sorge, ein Kind
 verliere beim versehentlichen Wischen seine Stelle. In der Praxis fehlte er:
 Wer eine bestimmte Stelle sucht, tippt sonst minutenlang auf ⏪. Seit M9 lässt
