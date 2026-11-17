@@ -43,7 +43,8 @@ registerRoute(
 )
 
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
-  // Wird ausgelöst, wenn die Nutzerin die neue Version bewusst annimmt.
+  // Wird ausgelöst, wenn die App die neue Version übernimmt – von selbst, an
+  // einer Stelle, an der gerade nichts läuft (siehe `AutoUpdate`).
   if ((event.data as { type?: string } | undefined)?.type === 'SKIP_WAITING') {
     void self.skipWaiting()
   }
