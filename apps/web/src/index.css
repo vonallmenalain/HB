@@ -182,6 +182,18 @@
     background: transparent;
     /* Ohne das scrollt Android beim Ziehen die Seite statt zu spulen. */
     touch-action: none;
+    /*
+     * Die Stelle kommt etwa viermal in der Sekunde. Dazwischen gleitet die
+     * Füllung, statt zu springen – bei einem Kapitel von einer Minute sieht
+     * man sonst jeden Schritt. So lange wie der Abstand zweier Meldungen,
+     * linear: Dann geht eine Bewegung nahtlos in die nächste über.
+     */
+    transition: --seek-fill 250ms linear;
+  }
+
+  /* Beim Ziehen gehört die Füllung dem Finger – ein Nachlauf fühlte sich zäh an. */
+  .seek[data-ziehen] {
+    transition: none;
   }
 
   .seek::-webkit-slider-runnable-track {
@@ -241,6 +253,17 @@
     outline-offset: 2px;
     border-radius: 9999px;
   }
+}
+
+/*
+ * Nur eine angemeldete Eigenschaft lässt sich überblenden – eine gewöhnliche
+ * Variable springt. `inherits`, weil die Spur des Balkens ein Pseudo-Element
+ * ist und den Wert vom Eingabefeld erbt.
+ */
+@property --seek-fill {
+  syntax: '<percentage>';
+  inherits: true;
+  initial-value: 0%;
 }
 
 @media (prefers-reduced-motion: reduce) {
