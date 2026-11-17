@@ -3,9 +3,14 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { OFFEN_MS, SeekBar } from './SeekBar'
 
-function zeigen(onSeek = vi.fn()) {
+function zeigen(onSeek = vi.fn(), positionSec = 900, durationSec = 1800) {
   render(
-    <SeekBar positionSec={900} durationSec={1800} onSeek={onSeek} label="Stelle im Hörbuch" />,
+    <SeekBar
+      positionSec={positionSec}
+      durationSec={durationSec}
+      onSeek={onSeek}
+      label="Stelle im Hörbuch"
+    />,
   )
   return {
     onSeek,
@@ -78,5 +83,38 @@ describe('SeekBar', () => {
 
     fireEvent.pointerUp(balken())
     expect(onSeek).toHaveBeenCalledWith(1200)
+  })
+
+  it('folgt der Stelle stufenlos, statt auf fünf Sekunden einzurasten', () => {
+    // Bei einem Kapitel von einer Minute waren fünf Sekunden ein Zwölftel der
+    // Breite: Der Balken stand still und machte dann einen Satz.
+    const { balken } = zeigen(vi.fn(), 23.6, 60)
+
+    expect(balken()).toHaveValue('23.6')
+    expect(balken().style.getPropertyValue('--seek-fill')).toMatch(/^39\.33/)
+  })
+
+  it('geht mit den Pfeiltasten fünf Sekunden weiter und springt beim Loslassen', () => {
+    const { balken, riegel, onSeek } = zeigen()
+    fireEvent.click(riegel())
+
+    fireEvent.keyDown(balken(), { key: 'ArrowRight' })
+    fireEvent.keyDown(balken(), { key: 'ArrowRight' })
+    expect(onSeek).not.toHaveBeenCalled()
+
+    fireEvent.keyUp(balken(), { key: 'ArrowRight' })
+    expect(onSeek).toHaveBeenCalledWith(910)
+  })
+
+  it('folgt beim Ziehen dem Finger ohne Nachlauf', () => {
+    const { balken, riegel } = zeigen()
+    expect(balken()).not.toHaveAttribute('data-ziehen')
+
+    fireEvent.click(riegel())
+    fireEvent.change(balken(), { target: { value: '1200' } })
+    expect(balken()).toHaveAttribute('data-ziehen')
+
+    fireEvent.pointerUp(balken())
+    expect(balken()).not.toHaveAttribute('data-ziehen')
   })
 })

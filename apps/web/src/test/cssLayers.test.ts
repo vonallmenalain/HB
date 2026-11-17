@@ -65,6 +65,9 @@ describe('index.css', () => {
     const unlayered = stripLayerBlocks(css)
       // `@theme` ist Tailwinds eigene Direktive und erzeugt nur Variablen.
       .replace(/@theme\s*\{[^}]*\}/g, '')
+      // `@property` meldet eine Variable an, damit sie sich überblenden lässt –
+      // auch das gestaltet kein Element.
+      .replace(/@property\s+--[\w-]+\s*\{[^}]*\}/g, '')
 
     // Übrig bleiben dürfen nur der Dark-Mode-Block und die Reduced-Motion-Regel.
     const declarations = [...unlayered.matchAll(/^\s*([a-z-]+)\s*:/gim)].map((m) => m[1])

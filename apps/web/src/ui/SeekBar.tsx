@@ -30,8 +30,14 @@ import { formatTime } from '@/lib/format'
  *
  * Gezogen wird gegen einen eigenen Wert, nicht gegen die laufende Wiedergabe –
  * sonst zöge der Daumen gegen die Sekunden an, die währenddessen weiterlaufen.
+ *
+ * Die Füllung folgt der Stelle stufenlos. Bis November 2026 rastete der Balken
+ * auf fünf Sekunden ein: Bei einem Kapitel von einer Minute ist das ein
+ * Zwölftel der Breite, und der Balken stand still und machte dann einen Satz.
+ * Jetzt bekommt er die genaue Stelle, und dazwischen gleitet er (`.seek` in
+ * index.css) – ohne dass React dafür sechzigmal in der Sekunde zeichnet.
  */
-/** Schrittweite: fein genug zum Suchen, grob genug für Pfeiltasten. */
+/** Schrittweite der Pfeiltasten. Ziehen geht stufenlos. */
 const SCHRITT = 5
 
 /** So lange bleibt der Balken nach der letzten Bedienung offen. */
@@ -88,11 +94,12 @@ export function SeekBar({
     if (offen) balken.current?.focus()
   }, [offen])
 
-  const max = Math.max(1, Math.round(durationSec))
-  // Auf die Schrittweite gerundet: Sonst zeigte der Browser einen anderen Wert
-  // an, als React gesetzt hat, und der Daumen sässe neben der Füllung.
-  const roh = Math.min(max, Math.max(0, Math.round(gezogen ?? positionSec)))
-  const wert = Math.min(max, Math.round(roh / SCHRITT) * SCHRITT)
+  const max = Number.isFinite(durationSec) && durationSec > 0 ? durationSec : 1
+  // Ungerundet: Jede Rundung hier ist ein Ruck auf dem Bildschirm. Der Balken
+  // nimmt jeden Wert an (`step="any"`), also sitzt der Daumen auch genau dort,
+  // wo die Füllung endet.
+  const stelle = gezogen ?? positionSec
+  const wert = Math.min(max, Math.max(0, Number.isFinite(stelle) ? stelle : 0))
   const anteil = (wert / max) * 100
 
   const springen = (): void => {
@@ -128,9 +135,11 @@ export function SeekBar({
           className="seek"
           min={0}
           max={max}
-          step={SCHRITT}
+          step="any"
           value={wert}
           disabled={!offen}
+          // Beim Ziehen folgt die Füllung dem Finger ohne Nachlauf (index.css).
+          data-ziehen={gezogen === null ? undefined : ''}
           aria-label={label}
           aria-valuetext={`${formatTime(wert)} von ${formatTime(max)}`}
           style={{ '--seek-fill': `${String(anteil)}%` } as React.CSSProperties}
@@ -144,6 +153,21 @@ export function SeekBar({
             // Abgebrochene Geste: Die Wiedergabe bleibt, wo sie ist.
             event.preventDefault()
             setGezogen(null)
+          }}
+          onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+            // Mit `step="any"` wählte jeder Browser seine eigene Schrittweite für
+            // die Pfeiltasten – Chrome ein Hundertstel der Länge. Fünf Sekunden
+            // sind ein Schritt, den man beim Suchen hört.
+            const richtung =
+              event.key === 'ArrowRight' || event.key === 'ArrowUp'
+                ? 1
+                : event.key === 'ArrowLeft' || event.key === 'ArrowDown'
+                  ? -1
+                  : 0
+            if (richtung === 0) return
+            event.preventDefault()
+            setGezogen(Math.min(max, Math.max(0, wert + richtung * SCHRITT)))
+            offenHalten()
           }}
           onKeyUp={(event: KeyboardEvent<HTMLInputElement>) => {
             if (event.key.startsWith('Arrow') || event.key === 'Home' || event.key === 'End') {
