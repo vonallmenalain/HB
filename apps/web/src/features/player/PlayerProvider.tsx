@@ -14,6 +14,7 @@ import { useLibrary } from '@/features/library/libraryContext'
 import { makeProgress, resolveResume } from '@/features/progress/progress'
 import { useProgress } from '@/features/progress/progressContext'
 
+import { chapterProgress } from './chapterProgress'
 import { getEngine, setAccessRenewal, setAudioUrlResolver } from './engine'
 import {
   SKIP_SECONDS,
@@ -212,8 +213,15 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     setMediaPlaybackState(snapshot?.playing ?? false)
   }, [snapshot?.playing])
 
+  // Auf dem Sperrbildschirm dasselbe Mass wie im Player: das Kapitel. Oben
+  // steht dort ohnehin der Kapitelname – ein Balken über neun Stunden passte
+  // nicht dazu und taugte auch dort nicht zum Spulen.
+  const kapitelStart = useRef(0)
   useEffect(() => {
-    if (book) setMediaPosition(positionSec, book.durationSec)
+    if (!book) return
+    const kapitel = chapterProgress(book, positionSec)
+    kapitelStart.current = kapitel.startSec
+    setMediaPosition(kapitel.positionSec, kapitel.lengthSec)
   }, [book, positionSec])
 
   useEffect(() => {
@@ -236,7 +244,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
       },
       previousChapter: engine.previousChapter,
       nextChapter: engine.nextChapter,
-      seekTo: engine.seekTo,
+      // Der Sperrbildschirm meldet die Stelle im Kapitel, so wie er sie
+      // gezeigt bekommt.
+      seekTo: (imKapitel: number) => {
+        engine.seekTo(kapitelStart.current + imKapitel)
+      },
     })
     return () => {
       setMediaHandlers(null)

@@ -29,7 +29,7 @@ const BOOK = makeBook({
 })
 
 describe('Player', () => {
-  it('zeigt Buch, Kapitel und Restzeit', () => {
+  it('zeigt Buch, Kapitel und Restzeit – die Zeiten am Balken fürs Kapitel', () => {
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/player/b_1',
       library: makeLibraryValue({ books: [BOOK] }),
@@ -44,8 +44,30 @@ describe('Player', () => {
 
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Der Super-Papagei')
     expect(screen.getByText('Die Spur')).toBeInTheDocument()
-    expect(screen.getByText('11:40')).toBeInTheDocument()
+    // 700 Sekunden im Buch sind 100 im zweiten Kapitel, das bis 1800 geht.
+    expect(screen.getByText('1:40')).toBeInTheDocument()
     expect(screen.getByText('-18:20')).toBeInTheDocument()
+    // Das ganze Buch steht für sich – auch es zählt zurück.
+    expect(screen.getByText('Kapitel 2 von 2')).toBeInTheDocument()
+    expect(screen.getByText('Hörbuch noch 18:20')).toBeInTheDocument()
+  })
+
+  it('lässt die Buchzeile weg, wenn es nur ein Kapitel gibt', () => {
+    const EINS = makeBook({
+      id: 'b_1',
+      durationSec: 600,
+      chapters: [{ idx: 0, title: 'Alles', fileIdx: 0, startSec: 0, endSec: 600 }],
+    })
+    renderWithProfiles(<AppRoutes />, profiles(), {
+      route: '/player/b_1',
+      library: makeLibraryValue({ books: [EINS] }),
+      player: makePlayerValue({ book: EINS, positionSec: 100, durationSec: 600 }),
+    })
+
+    expect(screen.getByText('-8:20')).toBeInTheDocument()
+    expect(screen.queryByText(/Hörbuch noch/)).not.toBeInTheDocument()
+    // Kapitel und Buch sind hier dasselbe – der Balken heisst wie früher.
+    expect(screen.getByRole('slider', { name: 'Stelle im Hörbuch' })).toBeInTheDocument()
   })
 
   it('bietet Pause an, während etwas läuft', async () => {
@@ -79,17 +101,18 @@ describe('Player', () => {
     expect(nextChapter).toHaveBeenCalled()
   })
 
-  it('zeigt die Stelle im Buch als Balken zum Spulen', () => {
+  it('zeigt die Stelle im Kapitel als Balken zum Spulen', () => {
     renderWithProfiles(<AppRoutes />, profiles(), {
       route: '/player/b_1',
       library: makeLibraryValue({ books: [BOOK] }),
       player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800 }),
     })
 
-    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
-    expect(balken).toHaveValue('900')
-    // Die Zeitangabe gehört dazu: „900" sagt einem Vorleseprogramm nichts.
-    expect(balken).toHaveAttribute('aria-valuetext', '15:00 von 30:00')
+    // 900 im Buch sind 300 im zweiten Kapitel (600 bis 1800).
+    const balken = screen.getByRole('slider', { name: 'Stelle im Kapitel' })
+    expect(balken).toHaveValue('300')
+    // Die Zeitangabe gehört dazu: „300" sagt einem Vorleseprogramm nichts.
+    expect(balken).toHaveAttribute('aria-valuetext', '5:00 von 20:00')
   })
 
   it('lässt sich nicht bedienen, bevor der Riegel offen ist', async () => {
@@ -104,7 +127,7 @@ describe('Player', () => {
       player: makePlayerValue({ book: BOOK, positionSec: 900, durationSec: 1800, seekTo }),
     })
 
-    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
+    const balken = screen.getByRole('slider', { name: 'Stelle im Kapitel' })
     expect(balken).toBeDisabled()
 
     await user.click(balken)
@@ -114,7 +137,7 @@ describe('Player', () => {
     expect(balken).toBeEnabled()
   })
 
-  it('springt beim Loslassen an die gezogene Stelle', async () => {
+  it('springt beim Loslassen an die gezogene Stelle im Kapitel', async () => {
     const seekTo = vi.fn()
     const user = userEvent.setup()
     renderWithProfiles(<AppRoutes />, profiles(), {
@@ -125,13 +148,14 @@ describe('Player', () => {
 
     await user.click(screen.getByRole('button', { name: 'Spulen freigeben' }))
 
-    const balken = screen.getByRole('slider', { name: 'Stelle im Hörbuch' })
-    fireEvent.change(balken, { target: { value: '1200' } })
+    const balken = screen.getByRole('slider', { name: 'Stelle im Kapitel' })
+    fireEvent.change(balken, { target: { value: '600' } })
     // Während des Ziehens passiert nichts – sonst ruckelte der Ton bei jedem
     // Zwischenwert.
     expect(seekTo).not.toHaveBeenCalled()
 
     fireEvent.pointerUp(balken)
+    // Zurückgerechnet aufs Buch: Das Kapitel beginnt bei 600.
     expect(seekTo).toHaveBeenCalledWith(1200)
   })
 })

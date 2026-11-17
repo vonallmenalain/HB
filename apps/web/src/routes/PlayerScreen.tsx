@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useLibrary } from '@/features/library/libraryContext'
+import { chapterProgress } from '@/features/player/chapterProgress'
 import { SKIP_SECONDS } from '@/features/player/mediaSession'
 import { PlayerCover } from '@/features/player/PlayerCover'
 import { SleepTimerButton } from '@/features/player/SleepTimerButton'
@@ -28,6 +29,12 @@ import { Screen } from '@/ui/Screen'
  * Grosse Knöpfe, nichts zum Kaputtmachen. Ein Kind soll hier vor allem zwei
  * Dinge tun: anhalten und weiterhören. Wer eine bestimmte Stelle sucht, zieht
  * am Balken oder springt in 30-Sekunden-Schritten.
+ *
+ * Der Balken misst das laufende Kapitel, nicht das ganze Buch: Bei neun
+ * Stunden wäre ein Millimeter darauf eine Viertelstunde, und „noch 32 Minuten
+ * in diesem Kapitel" ist die Zahl, nach der man vor dem Einschlafen sucht.
+ * Wie lange das ganze Hörbuch noch dauert, steht für sich darunter – an den
+ * Balken gehängt, gehörte die linke Zahl zum Balken und die rechte nicht.
  *
  * Gescrollt wird hier nie. Alle Knöpfe stehen immer im Bild, auf jedem
  * Bildschirm: Auf dem Tablet im Querformat lag der Play-Knopf früher unter
@@ -66,7 +73,10 @@ export function PlayerScreen() {
   }
 
   const cover = book.cover !== null ? (client?.coverUrl(book.cover) ?? null) : null
-  const remaining = Math.max(0, book.durationSec - player.positionSec)
+  const kapitel = chapterProgress(book, player.positionSec)
+  const restBuch = Math.max(0, book.durationSec - player.positionSec)
+  // Bei einem einzigen Kapitel wäre die zweite Zeile dieselbe Zahl noch einmal.
+  const mehrereKapitel = kapitel.count > 1
 
   return (
     <Screen wide fit>
@@ -124,15 +134,31 @@ export function PlayerScreen() {
             <h1 className="line-clamp-2 text-center text-2xl font-bold">{book.title}</h1>
 
             <SeekBar
-              positionSec={player.positionSec}
-              durationSec={book.durationSec}
-              onSeek={player.seekTo}
-              label="Stelle im Hörbuch"
+              // Je Kapitel ein frischer Balken: Läuft während des Ziehens ein
+              // Kapitel zu Ende, gälte die gezogene Stelle sonst im nächsten.
+              key={kapitel.startSec}
+              positionSec={kapitel.positionSec}
+              durationSec={kapitel.lengthSec}
+              onSeek={(imKapitel) => {
+                player.seekTo(kapitel.startSec + imKapitel)
+              }}
+              label={mehrereKapitel ? 'Stelle im Kapitel' : 'Stelle im Hörbuch'}
               footer={
-                <div className="flex justify-between tabular-nums text-ink-soft">
-                  <span>{formatTime(player.positionSec)}</span>
-                  <span>{formatCountdown(remaining)}</span>
-                </div>
+                <>
+                  <div className="flex justify-between tabular-nums text-ink-soft">
+                    <span>{formatTime(kapitel.positionSec)}</span>
+                    <span>{formatCountdown(kapitel.lengthSec - kapitel.positionSec)}</span>
+                  </div>
+                  {mehrereKapitel ? (
+                    /* Bricht auf dem Handy lieber um, als die Zeit abzuschneiden. */
+                    <p className="flex flex-wrap justify-center gap-x-4 pt-1 text-sm tabular-nums text-ink-soft">
+                      <span>
+                        Kapitel {kapitel.number} von {kapitel.count}
+                      </span>
+                      <span>Hörbuch noch {formatTime(restBuch)}</span>
+                    </p>
+                  ) : null}
+                </>
               }
             />
 

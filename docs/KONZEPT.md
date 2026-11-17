@@ -349,6 +349,17 @@ eine Absicht, kein Nebenprodukt des Haltens. Die ±30-Sekunden-Knöpfe bleiben
 frei bedienbar – sie kosten im schlimmsten Fall dreissig Sekunden, nicht die
 Stelle.
 
+**Der Balken misst das Kapitel, nicht das Buch.** Bei neun Stunden ist ein
+Millimeter auf einem Balken über das ganze Buch eine Viertelstunde – zum Spulen
+taugt das nicht. Und „1:09 … -9:05:48" beantwortet die Frage vor dem
+Einschlafen nicht: Wann ist dieses Kapitel zu Ende? Deshalb gelten Balken und
+die beiden Zeiten daran dem laufenden Kapitel. Wie lange das ganze Hörbuch noch
+dauert, steht für sich darunter („Kapitel 2 von 19 · Hörbuch noch 9:05:48") und
+zählt ebenso zurück. An den Balken gehängt, gehörte die linke Zahl zum Balken
+und die rechte nicht. Bei einem Buch aus einem einzigen Kapitel entfällt die
+Zeile. Der Sperrbildschirm misst genauso – dort steht oben ohnehin der
+Kapitelname.
+
 Technisch ist es ein `input[type=range]` mit `disabled`: Tastatur und
 Vorleseprogramm können damit umgehen, ohne dass dafür etwas nachgebaut werden
 müsste. Der Tap auf den Riegel setzt den Tastaturfokus auf den Balken – sonst
