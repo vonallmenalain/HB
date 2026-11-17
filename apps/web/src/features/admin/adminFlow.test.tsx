@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import { AdminScreen } from '@/routes/AdminScreen'
 import { type AccessRequest } from '@/features/auth/accessRequest'
-import type { MediaClient, MediaFolder } from '@/features/library/mediaClient'
+import type { MediaClient, MediaFolder, ScanIssue } from '@/features/library/mediaClient'
 import {
   makeAdminValue,
   makeAuthValue,
@@ -190,8 +190,9 @@ function makeClient(overrides: Partial<MediaClient> = {}): MediaClient {
     fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
     startRescan: () => Promise.resolve('started'),
     fetchStatus: () =>
-      Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
+      Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null, issues: 0 }),
     fetchFolders: () => Promise.resolve([]),
+    fetchScanIssues: () => Promise.resolve({ scannedAt: null, issues: [] }),
     fetchOwnCovers: () => Promise.resolve({}),
     startCoverSearch: () => Promise.resolve('started' as const),
     fetchCoverSearch: () =>
@@ -481,5 +482,71 @@ describe('Ordner umstellen', () => {
     await waitFor(() => {
       expect(setFolderMode).toHaveBeenCalledWith('Die Drei Ausrufezeichen', 'einBuch')
     })
+  })
+})
+
+describe('Was beim Einlesen liegen blieb', () => {
+  const ATMOS: ScanIssue = {
+    kind: 'unsupported-format',
+    folder: 'Reihe/Das Buch [Dolby Atmos 5.1]',
+    files: ['01 - Vorspann.mka', '02 - Erstes Kapitel.mka', '03 - Zweites Kapitel.mka', '04.mka'],
+    extensions: ['.mka'],
+    noPlayableAudio: true,
+  }
+
+  function zeigen(client: MediaClient, route = '/admin/einlesen') {
+    renderWithProfiles(<AdminScreen />, profiles(), {
+      route,
+      auth: makeAuthValue({ isAdmin: true }),
+      admin: makeAdminValue(),
+      library: makeLibraryValue({ books: [makeBook()], client }),
+    })
+  }
+
+  it('nennt Ordner, Format und was hilft', async () => {
+    zeigen(
+      makeClient({
+        fetchScanIssues: () =>
+          Promise.resolve({ scannedAt: '2026-11-17T08:20:32.830Z', issues: [ATMOS] }),
+      }),
+    )
+
+    expect(await screen.findByText('Reihe/Das Buch [Dolby Atmos 5.1]')).toBeInTheDocument()
+    expect(screen.getByText(/4 Dateien im Format \.mka/)).toBeInTheDocument()
+    expect(screen.getByText(/fehlt deshalb in der Bibliothek/)).toBeInTheDocument()
+    expect(screen.getByText(/als MP3 oder M4B ablegen/)).toBeInTheDocument()
+    // Drei Namen reichen zum Wiedererkennen.
+    expect(screen.getByText(/und 1 weitere/)).toBeInTheDocument()
+  })
+
+  it('sagt, wenn nichts liegen blieb', async () => {
+    zeigen(makeClient())
+
+    expect(await screen.findByText(/nichts liegen geblieben/)).toBeInTheDocument()
+  })
+
+  it('verwechselt einen älteren Dienst nicht mit einer leeren Liste', async () => {
+    zeigen(makeClient({ fetchScanIssues: () => Promise.resolve(null) }))
+
+    expect(await screen.findByText(/älter als diese Liste/)).toBeInTheDocument()
+    expect(screen.queryByText(/nichts liegen geblieben/)).not.toBeInTheDocument()
+  })
+
+  it('zeigt die Zahl schon auf der Kachel', async () => {
+    zeigen(
+      makeClient({
+        fetchStatus: () =>
+          Promise.resolve({
+            scanning: false,
+            books: 1,
+            schemaVersion: 2,
+            scannedAt: null,
+            issues: 2,
+          }),
+      }),
+      '/admin',
+    )
+
+    expect(await screen.findByText(/Einlesen · 2 Hinweise/)).toBeInTheDocument()
   })
 })

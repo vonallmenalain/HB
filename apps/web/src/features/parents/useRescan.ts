@@ -25,7 +25,11 @@ const MAX_PROBE_FAILURES = 3
 export type RescanState =
   | { kind: 'idle' }
   | { kind: 'running' }
-  | { kind: 'done'; neu: number; gesamt: number }
+  /**
+   * Durchgelaufen. `hinweise` zählt die Ordner, in denen etwas liegen blieb –
+   * 0 auch dann, wenn ein älterer Dienst die Zahl nicht kennt.
+   */
+  | { kind: 'done'; neu: number; gesamt: number; hinweise: number }
   | { kind: 'still-running' }
   /** Der Scan endete, ohne einen neuen Katalog zu hinterlassen. */
   | { kind: 'incomplete' }
@@ -149,6 +153,7 @@ export function useScanWatch(
               kind: 'done',
               neu: Math.max(jetzt.books - vorher.books, 0),
               gesamt: jetzt.books,
+              hinweise: jetzt.issues ?? 0,
             })
           }
           return

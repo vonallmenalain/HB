@@ -4,8 +4,10 @@ import {
   audioMime,
   chapterTitle,
   formatSeriesIndex,
+  extensionOf,
   isAudioFile,
   isCoverFile,
+  isUnsupportedMedia,
   naturalCompare,
   parseBookFolder,
   stripSeriesPrefix,
@@ -270,6 +272,26 @@ describe('Dateierkennung', () => {
     expect(audioMime('cover.jpg')).toBeNull()
     expect(audioMime('liesmich')).toBeNull()
     expect(isAudioFile('buch.json')).toBe(false)
+  })
+
+  it('erkennt Ton, der liegen bleibt, statt ihn mit Beiwerk zu verwechseln', () => {
+    // So kam die Dolby-Atmos-Fassung aufs NAS – und erschien nirgends.
+    expect(isUnsupportedMedia('01 - Vorspann.mka')).toBe(true)
+    expect(isUnsupportedMedia('Kapitel.EAC3')).toBe(true)
+    expect(isUnsupportedMedia('Gekauft.aax')).toBe(true)
+    // Was der Scanner liest, ist kein Fall dafür.
+    expect(isUnsupportedMedia('a.mp3')).toBe(false)
+    expect(isUnsupportedMedia('a.m4b')).toBe(false)
+    // Beiwerk darf still liegen bleiben.
+    expect(isUnsupportedMedia('folder.jpg')).toBe(false)
+    expect(isUnsupportedMedia('desktop.ini')).toBe(false)
+    expect(isUnsupportedMedia('00 - Playlist.m3u')).toBe(false)
+    expect(isUnsupportedMedia('ohne-endung')).toBe(false)
+  })
+
+  it('nennt die Endung kleingeschrieben', () => {
+    expect(extensionOf('Kapitel 1.MKA')).toBe('.mka')
+    expect(extensionOf('ohne-endung')).toBe('')
   })
 
   it('erkennt übliche Cover-Dateinamen', () => {

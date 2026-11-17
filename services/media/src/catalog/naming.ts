@@ -337,6 +337,68 @@ export function isAudioFile(fileName: string): boolean {
   return audioMime(fileName) !== null
 }
 
+/**
+ * Ton- und Filmformate, die der Scanner kennt, aber nicht einliest.
+ *
+ * Alles andere neben den Hörbüchern – Bilder, `desktop.ini`, Playlisten,
+ * Booklets – ist Beiwerk und darf still liegen bleiben. Diese hier nicht: Wer
+ * eine Dolby-Atmos-Fassung als `.mka` oder ein Audible-Hörbuch als `.aax`
+ * ablegt, will ein Hörbuch sehen. Bliebe der Ordner wortlos aussen vor, suchte
+ * man den Fehler überall, nur nicht im Format.
+ *
+ * Nicht eingelesen werden sie, weil der Browser sie nicht zuverlässig abspielt:
+ * Dolby (AC-3, E-AC-3, Atmos) nur auf Geräten mit eigenem Decoder, Matroska gar
+ * nicht als Ton, DRM-geschützte Dateien (`.aax`, `.m4p`) überhaupt nicht. Filme
+ * gehören dazu, weil ein Video im Ordner selten das Hörbuch ist – und wenn
+ * doch, ist es als Tonspur besser abgelegt.
+ */
+const UNSUPPORTED_MEDIA_EXTENSIONS = new Set([
+  // Dolby, DTS und Matroska – so kommen Raumklang-Fassungen daher.
+  '.mka',
+  '.mkv',
+  '.ac3',
+  '.ec3',
+  '.eac3',
+  '.ac4',
+  '.dts',
+  '.thd',
+  '.webm',
+  // Kopiergeschützt: Audible und alte iTunes-Käufe.
+  '.aa',
+  '.aax',
+  '.aaxc',
+  '.m4p',
+  // Andere Tonformate, die ein Browser nicht kennt.
+  '.wma',
+  '.aif',
+  '.aiff',
+  '.ape',
+  '.wv',
+  '.mpc',
+  '.mp2',
+  '.amr',
+  '.ra',
+  '.rm',
+  // Filme: Manche Sammlung legt das Hörbuch als Video ab.
+  '.mp4',
+  '.m4v',
+  '.mov',
+  '.avi',
+])
+
+/** Eine Ton- oder Filmdatei, die der Scanner bewusst nicht einliest. */
+export function isUnsupportedMedia(fileName: string): boolean {
+  const dot = fileName.lastIndexOf('.')
+  if (dot < 0) return false
+  return UNSUPPORTED_MEDIA_EXTENSIONS.has(fileName.slice(dot).toLowerCase())
+}
+
+/** `Kapitel 1.MKA` → `.mka`. Für die Meldung, welche Formate liegen blieben. */
+export function extensionOf(fileName: string): string {
+  const dot = fileName.lastIndexOf('.')
+  return dot < 0 ? '' : fileName.slice(dot).toLowerCase()
+}
+
 const COVER_NAMES = ['cover', 'folder', 'front', 'albumart']
 const COVER_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
 

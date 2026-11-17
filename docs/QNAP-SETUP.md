@@ -451,7 +451,7 @@ indem man `HB_IMAGE` wieder leert.
 | `403` bei `/auth/session` | UID steht nicht in `HB_ALLOWED_UIDS` |
 | App zeigt Bücher, spielt aber nichts | Medien-Host fehlt in der CSP in `netlify.toml` |
 | Tunnel erreichbar, aber CORS-Fehler | `HB_ALLOWED_ORIGINS` stimmt nicht mit der App-Adresse überein |
-| Neue Bücher erscheinen nicht | Im Elternbereich **Neue Hörbücher suchen** drücken. Bleibt es dabei: `HB_RESCAN_INTERVAL_MINUTES` steht auf `0`, oder der Scan läuft noch (`/health` zeigt `scanning: true`) |
+| Neue Bücher erscheinen nicht | Im Elternbereich **Neue Hörbücher suchen** drücken. Bleibt es dabei: Im Adminbereich unter **Einlesen** nachsehen – dort steht jeder Ordner, in dem etwas liegen blieb, etwa eine Dolby-Atmos-Fassung als `.mka` oder ein Audible-Download als `.aax`. Steht dort nichts: `HB_RESCAN_INTERVAL_MINUTES` steht auf `0`, oder der Scan läuft noch (`/health` zeigt `scanning: true`) |
 | **Neue Hörbücher suchen** meldet „darf das Einlesen nicht anstossen" | In `HB_ADMIN_UIDS` steht eine UID-Liste, in der dieses Konto fehlt – ergänzen oder die Variable leer lassen |
 
 Logs ansehen:

@@ -13,7 +13,14 @@ import {
   writeCover,
 } from './cover.js'
 import { bookId } from './ids.js'
-import { audioMime, formatSeriesIndex, isCoverFile, naturalCompare } from './naming.js'
+import {
+  audioMime,
+  extensionOf,
+  formatSeriesIndex,
+  isCoverFile,
+  isUnsupportedMedia,
+  naturalCompare,
+} from './naming.js'
 import { type Structure, readStructure } from './settings.js'
 import {
   isDiscFolder,
@@ -21,10 +28,15 @@ import {
   partsOfOneBook,
   splitsIntoEpisodes,
 } from './structure.js'
-import type { Book, BookLocation, ScanResult } from './types.js'
+import type { Book, BookLocation, ScanIssue, ScanResult } from './types.js'
 import { SCHEMA_VERSION } from './types.js'
 
 const MAX_DEPTH = 4
+/**
+ * So weit sieht der Scanner unter {@link MAX_DEPTH} noch nach – nicht, um dort
+ * einzulesen, sondern um zu sagen, dass dort etwas liegt.
+ */
+const DEEP_LOOK_LEVELS = 3
 const ADDED_AT_FILE = 'added-at.json'
 const OVERRIDE_FILE = 'buch.json'
 const IMAGE_EXTENSIONS = ['.jpg', '.jpeg', '.png', '.webp']
@@ -94,6 +106,8 @@ async function readOverride(folder: string): Promise<BookOverride | null> {
 
 interface FolderContents {
   audio: string[]
+  /** Ton und Film in Formaten, die der Scanner nicht einliest (siehe `naming.ts`). */
+  unsupported: string[]
   cover: string | null
   /** Alle Bilddateien im Ordner – auch die, die keine `cover.jpg` sind. */
   images: string[]
@@ -103,6 +117,7 @@ interface FolderContents {
 async function readFolder(folder: string): Promise<FolderContents> {
   const entries = await readdir(folder, { withFileTypes: true })
   const audio: string[] = []
+  const unsupported: string[] = []
   const images: string[] = []
   const subdirectories: string[] = []
   let cover: string | null = null
@@ -113,6 +128,7 @@ async function readFolder(folder: string): Promise<FolderContents> {
       subdirectories.push(entry.name)
     } else if (entry.isFile()) {
       if (audioMime(entry.name) !== null) audio.push(entry.name)
+      else if (isUnsupportedMedia(entry.name)) unsupported.push(entry.name)
       else {
         const dot = entry.name.lastIndexOf('.')
         if (dot >= 0 && IMAGE_EXTENSIONS.includes(entry.name.slice(dot).toLowerCase())) {
@@ -124,9 +140,10 @@ async function readFolder(folder: string): Promise<FolderContents> {
   }
 
   audio.sort(naturalCompare)
+  unsupported.sort(naturalCompare)
   images.sort(naturalCompare)
   subdirectories.sort(naturalCompare)
-  return { audio, cover, images, subdirectories }
+  return { audio, unsupported, cover, images, subdirectories }
 }
 
 function withoutExtension(fileName: string): string {
@@ -193,9 +210,15 @@ async function scanBook(
   const { options, knownAddedAt } = run
   const { cacheDir } = options
 
+  // Vor dem Lesen: Ein verborgenes Buch muss niemand vermessen, und was darin
+  // nicht lesbar ist, muss auch niemand erfahren.
+  if (source.override?.hidden === true) return null
+
   const files: ProbedFile[] = []
   const filePaths: string[] = []
   let embeddedPictureFrom: string | null = null
+  const unlesbar: string[] = []
+  let grund: string | null = null
 
   for (const entry of source.audio) {
     try {
@@ -214,14 +237,26 @@ async function scanBook(
       filePaths.push(entry.path)
       if (probed.hasPicture && embeddedPictureFrom === null) embeddedPictureFrom = entry.path
     } catch (error) {
-      options.onNotice?.(
-        `Übersprungen: ${entry.path} (${error instanceof Error ? error.message : 'Lesefehler'})`,
-      )
+      const message = error instanceof Error ? error.message : 'Lesefehler'
+      options.onNotice?.(`Übersprungen: ${entry.path} (${message})`)
+      // Bei einem Buch über CD-Ordner heisst die Datei in jedem Ordner gleich –
+      // ohne den Teil davor wüsste niemand, welche gemeint ist.
+      unlesbar.push(entry.discName === null ? entry.fileName : join(entry.discName, entry.fileName))
+      grund ??= message
     }
   }
 
+  if (unlesbar.length > 0) {
+    run.collected.issues.push({
+      kind: 'unreadable-files',
+      folder: relative(options.mediaRoot, source.folder),
+      files: unlesbar,
+      reason: grund ?? 'Lesefehler',
+      bookMissing: files.length === 0,
+    })
+  }
+
   if (files.length === 0) return null
-  if (source.override?.hidden === true) return null
 
   const id = bookId(source.idPath)
 
@@ -304,6 +339,66 @@ async function scanBook(
 interface Collected {
   books: Book[]
   locations: Map<string, BookLocation>
+  issues: ScanIssue[]
+}
+
+/**
+ * Hält fest, was in einem gerade gelesenen Ordner liegen bleibt.
+ *
+ * Aufgerufen genau dort, wo ein Ordner gelesen wird – nicht dort, wo über ihn
+ * entschieden wird. Entschieden wird an vier Stellen (Buch, CD-Teile, einzelner
+ * CD-Ordner, Einzelfolgen), gelesen nur an zweien: So wird jeder Ordner genau
+ * einmal gemeldet, ganz gleich, welcher Zweig ihn am Ende verbraucht.
+ */
+function noteFolder(folder: string, contents: FolderContents, run: ScanRun): void {
+  if (contents.unsupported.length === 0) return
+
+  const relativeFolder = relative(run.options.mediaRoot, folder)
+  const extensions = [...new Set(contents.unsupported.map(extensionOf))].sort()
+  run.collected.issues.push({
+    kind: 'unsupported-format',
+    folder: relativeFolder,
+    files: contents.unsupported,
+    extensions,
+    noPlayableAudio: contents.audio.length === 0,
+  })
+  run.options.onNotice?.(
+    `Nicht eingelesen: ${relativeFolder} – ${String(contents.unsupported.length)} Dateien im Format ${extensions.join(', ')}`,
+  )
+}
+
+function unreadableFolder(folder: string, error: unknown, run: ScanRun): void {
+  const reason = error instanceof Error ? error.message : 'Fehler'
+  run.options.onNotice?.(`Ordner nicht lesbar: ${folder} (${reason})`)
+  run.collected.issues.push({
+    kind: 'unreadable-folder',
+    folder: relative(run.options.mediaRoot, folder),
+    reason,
+  })
+}
+
+/**
+ * Liegt in diesem Ordner oder ein paar Ebenen darunter Ton?
+ *
+ * Nur zum Melden, nie zum Einlesen: Unter {@link MAX_DEPTH} sucht der Scanner
+ * bewusst nicht weiter – eine Bibliothek, die so tief verschachtelt ist, hat
+ * meistens eine Ebene zuviel, und die soll man sehen statt dass der Scanner
+ * sie errät. Ein Ordner voller Booklets oder Bilder ist dagegen keine Meldung
+ * wert.
+ */
+async function holdsMedia(folder: string, levels: number): Promise<boolean> {
+  let contents: FolderContents
+  try {
+    contents = await readFolder(folder)
+  } catch {
+    return false
+  }
+  if (contents.audio.length > 0 || contents.unsupported.length > 0) return true
+  if (levels <= 0) return false
+  for (const name of contents.subdirectories) {
+    if (await holdsMedia(join(folder, name), levels - 1)) return true
+  }
+  return false
 }
 
 /**
@@ -395,14 +490,13 @@ async function readChildren(
 ): Promise<Map<string, FolderContents>> {
   const children = new Map<string, FolderContents>()
   for (const name of names) {
+    const path = join(folder, name)
     try {
-      children.set(name, await readFolder(join(folder, name)))
+      const contents = await readFolder(path)
+      children.set(name, contents)
+      noteFolder(path, contents, run)
     } catch (error) {
-      run.options.onNotice?.(
-        `Ordner nicht lesbar: ${join(folder, name)} (${
-          error instanceof Error ? error.message : 'Fehler'
-        })`,
-      )
+      unreadableFolder(path, error, run)
     }
   }
   return children
@@ -416,7 +510,15 @@ async function walk(
   known?: FolderContents,
 ): Promise<void> {
   const { options } = run
-  if (depth > MAX_DEPTH) return
+  if (depth > MAX_DEPTH) {
+    // Hier wird nicht mehr eingelesen. Liegt darunter aber Ton, soll man das
+    // erfahren – sonst fehlt ein Hörbuch, und nirgends steht, warum.
+    if (await holdsMedia(folder, DEEP_LOOK_LEVELS)) {
+      run.collected.issues.push({ kind: 'too-deep', folder: relative(options.mediaRoot, folder) })
+      options.onNotice?.(`Zu tief verschachtelt, nicht eingelesen: ${folder}`)
+    }
+    return
+  }
 
   let contents: FolderContents
   if (known) {
@@ -425,11 +527,10 @@ async function walk(
     try {
       contents = await readFolder(folder)
     } catch (error) {
-      options.onNotice?.(
-        `Ordner nicht lesbar: ${folder} (${error instanceof Error ? error.message : 'Fehler'})`,
-      )
+      unreadableFolder(folder, error, run)
       return
     }
+    noteFolder(folder, contents, run)
   }
 
   const override = contents.audio.length > 0 ? await readOverride(folder) : null
@@ -444,16 +545,19 @@ async function walk(
     return
   }
 
-  const children =
-    depth < MAX_DEPTH
-      ? await readChildren(folder, contents.subdirectories, run)
-      : new Map<string, FolderContents>()
+  const kinderGelesen = depth < MAX_DEPTH
+  const children = kinderGelesen
+    ? await readChildren(folder, contents.subdirectories, run)
+    : new Map<string, FolderContents>()
   const mitTon = [...children].filter(([, inner]) => inner.audio.length > 0).map(([name]) => name)
 
   /** Was bleibt, nachdem ein Zweig ein paar Unterordner für sich beansprucht hat. */
   const weiterUnten = async (verbraucht: readonly string[]): Promise<void> => {
     for (const name of contents.subdirectories) {
       if (verbraucht.includes(name)) continue
+      // Schon beim Lesen gescheitert und gemeldet: Ein zweiter Versuch
+      // scheiterte genauso und stünde nur doppelt in der Liste.
+      if (kinderGelesen && !children.has(name)) continue
       await walk(join(folder, name), depth + 1, run, children.get(name))
     }
   }
@@ -613,7 +717,7 @@ export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
   await mkdir(join(options.cacheDir, 'manual'), { recursive: true })
   await mkdir(join(options.cacheDir, 'online'), { recursive: true })
 
-  const collected: Collected = { books: [], locations: new Map() }
+  const collected: Collected = { books: [], locations: new Map(), issues: [] }
   const run: ScanRun = {
     options,
     collected,
@@ -638,5 +742,10 @@ export async function scanLibrary(options: ScanOptions): Promise<ScanResult> {
       books: sortBooks(collected.books),
     },
     locations: collected.locations,
+    // Nach Ordner, damit zusammensteht, was zusammengehört – und die Liste nicht
+    // von Scan zu Scan anders aussieht.
+    issues: [...collected.issues].sort(
+      (a, b) => naturalCompare(a.folder, b.folder) || a.kind.localeCompare(b.kind),
+    ),
   }
 }

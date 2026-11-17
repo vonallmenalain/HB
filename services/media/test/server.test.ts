@@ -89,6 +89,60 @@ describe('GET /health', () => {
   })
 })
 
+describe('Was beim Einlesen liegen blieb', () => {
+  it('nennt in /health nur die Zahl', async () => {
+    const response = await app.inject({ method: 'GET', url: '/health' })
+    expect(response.json()).toMatchObject({ issues: 0 })
+  })
+
+  it('nennt Ordner und Dateien nur dem Adminbereich', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Ein Buch', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Atmos', files: [{ name: '01.mka', content: 'x' }] },
+    ])
+    const eigener = createCatalogStore({ mediaRoot, cacheDir })
+    await eigener.rescan()
+    const server = buildServer({
+      config: makeConfig(),
+      store: eigener,
+      verifyIdToken: () => Promise.resolve({ uid: UID, email: null }),
+    })
+
+    const health = await server.inject({ method: 'GET', url: '/health' })
+    expect(health.json()).toMatchObject({ books: 1, issues: 1 })
+    expect(health.body).not.toContain('Atmos')
+
+    const response = await server.inject({ method: 'GET', url: `/admin/einlesen?t=${ticket}` })
+    expect(response.statusCode).toBe(200)
+    expect(response.json()).toEqual({
+      scannedAt: eigener.catalog().generatedAt,
+      issues: [
+        {
+          kind: 'unsupported-format',
+          folder: join('Reihe', 'Atmos'),
+          files: ['01.mka'],
+          extensions: ['.mka'],
+          noPlayableAudio: true,
+        },
+      ],
+    })
+  })
+
+  it('verlangt ein Ticket', async () => {
+    expect((await app.inject({ method: 'GET', url: '/admin/einlesen' })).statusCode).toBe(401)
+  })
+
+  it('lehnt Nicht-Administratoren ab', async () => {
+    const restricted = buildServer({
+      config: makeConfig({ adminUids: ['nur-papa'] }),
+      store,
+      verifyIdToken: () => Promise.resolve({ uid: UID, email: null }),
+    })
+    const response = await restricted.inject({ method: 'GET', url: `/admin/einlesen?t=${ticket}` })
+    expect(response.statusCode).toBe(403)
+  })
+})
+
 describe('POST /auth/session', () => {
   it('tauscht ein Firebase-Token gegen ein Ticket', async () => {
     const response = await app.inject({

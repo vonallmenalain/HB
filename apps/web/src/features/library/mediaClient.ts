@@ -60,6 +60,49 @@ export interface NasStatus {
    * Zeitpunkt. `null`, wenn ein älterer Dienst ihn nicht mitschickt.
    */
   scannedAt: string | null
+  /**
+   * Wie viele Ordner beim letzten Einlesen etwas liegen liessen.
+   *
+   * Nur die Zahl – welche es sind, sagt {@link MediaClient.fetchScanIssues}.
+   * `null`, wenn ein älterer Dienst sie nicht mitschickt.
+   */
+  issues: number | null
+}
+
+/**
+ * Etwas, das der Scanner auf dem NAS liegen gelassen hat.
+ *
+ * `folder` ist relativ zum Hörbuch-Ordner, so wie er in der File Station
+ * heisst; leer heisst „der Hörbuch-Ordner selbst".
+ */
+export type ScanIssue =
+  /** Ton- oder Filmdateien in einem Format, das der Scanner nicht einliest. */
+  | {
+      kind: 'unsupported-format'
+      folder: string
+      files: string[]
+      /** `['.mka']` */
+      extensions: string[]
+      /** Liegt daneben nichts Abspielbares? Dann fehlt der Ordner ganz. */
+      noPlayableAudio: boolean
+    }
+  /** Dateien, die sich nicht lesen liessen. */
+  | {
+      kind: 'unreadable-files'
+      folder: string
+      files: string[]
+      reason: string
+      /** Liess sich keine einzige lesen? Dann fehlt das Hörbuch ganz. */
+      bookMissing: boolean
+    }
+  | { kind: 'unreadable-folder'; folder: string; reason: string }
+  /** Ton in einem Ordner, der tiefer liegt, als der Scanner sucht. */
+  | { kind: 'too-deep'; folder: string }
+
+/** Was der letzte Scan liegen liess, samt Zeitpunkt. */
+export interface ScanReport {
+  scannedAt: string | null
+  issues: ScanIssue[]
 }
 
 /** Wie ein Ordner gelesen wird, wenn der Adminbereich es vorgibt. */
@@ -106,6 +149,53 @@ export interface CoverSuche {
   vorschlaege: Record<string, CoverVorschlag[]>
 }
 
+function stringList(raw: unknown): string[] {
+  return Array.isArray(raw) ? raw.filter((entry): entry is string => typeof entry === 'string') : []
+}
+
+/**
+ * Ein Eintrag aus `/admin/einlesen`, geprüft.
+ *
+ * Defensiv wie beim Katalog: Eine Art, die diese App nicht kennt – etwa von
+ * einem neueren Dienst –, fliegt heraus, statt die ganze Liste zu verwerfen.
+ */
+export function parseScanIssue(raw: unknown): ScanIssue[] {
+  if (typeof raw !== 'object' || raw === null) return []
+  const entry = raw as Record<string, unknown>
+  if (typeof entry.folder !== 'string') return []
+  const folder = entry.folder
+  const reason = typeof entry.reason === 'string' ? entry.reason : ''
+
+  switch (entry.kind) {
+    case 'unsupported-format':
+      return [
+        {
+          kind: 'unsupported-format',
+          folder,
+          files: stringList(entry.files),
+          extensions: stringList(entry.extensions),
+          noPlayableAudio: entry.noPlayableAudio === true,
+        },
+      ]
+    case 'unreadable-files':
+      return [
+        {
+          kind: 'unreadable-files',
+          folder,
+          files: stringList(entry.files),
+          reason,
+          bookMissing: entry.bookMissing === true,
+        },
+      ]
+    case 'unreadable-folder':
+      return [{ kind: 'unreadable-folder', folder, reason }]
+    case 'too-deep':
+      return [{ kind: 'too-deep', folder }]
+    default:
+      return []
+  }
+}
+
 export interface MediaClient {
   /** Sorgt für ein gültiges Ticket und liefert es zurück. */
   ensureTicket: () => Promise<string>
@@ -133,6 +223,13 @@ export interface MediaClient {
   fetchStatus: () => Promise<NasStatus>
   /** Die Ordner, die sich umstellen lassen. Nur fürs Administratorkonto. */
   fetchFolders: () => Promise<MediaFolder[]>
+  /**
+   * Was beim letzten Einlesen liegen blieb. Nur fürs Administratorkonto.
+   *
+   * `null`, wenn der Dienst auf dem NAS das noch nicht kennt – dann ist er
+   * älter als die App, und das ist etwas anderes als „nichts liegen geblieben".
+   */
+  fetchScanIssues: () => Promise<ScanReport | null>
   /**
    * Stellt einen Ordner um: ein Hörbuch oder eines je Datei.
    *
@@ -446,6 +543,38 @@ export function createMediaClient(options: {
     })
   }
 
+  async function fetchScanIssues(): Promise<ScanReport | null> {
+    let response: Response
+    try {
+      response = await withFreshTicket((ticket) =>
+        doFetch(withTicket('/admin/einlesen', ticket), { method: 'GET' }),
+      )
+    } catch (error) {
+      if (error instanceof MediaRequestError) throw error
+      throw new MediaRequestError('offline')
+    }
+    // Vor der allgemeinen Fehlerlesart: Ein 404 heisst hier nicht „kaputt",
+    // sondern „der Dienst ist älter als diese Route".
+    if (response.status === 404) return null
+    const fehler = adminError(response)
+    if (fehler !== null) throw fehler
+
+    let raw: unknown
+    try {
+      raw = await response.json()
+    } catch {
+      throw new MediaRequestError('malformed')
+    }
+
+    const body = raw as { scannedAt?: unknown; issues?: unknown }
+    if (!Array.isArray(body.issues)) throw new MediaRequestError('malformed')
+
+    return {
+      scannedAt: typeof body.scannedAt === 'string' ? body.scannedAt : null,
+      issues: body.issues.flatMap(parseScanIssue),
+    }
+  }
+
   async function fetchStatus(): Promise<NasStatus> {
     let response: Response
     try {
@@ -475,6 +604,7 @@ export function createMediaClient(options: {
       books: body.books,
       schemaVersion: body.schemaVersion,
       scannedAt: typeof body.scannedAt === 'string' ? body.scannedAt : null,
+      issues: typeof body.issues === 'number' ? body.issues : null,
     }
   }
 
@@ -487,6 +617,7 @@ export function createMediaClient(options: {
     startRescan,
     fetchStatus,
     fetchFolders,
+    fetchScanIssues,
     fetchOwnCovers: async () => {
       const body = await adminJson('/admin/cover')
       const covers = (body as { covers?: unknown }).covers

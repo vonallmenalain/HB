@@ -39,7 +39,7 @@ import type { Book } from './features/library/catalog'
 import { SUPPORTED_SCHEMA_VERSION, parseCatalog, sortBooks } from './features/library/catalog'
 import { LibraryContext, type LibraryContextValue } from './features/library/libraryContext'
 import { tidyBook, tidyBooks } from './features/library/titles'
-import { createMediaClient } from './features/library/mediaClient'
+import { type ScanIssue, createMediaClient } from './features/library/mediaClient'
 import { NowPlayingBar } from './features/player/NowPlayingBar'
 import { PlayerProvider } from './features/player/PlayerProvider'
 import type { ProgressCloud } from './features/progress/cloud'
@@ -233,6 +233,25 @@ const rohBooks: Book[] = [...TITLES, ...LANGE_REIHE].map(([folderName, series, g
 
 const demoBooks = sortBooks(rohBooks.map((book) => tidyBook(book)))
 
+/** Was ein Scan liegen lassen könnte – erfunden, wie alles in der Vorschau. */
+const demoScanIssues: ScanIssue[] = [
+  {
+    kind: 'unsupported-format',
+    folder: 'Die Sternenfahrer/03 - Der Kometenschweif [Dolby Atmos 5.1]',
+    files: Array.from({ length: 19 }, (_, i) => `${String(i + 1).padStart(2, '0')} - Kapitel.mka`),
+    extensions: ['.mka'],
+    noPlayableAudio: true,
+  },
+  {
+    kind: 'unreadable-files',
+    folder: 'Die Sternenfahrer/04 - Funkstille',
+    files: ['07 - Siebtes Kapitel.mp3'],
+    reason: 'End-Of-Stream',
+    bookMissing: false,
+  },
+  { kind: 'too-deep', folder: 'Archiv/Alt/2019/Sommer/Hörspiele' },
+]
+
 const demoClient: LibraryContextValue['client'] = {
   ensureTicket: () => Promise.resolve('t'),
   renewTicket: () => Promise.resolve('t'),
@@ -245,7 +264,10 @@ const demoClient: LibraryContextValue['client'] = {
       books: demoBooks.length,
       schemaVersion: 2,
       scannedAt: new Date().toISOString(),
+      issues: demoScanIssues.length,
     }),
+  fetchScanIssues: () =>
+    Promise.resolve({ scannedAt: new Date().toISOString(), issues: demoScanIssues }),
   // In der Vorschau gibt es kein NAS, das etwas umstellen könnte – die Liste
   // bleibt leer, die Aufrufe tun nichts.
   fetchFolders: () =>
