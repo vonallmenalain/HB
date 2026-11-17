@@ -91,7 +91,49 @@ export interface BookLocation {
   scannedCover: string | null
 }
 
+/**
+ * Etwas, das der Scanner liegen gelassen hat.
+ *
+ * Kein Teil des Katalogs: Den bekommt jedes Gerät, und ein Kind braucht keine
+ * Ordnerpfade. Die Liste geht nur an den Adminbereich.
+ *
+ * `folder` ist immer relativ zum Medien-Stamm – so, wie der Ordner auch in der
+ * File Station heisst.
+ */
+export type ScanIssue =
+  /** Ton- oder Filmdateien in einem Format, das der Scanner nicht einliest. */
+  | {
+      kind: 'unsupported-format'
+      folder: string
+      /** Die Dateinamen, natürlich sortiert. */
+      files: string[]
+      /** Ihre Endungen, kleingeschrieben und ohne Doppelte: `['.mka']`. */
+      extensions: string[]
+      /**
+       * Liegt daneben gar nichts, was der Scanner abspielen kann?
+       *
+       * Dann fehlt der Ordner in der Bibliothek ganz – sonst nur diese Dateien.
+       */
+      noPlayableAudio: boolean
+    }
+  /** Dateien, die sich nicht lesen liessen – kaputt, abgeschnitten, gesperrt. */
+  | {
+      kind: 'unreadable-files'
+      folder: string
+      files: string[]
+      /** Die Fehlermeldung der ersten Datei. */
+      reason: string
+      /** Liess sich keine einzige Datei des Hörbuchs lesen? Dann fehlt es ganz. */
+      bookMissing: boolean
+    }
+  /** Ein Ordner, in den der Scanner nicht hineinsehen durfte. */
+  | { kind: 'unreadable-folder'; folder: string; reason: string }
+  /** Ton in einem Ordner, der tiefer liegt, als der Scanner sucht. */
+  | { kind: 'too-deep'; folder: string }
+
 export interface ScanResult {
   catalog: Catalog
   locations: Map<string, BookLocation>
+  /** Was beim Einlesen liegen blieb, nach Ordner sortiert. */
+  issues: ScanIssue[]
 }

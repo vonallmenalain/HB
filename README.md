@@ -142,7 +142,7 @@ aber fremde Konten aus dem Projekt heraus.
 apps/web/            PWA (Vite, React, TypeScript, Tailwind)
   src/app/           Router, Anmelde-Weiche, App-Hülle
   src/features/auth/ Anmeldung, Freigabeliste, Zugriffsanfragen
-  src/features/admin/     Adminbereich: Freigaben, Titel, Altersfreigaben, Hörhistorie
+  src/features/admin/     Adminbereich: Freigaben, Titel, Altersfreigaben, Einlesen, Hörhistorie
   src/features/library/   Katalog, Medien-Client, Reihen, Titel-Aufbereitung
   src/features/favorites/ Gemerkte Hörbücher je Profil
   src/features/history/   Hörhistorie aufzeichnen und auswerten

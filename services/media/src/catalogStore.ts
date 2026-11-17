@@ -11,7 +11,7 @@ import {
 } from './catalog/cover.js'
 import { scanLibrary } from './catalog/scan.js'
 import { type FolderMode, readStructure, writeStructure } from './catalog/settings.js'
-import type { Book, BookLocation, Catalog, ScanResult } from './catalog/types.js'
+import type { Book, BookLocation, Catalog, ScanIssue, ScanResult } from './catalog/types.js'
 import {
   type CoverSucheStand,
   type CoverVorschlag,
@@ -45,6 +45,14 @@ export interface CatalogStore {
   book: (bookId: string) => Book | undefined
   rescan: () => Promise<void>
   scanning: () => boolean
+  /**
+   * Was der letzte Scan liegen gelassen hat.
+   *
+   * Lebt wie der Katalog nur im Speicher: Nach einem Neustart liest der Dienst
+   * ohnehin neu ein, und eine Liste von gestern wäre ein Stand, der nicht mehr
+   * stimmt.
+   */
+  issues: () => ScanIssue[]
   /** Die Datei, die als Cover ausgeliefert wird – eigenes schlägt gescanntes. */
   coverFile: (bookId: string) => Promise<string | null>
   /** Ordner, für die sich eine Umstellung überhaupt lohnt. */
@@ -110,6 +118,7 @@ export function createCatalogStore(options: {
   let current: ScanResult = {
     catalog: { schemaVersion: 1, generatedAt: new Date(0).toISOString(), books: [] },
     locations: new Map(),
+    issues: [],
   }
   let etagValue = '"leer"'
   let running: Promise<void> | null = null
@@ -258,6 +267,7 @@ export function createCatalogStore(options: {
     book: (bookId) => current.catalog.books.find((entry) => entry.id === bookId),
     rescan,
     scanning: () => running !== null,
+    issues: () => current.issues,
 
     coverFile: async (bookId) => {
       // Erst nachschlagen, dann einen Pfad bauen – nie umgekehrt. Aus der

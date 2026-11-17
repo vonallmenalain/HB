@@ -44,6 +44,7 @@ const status = (overrides: Partial<NasStatus> = {}): NasStatus => {
     books: 10,
     schemaVersion: 2,
     scannedAt: `2026-02-01T10:0${String(uhr)}:00.000Z`,
+    issues: 0,
     ...overrides,
   }
 }
@@ -153,6 +154,28 @@ describe('Neue Hörbücher suchen', () => {
     await suchen()
 
     expect(screen.getByText(/nichts Neues gefunden/)).toBeInTheDocument()
+  })
+
+  it('sagt, wenn auf dem NAS etwas liegen blieb', async () => {
+    // So fiel die Dolby-Atmos-Fassung durch: eingelesen, „nichts Neues
+    // gefunden" – und der Ordner lag doch da.
+    const client = makeClient([status({ books: 10 }), status({ books: 10, issues: 1 })])
+    zeigen({ client })
+
+    await suchen()
+
+    expect(screen.getByText(/nichts Neues gefunden/)).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('In 1 Ordner auf dem NAS')
+    expect(screen.getByRole('alert')).toHaveTextContent('Einlesen')
+  })
+
+  it('schweigt darüber, wenn nichts liegen blieb', async () => {
+    const client = makeClient([status({ books: 10 }), status({ books: 11, issues: 0 })])
+    zeigen({ client })
+
+    await suchen()
+
+    expect(screen.queryByText(/liegen geblieben/)).not.toBeInTheDocument()
   })
 
   it('behauptet nicht „fertig", wenn der Scan nichts hinterlassen hat', async () => {

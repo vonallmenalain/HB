@@ -73,8 +73,9 @@ const client: MediaClient = {
   fetchCatalog: () => Promise.resolve({ status: 'not-modified' }),
   startRescan: () => Promise.resolve('started'),
   fetchStatus: () =>
-    Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null }),
+    Promise.resolve({ scanning: false, books: 1, schemaVersion: 2, scannedAt: null, issues: 0 }),
   fetchFolders: () => Promise.resolve([]),
+  fetchScanIssues: () => Promise.resolve({ scannedAt: null, issues: [] }),
   fetchOwnCovers: () => Promise.resolve({}),
   startCoverSearch: () => Promise.resolve('started' as const),
   fetchCoverSearch: () =>

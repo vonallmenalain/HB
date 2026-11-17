@@ -107,6 +107,9 @@ export function buildServer(options: ServerOptions): FastifyInstance {
     books: store.catalog().books.length,
     scannedAt: store.catalog().generatedAt,
     scanning: store.scanning(),
+    // Nur die Zahl, ohne Anmeldung: Sie sagt nach „Neue Hörbücher suchen", ob
+    // etwas liegen blieb. Welche Ordner das sind, verrät erst die Admin-Route.
+    issues: store.issues().length,
   }))
 
   app.post('/auth/session', async (request, reply) => {
@@ -243,6 +246,21 @@ export function buildServer(options: ServerOptions): FastifyInstance {
       request.log.error({ error }, 'Scan fehlgeschlagen')
     })
     return reply.code(202).send({ started: true })
+  })
+
+  /**
+   * Was beim letzten Einlesen liegen blieb: Dateien in einem Format, das der
+   * Scanner nicht liest, unlesbare Dateien und Ordner, zu tief Verschachteltes.
+   *
+   * Ohne diese Liste fehlt ein Hörbuch einfach – und man sucht den Grund
+   * überall, nur nicht im Dateiformat.
+   */
+  app.get<{ Querystring: TicketQuery }>('/admin/einlesen', async (request, reply) => {
+    if ((await adminUid(request, reply)) === null) return reply
+    return reply.send({
+      scannedAt: store.catalog().generatedAt,
+      issues: store.issues(),
+    })
   })
 
   app.get<{ Querystring: TicketQuery }>('/admin/struktur', async (request, reply) => {

@@ -594,3 +594,132 @@ describe('Reihenfolge in einer Reihe', () => {
     expect(catalog.books.map((book) => book.title)).toEqual(['Zwei', 'Der Anfang'])
   })
 })
+
+describe('Was liegen bleibt', () => {
+  it('meldet einen Ordner, in dem nur Dolby-Atmos-Dateien liegen', async () => {
+    // Genau so lag die Atmos-Fassung auf dem NAS: Kapitel als `.mka`, daneben
+    // Cover, Playlist und was Windows hinterlässt. Der Ordner erschien nirgends,
+    // und nichts sagte, warum.
+    const neu = 'Reihe/Das Buch (Hörbuch mit voller Besetzung) [Dolby Atmos 5.1]'
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/01 - Das Buch', files: [{ name: 'a.wav' }] },
+      {
+        path: neu,
+        files: [
+          { name: '00 - Das Buch.m3u', content: '#EXTM3U' },
+          { name: '01 - Vorspann.mka', content: 'atmos' },
+          { name: '02 - Erstes Kapitel.mka', content: 'atmos' },
+          { name: 'folder.jpg', content: PNG_1X1 },
+          { name: 'desktop.ini', content: '[.ShellClassInfo]' },
+        ],
+      },
+    ])
+
+    const { catalog, issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(issues).toEqual([
+      {
+        kind: 'unsupported-format',
+        folder: join(...neu.split('/')),
+        files: ['01 - Vorspann.mka', '02 - Erstes Kapitel.mka'],
+        extensions: ['.mka'],
+        noPlayableAudio: true,
+      },
+    ])
+  })
+
+  it('meldet übergangene Dateien auch neben lesbaren', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: 'Buch',
+        files: [{ name: '01.wav' }, { name: '02.mka', content: 'x' }, { name: '03.AC3', content: 'x' }],
+      },
+    ])
+
+    const { catalog, issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    // Das Buch ist da – nur eben mit einem Kapitel statt drei.
+    expect(catalog.books[0]?.files).toHaveLength(1)
+    expect(issues).toMatchObject([
+      { kind: 'unsupported-format', folder: 'Buch', extensions: ['.ac3', '.mka'], noPlayableAudio: false },
+    ])
+  })
+
+  it('lässt Beiwerk still liegen', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: 'Buch',
+        files: [
+          { name: '01.wav' },
+          { name: 'cover.jpg', content: PNG_1X1 },
+          { name: 'Booklet.pdf', content: 'pdf' },
+          { name: 'Icon.ico', content: 'ico' },
+          { name: 'Buch.m3u', content: '#EXTM3U' },
+        ],
+      },
+    ])
+
+    const { issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(issues).toEqual([])
+  })
+
+  it('meldet einen CD-Ordner im falschen Format genau einmal', async () => {
+    // Die Unterordner liest ein anderer Zweig als den Buchordner. Gemeldet wird
+    // beim Lesen, nicht beim Entscheiden – sonst stünde er doppelt da.
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Buch/CD 1', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/CD 2', files: [{ name: 'a.wav' }] },
+      { path: 'Reihe/Buch/CD 3', files: [{ name: 'a.mka', content: 'x' }] },
+    ])
+
+    const { catalog, issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toHaveLength(1)
+    expect(catalog.books[0]?.files).toHaveLength(2)
+    expect(issues).toMatchObject([
+      { kind: 'unsupported-format', folder: join('Reihe', 'Buch', 'CD 3'), noPlayableAudio: true },
+    ])
+  })
+
+  it('meldet Dateien, die sich nicht lesen lassen', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'Reihe/Halb', files: [{ name: '01.wav' }, { name: '02.wav', content: 'kaputt' }] },
+      { path: 'Reihe/Ganz kaputt', files: [{ name: '01.wav', content: 'kaputt' }] },
+    ])
+
+    const { catalog, issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books.map((book) => book.folderName)).toEqual(['Halb'])
+    expect(issues).toMatchObject([
+      { kind: 'unreadable-files', folder: join('Reihe', 'Ganz kaputt'), files: ['01.wav'], bookMissing: true },
+      { kind: 'unreadable-files', folder: join('Reihe', 'Halb'), files: ['02.wav'], bookMissing: false },
+    ])
+    expect(issues[0]).toHaveProperty('reason', expect.any(String))
+  })
+
+  it('meldet Ton, der tiefer liegt, als der Scanner sucht', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      { path: 'A/B/C/D/E/Buch/CD 1', files: [{ name: 'a.wav' }] },
+      // Bilder allein sind keine Meldung wert, auch nicht in der Tiefe.
+      { path: 'A/B/C/D/F/Scans', files: [{ name: 'seite1.jpg', content: PNG_1X1 }] },
+    ])
+
+    const { catalog, issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+
+    expect(catalog.books).toEqual([])
+    expect(issues).toEqual([{ kind: 'too-deep', folder: join('A', 'B', 'C', 'D', 'E') }])
+  })
+
+  it('schweigt über einen verborgenen Ordner', async () => {
+    const { mediaRoot, cacheDir } = await makeLibrary([
+      {
+        path: 'Weg',
+        files: [{ name: 'buch.json', content: '{"hidden": true}' }, { name: '01.wav', content: 'kaputt' }],
+      },
+    ])
+
+    const { issues } = await scanLibrary({ mediaRoot, cacheDir, now: NOW })
+    expect(issues).toEqual([])
+  })
+})

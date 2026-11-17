@@ -1,4 +1,4 @@
-import { type ReactNode } from 'react'
+import { type ReactNode, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 
 import { AccessSection } from '@/features/admin/AccessSection'
@@ -7,9 +7,12 @@ import { useAdmin } from '@/features/admin/adminContext'
 import { CoverSearchSection } from '@/features/admin/CoverSearchSection'
 import { CoversSection } from '@/features/admin/CoversSection'
 import { HistorySection } from '@/features/admin/HistorySection'
+import { ScanIssuesSection } from '@/features/admin/ScanIssuesSection'
 import { StructureSection } from '@/features/admin/StructureSection'
 import { TitlesSection } from '@/features/admin/TitlesSection'
 import { useAuth } from '@/features/auth/authContext'
+import { useLibrary } from '@/features/library/libraryContext'
+import type { MediaClient } from '@/features/library/mediaClient'
 import { BigLinkButton } from '@/ui/BigButton'
 import { Notice } from '@/ui/Notice'
 import { Screen, ScreenTitle } from '@/ui/Screen'
@@ -67,6 +70,13 @@ const BEREICHE: Bereich[] = [
     inhalt: () => <StructureSection />,
   },
   {
+    slug: 'einlesen',
+    name: 'Einlesen',
+    hinweis: 'Was auf dem NAS liegt, aber nicht in die Bibliothek kam',
+    zeichen: '⚠',
+    inhalt: () => <ScanIssuesSection />,
+  },
+  {
     slug: 'gehoert',
     name: 'Gehört',
     hinweis: 'Was zuletzt lief',
@@ -74,6 +84,36 @@ const BEREICHE: Bereich[] = [
     inhalt: (isAdmin) => <HistorySection enabled={isAdmin} />,
   },
 ]
+
+/**
+ * Wie viele Ordner beim letzten Einlesen etwas liegen liessen – oder null.
+ *
+ * Aus `/health`, nicht aus der Liste: Für die Zahl auf der Kachel braucht es
+ * weder Ticket noch Pfade. Null, solange niemand gefragt hat, das NAS nicht
+ * antwortet oder ein älterer Dienst die Zahl nicht kennt – dann steht eben
+ * keine da.
+ */
+function useScanIssueCount(client: MediaClient | null): number | null {
+  const [anzahl, setAnzahl] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!client) return
+    let lebt = true
+    client.fetchStatus().then(
+      (status) => {
+        if (lebt) setAnzahl(status.issues)
+      },
+      () => {
+        // Ohne Antwort keine Zahl – die Kachel selbst bleibt brauchbar.
+      },
+    )
+    return () => {
+      lebt = false
+    }
+  }, [client])
+
+  return client === null ? null : anzahl
+}
 
 /** Der Teil der Adresse hinter `/admin` – leer heisst: die Übersicht. */
 function bereichAus(pathname: string): string {
@@ -99,7 +139,9 @@ function bereichAus(pathname: string): string {
 export function AdminScreen() {
   const { isAdmin, state } = useAuth()
   const { requests } = useAdmin()
+  const { client } = useLibrary()
   const { pathname } = useLocation()
+  const liegenGeblieben = useScanIssueCount(isAdmin ? client : null)
 
   if (!isAdmin) {
     return (
@@ -168,6 +210,12 @@ export function AdminScreen() {
                       unbemerkt, bis jemand nachsieht. */}
                   {bereich.slug === 'zugaenge' && offeneAnfragen > 0
                     ? ` · ${String(offeneAnfragen)} offen`
+                    : ''}
+                  {/* Dasselbe für Ordner, die beim Einlesen liegen blieben: Ein
+                      fehlendes Hörbuch fällt sonst erst auf, wenn ein Kind
+                      danach fragt. */}
+                  {bereich.slug === 'einlesen' && liegenGeblieben !== null && liegenGeblieben > 0
+                    ? ` · ${String(liegenGeblieben)} ${liegenGeblieben === 1 ? 'Hinweis' : 'Hinweise'}`
                     : ''}
                 </span>
                 <span className="text-sm text-ink-soft">{bereich.hinweis}</span>

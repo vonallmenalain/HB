@@ -106,6 +106,19 @@ export function LibrarySection() {
         </Notice>
       ) : null}
 
+      {/* Genau die Lage, in der ein Hörbuch fehlt: eingelesen, „nichts Neues",
+          und der Ordner liegt doch auf dem NAS. Der Grund steht nicht hier –
+          er nennt Ordnerpfade und gehört in den Adminbereich. */}
+      {rescan.kind === 'done' && rescan.hinweise > 0 ? (
+        <Notice tone="error">
+          {rescan.hinweise === 1
+            ? 'In 1 Ordner auf dem NAS ist etwas liegen geblieben'
+            : `In ${String(rescan.hinweise)} Ordnern auf dem NAS ist etwas liegen geblieben`}{' '}
+          – etwa Dateien in einem Format, das die App nicht abspielt. Welche Ordner das sind
+          und was hilft, steht im Adminbereich unter „Einlesen".
+        </Notice>
+      ) : null}
+
       <BigButton
         variant="secondary"
         onClick={rescanStarten}

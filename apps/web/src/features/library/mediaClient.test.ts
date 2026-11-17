@@ -346,8 +346,16 @@ describe('Neu einlesen anstossen', () => {
       books: 12,
       schemaVersion: 2,
       scannedAt: '2026-02-01T10:00:00.000Z',
+      // Ein Dienst ohne die Zahl ist älter – nicht fehlerfrei.
+      issues: null,
     })
     expect(fetchImpl).toHaveBeenCalledExactlyOnceWith(`${BASE}/health`)
+  })
+
+  it('liest mit, in wie vielen Ordnern etwas liegen blieb', async () => {
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({ ...healthBody, issues: 2 }))
+
+    expect(await makeClient(fetchImpl).fetchStatus()).toMatchObject({ issues: 2 })
   })
 
   it('meldet eine unverständliche Antwort, statt sie zu glauben', async () => {
@@ -355,6 +363,67 @@ describe('Neu einlesen anstossen', () => {
 
     await expect(makeClient(fetchImpl).fetchStatus()).rejects.toMatchObject({
       reason: 'malformed',
+    })
+  })
+})
+
+describe('Was beim Einlesen liegen blieb', () => {
+  const ATMOS = {
+    kind: 'unsupported-format',
+    folder: 'Reihe/Das Buch [Dolby Atmos 5.1]',
+    files: ['01 - Vorspann.mka'],
+    extensions: ['.mka'],
+    noPlayableAudio: true,
+  }
+
+  it('holt die Liste mit Ticket', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(
+        jsonResponse({ scannedAt: '2026-11-17T08:20:32.830Z', issues: [ATMOS] }),
+      )
+
+    expect(await makeClient(fetchImpl).fetchScanIssues()).toEqual({
+      scannedAt: '2026-11-17T08:20:32.830Z',
+      issues: [ATMOS],
+    })
+    expect(fetchImpl.mock.calls[1]![0]).toBe(`${BASE}/admin/einlesen?t=TICKET-1`)
+  })
+
+  it('lässt fallen, was es nicht kennt, statt die Liste zu verwerfen', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          scannedAt: null,
+          issues: [ATMOS, { kind: 'ganz-neu', folder: 'x' }, { kind: 'too-deep' }, 'unsinn'],
+        }),
+      )
+
+    const report = await makeClient(fetchImpl).fetchScanIssues()
+    expect(report?.issues).toEqual([ATMOS])
+  })
+
+  it('erkennt einen Dienst, der die Liste noch nicht kennt', async () => {
+    // Ein 404 heisst hier „älter als die App" – nicht „nichts liegen geblieben".
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'not_found' }, { status: 404 }))
+
+    expect(await makeClient(fetchImpl).fetchScanIssues()).toBeNull()
+  })
+
+  it('unterscheidet ein nicht berechtigtes Konto', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(jsonResponse(ticketBody()))
+      .mockResolvedValueOnce(jsonResponse({ error: 'not_admin' }, { status: 403 }))
+
+    await expect(makeClient(fetchImpl).fetchScanIssues()).rejects.toMatchObject({
+      reason: 'forbidden',
     })
   })
 })
