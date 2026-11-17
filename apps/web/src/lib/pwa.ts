@@ -4,10 +4,9 @@ import { registerSW } from 'virtual:pwa-register'
 /**
  * Registrierung des Service Workers und der Aktualisierungs-Ablauf.
  *
- * Bewusst *kein* automatischer Reload: Sobald der Player steht (M5), würde ein
- * Neuladen mitten im Kapitel genau den Fortschritt kosten, um den es in dieser
- * App geht. Stattdessen meldet sich eine Leiste, und die Aktualisierung
- * passiert erst auf Tastendruck.
+ * Hier wird nur gemeldet, dass eine neue Version wartet. *Wann* sie übernommen
+ * wird, entscheidet `AutoUpdate` – nie mitten im Kapitel, denn ein Neuladen
+ * dort kostete genau das, worum es in dieser App geht.
  */
 interface PwaState {
   needRefresh: boolean
@@ -41,6 +40,37 @@ function getSnapshot(): PwaState {
   return snapshot
 }
 
+/** So oft sieht die App beim Zurückholen höchstens nach einer neuen Version. */
+export const UPDATE_CHECK_MS = 30 * 60 * 1000
+
+/**
+ * Sieht nach einer neuen Version, sobald die App wieder in den Vordergrund
+ * kommt.
+ *
+ * Von selbst prüft der Browser nur, wenn die Seite wirklich geladen wird. Auf
+ * Android bleibt die App aber oft tagelang im Speicher und wird nur
+ * hervorgeholt – ohne diesen Blick käme eine neue Version erst an, wenn das
+ * System sie einmal ganz beendet. Höchstens alle halbe Stunde: Ein Tablet wird
+ * am Tag dutzendmal geweckt.
+ */
+export function watchForUpdates(
+  check: () => Promise<unknown>,
+  now: () => number = Date.now,
+): () => void {
+  let zuletzt = now()
+  const onVisible = (): void => {
+    if (document.visibilityState !== 'visible') return
+    if (now() - zuletzt < UPDATE_CHECK_MS) return
+    zuletzt = now()
+    // Offline schlägt das fehl – dann eben beim nächsten Mal.
+    void check().catch(() => undefined)
+  }
+  document.addEventListener('visibilitychange', onVisible)
+  return () => {
+    document.removeEventListener('visibilitychange', onVisible)
+  }
+}
+
 export function registerServiceWorker(): void {
   if (import.meta.env.DEV) return
 
@@ -51,6 +81,9 @@ export function registerServiceWorker(): void {
     },
     onOfflineReady: () => {
       publish({ offlineReady: true })
+    },
+    onRegisteredSW: (_url, registration) => {
+      if (registration) watchForUpdates(() => registration.update())
     },
   })
 }

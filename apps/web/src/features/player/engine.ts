@@ -31,6 +31,18 @@ export function setAccessRenewal(next: (force: boolean) => Promise<void>): void 
   renewal = next
 }
 
+/**
+ * Läuft gerade Ton – oder ist er gleich da?
+ *
+ * Fragt, ohne die Engine dafür erst anzulegen: Wer nur wissen will, ob er
+ * stören würde, soll dafür kein `<audio>`-Element erzeugen. Laden zählt mit –
+ * wer eben auf Abspielen getippt hat, wartet auf Ton.
+ */
+export function isAudioBusy(): boolean {
+  const state = engine?.snapshot()
+  return state !== undefined && (state.playing || state.loading)
+}
+
 export function getEngine(): AudioEngine {
   engine ??= createAudioEngine({
     element: getAudioElement(),

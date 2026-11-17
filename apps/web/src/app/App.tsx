@@ -23,7 +23,7 @@ import { Spinner } from '@/ui/Spinner'
 
 import { AppRoutes } from './AppRoutes'
 import { InstallButton } from './InstallButton'
-import { UpdateBar } from './UpdateBar'
+import { AutoUpdate } from './AutoUpdate'
 
 /**
  * Entscheidet anhand des Anmeldezustands, was überhaupt gezeigt wird.
@@ -98,7 +98,7 @@ export function App() {
         <div className="mx-auto w-full max-w-2xl px-4">
           <InstallButton />
         </div>
-        <UpdateBar />
+        <AutoUpdate />
       </BrowserRouter>
     </AuthProvider>
   )
